@@ -27,6 +27,8 @@ All notable changes to this project are documented here. The format follows
   in about half the time.
 
 ### Changed
+- When GitHub's request limit stops the update check, the status bar says so and tells how many
+  minutes to wait, instead of showing the raw API response.
 - Chart legends sit above the plot, outside the axes, so they never cover the data; the T-S
   diagram and the salinity profile were the worst affected.
 

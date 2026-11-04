@@ -14,12 +14,13 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from pathlib import Path
 from typing import Callable
 
 from . import __url__, __version__
 from .config import app_data_dir
-from .http import FetchError, Fetcher
+from .http import FetchError, Fetcher, RateLimited
 from .i18n import msg
 
 RELEASES_API = "https://api.github.com/repos/jongsu-king/SUYA/releases/latest"
@@ -60,8 +61,33 @@ def can_self_update(system: str = sys.platform, frozen: bool | None = None) -> b
     return (is_frozen() if frozen is None else frozen) and asset_name("0", system) is not None
 
 
+def rate_limit_message(reset: str | None = None, now: float | None = None) -> str:
+    """GitHub가 알려 준 한도 해제 시각(Unix 초)을 '몇 분 뒤'로 바꿔 안내문을 만듭니다."""
+    try:
+        remaining = int(reset) - (now if now is not None else time.time()) if reset else 0
+    except ValueError:
+        remaining = 0
+    if remaining > 0:
+        return msg("GitHub 요청 한도에 걸렸습니다. 약 {minutes}분 뒤에 다시 확인하세요", minutes=max(1, int((remaining + 59) // 60)))
+    return msg("GitHub 요청 한도에 걸렸습니다. 잠시 후 다시 확인하세요")
+
+
+def _rate_limited(response) -> bool:
+    return response.status_code == 403 and (
+        response.headers.get("x-ratelimit-remaining") == "0" or "rate limit" in response.text.lower()
+    )
+
+
 async def latest_release(fetcher: Fetcher, system: str = sys.platform, machine: str = platform.machine()) -> dict:
-    data = await fetcher.get_json(RELEASES_API, timeout=20.0, interactive=True)
+    try:
+        response = await fetcher.request("GET", RELEASES_API, timeout=20.0, interactive=True)
+    except RateLimited as exc:
+        raise FetchError(rate_limit_message()) from exc
+    if _rate_limited(response):
+        raise FetchError(rate_limit_message(response.headers.get("x-ratelimit-reset")))
+    if response.status_code >= 400:
+        raise FetchError(f"HTTP {response.status_code}")
+    data = response.json()
     tag = str(data.get("tag_name") or "")
     version = tag[1:] if tag.startswith("v") else tag
     assets = {item.get("name"): item for item in data.get("assets") or [] if item.get("name")}
