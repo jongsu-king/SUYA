@@ -39,7 +39,7 @@ async def _fetch_one(fetcher: Fetcher, key: str, period: int, lat: float, lon: f
     folder, letter, _ = FILES[key]
     url = f"{BASE}/{folder}/netcdf/decav/0.25/woa23_decav_{letter}{period:02d}_04.nc"
     params = {"var": f"{letter}_an", "latitude": lat, "longitude": lon, "accept": "csv"}
-    response = await fetcher.request("GET", url, params=params, timeout=60.0, interactive=True)  # 지점 조회 전용
+    response = await fetcher.request("GET", url, params=params, timeout=60.0, interactive=True)
     if response.status_code >= 400:
         raise FetchError(f"WOA HTTP {response.status_code}")
     return parse_csv_profile(response.text)

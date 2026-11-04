@@ -29,7 +29,6 @@ MAP_DEPTHS = (0, 100, 200, 500, 1000, 2000)
 LAT_ORIGIN, LAT_STEP = -80.0, 0.04
 LON_STEP = 0.08
 NLON = 4500
-# 지도용 격자: 약 0.48° 간격, 80°S–40°S
 MAP_LAT_LAST, MAP_LAT_STRIDE, MAP_LON_STRIDE = 1000, 12, 6
 
 
@@ -187,7 +186,6 @@ async def fetch_profile(fetcher: Fetcher, lat: float, lon: float) -> dict:
     now = utcnow()
 
     async def one(variable: str) -> dict:
-        # 사용자가 지점을 눌러 기다리는 요청이므로 격자 수집과 같은 줄에 서지 않습니다(interactive).
         hours, origin = await time_axis(fetcher, variable, interactive=True)
         time_index, valid = nearest_time(hours, origin, now)
         selector = f"{variable}%5B{time_index}%5D%5B0:1:39%5D%5B{li}%5D%5B{lj}%5D"

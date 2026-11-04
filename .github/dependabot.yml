@@ -1,6 +1,3 @@
-# Weekly dependency updates. Python packages are grouped into one pull request so the
-# test matrix runs once per week instead of once per package; GitHub Actions versions
-# used by ci.yml and release.yml are checked the same way.
 version: 2
 updates:
   - package-ecosystem: pip

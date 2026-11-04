@@ -57,7 +57,6 @@ async def _collect_once(sources: list[str] | None) -> int:
         if _print_state(store, name) in ("error", "rate_limited"):
             failures += 1
 
-    # 엑셀은 다른 수집이 끝난 뒤에 저장해야 방금 받은 값이 들어갑니다.
     collectors = [name for name in engine.sources if name != "excel"]
     await asyncio.gather(*(one(name) for name in collectors))
     if "excel" in engine.sources:
@@ -79,7 +78,7 @@ async def _daemon(sources: list[str] | None) -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, stop.set)
-        except NotImplementedError:  # Windows
+        except NotImplementedError:
             signal.signal(sig, lambda *_: stop.set())
 
     async def report() -> None:
@@ -160,9 +159,8 @@ def _self_test(args: argparse.Namespace) -> None:
         window.grab()
         lines.append("gui ok")
         lines.append(f"excel ok {excel.sync(backend.store, settings.excel_dir)['files']}")
-        window.close()  # closeEvent stops the backend thread and closes the database
+        window.close()
         app.processEvents()
-        # Qt 객체는 여기서 일부러 해제하지 않습니다. main()이 os._exit로 끝내므로 종료 시점의 소멸자 경쟁이 없습니다.
     lines.append(f"version {__version__}")
     text = "\n".join(lines) + "\n"
     if args.out:
@@ -243,7 +241,6 @@ def main(argv: list[str] | None = None) -> None:
     self_test = sub.add_parser("self-test", help="check that the installed program can start")
     self_test.add_argument("--out")
 
-    # macOS가 넘기는 -psn 인자처럼 모르는 인자는 무시합니다.
     args, _unknown = parser.parse_known_args(argv)
     command = args.command or "gui"
     _configure_logging(command)

@@ -13,7 +13,7 @@ class ParsedPoint:
     lat: float
     lon: float
     site: str
-    kind: str  # "marker": 사용자가 찍은 지점, "view": 지도 중심
+    kind: str
 
 
 def normalize_lon(lon: float) -> float:

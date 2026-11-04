@@ -23,7 +23,7 @@ HOST_LIMITS = {
     "api.windy.com": 2,
 }
 DEFAULT_HOST_LIMIT = 4
-INTERACTIVE_LIMIT = 2  # 화면에서 바로 요청한 것은 백그라운드 수집과 다른 줄에 서서 기다리지 않게 합니다
+INTERACTIVE_LIMIT = 2
 RETRYABLE_STATUS = {500, 502, 503, 504}
 
 

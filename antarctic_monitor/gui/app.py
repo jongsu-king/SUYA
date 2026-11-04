@@ -98,7 +98,6 @@ class MainWindow(QMainWindow):
         self.clock.start()
         self.backend.event.connect(self.on_event)
 
-    # ---- 메뉴 ----
     def _build_menu(self) -> None:
         bar = self.menuBar()
         file_menu = bar.addMenu(tr("파일"))
@@ -138,7 +137,6 @@ class MainWindow(QMainWindow):
         help_menu.addSeparator()
         help_menu.addAction(tr("프로그램 정보…"), lambda: AboutDialog(self).exec())
 
-    # ---- 화면 구성 ----
     def _build(self) -> None:
         self.cursor_label = QLabel()
         self.live_label = QLabel()
@@ -302,7 +300,6 @@ class MainWindow(QMainWindow):
         if geometry:
             self.restoreGeometry(geometry)
 
-    # ---- 시작과 갱신 ----
     def start(self) -> None:
         self._refresh_layers(then_render=True)
         self.refresh_overview()
@@ -416,7 +413,6 @@ class MainWindow(QMainWindow):
             if item and source["id"] not in running:
                 item.setText(countdown(source.get("next_run")))
 
-    # ---- 메뉴 동작 ----
     def collect_now(self) -> None:
         names = self.backend.trigger()
         self.statusBar().showMessage(tr("수집 꺼짐") if not names else f"{tr('지금 전체 수집')}: {len(names)}", 4000)
@@ -426,7 +422,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(tr("수집 꺼짐") if not names else f"{tr('수집')}: {source}", 4000)
 
     def save_excel_now(self) -> None:
-        self.backend.store.kv_set("excel:stamp", "")  # 변경 여부와 관계없이 다시 씁니다
+        self.backend.store.kv_set("excel:stamp", "")
         self.collect_source("excel")
 
     def _open_folder(self, path: Path) -> None:
@@ -457,7 +453,6 @@ class MainWindow(QMainWindow):
         self.relaunch = True
         self.close()
 
-    # ---- 레이어 ----
     def _layer_def(self) -> dict:
         return next(layer for layer in LAYERS if layer["id"] == self.layer_id)
 
@@ -524,7 +519,6 @@ class MainWindow(QMainWindow):
 
         self.backend.call_sync(self.backend.store.load_grid, grid_id, callback=done)
 
-    # ---- 지점 ----
     def submit_locator(self) -> None:
         text = self.locator.text().strip()
         if not text:
@@ -594,7 +588,6 @@ class MainWindow(QMainWindow):
             self.pages.setCurrentIndex(0)
             self.select_point(item["lat"], item["lon"], location_label(item))
 
-    # ---- 그리기 ----
     def _render_summary(self, overview: dict) -> None:
         stats, argo = overview["stats"], overview["argo"]
         for key, _, unit, digits in SUMMARY_ROWS:
@@ -729,7 +722,6 @@ class MainWindow(QMainWindow):
         while self.feed_list.count() > 300:
             self.feed_list.takeItem(self.feed_list.count() - 1)
 
-    # ---- 내보내기 ----
     def _save_path(self, default_name: str) -> Path | None:
         path, _ = QFileDialog.getSaveFileName(self, tr("CSV로 저장"), default_name, "CSV (*.csv)")
         return Path(path) if path else None

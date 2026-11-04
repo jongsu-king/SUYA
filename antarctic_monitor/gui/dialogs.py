@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from .. import AUTHORS, __concept_doi__, __doi__, __email__, __url__, __version__
+from .. import AUTHORS, __concept_doi__, __email__, __url__, __version__
 from ..catalog import KIND_LABEL, NOT_INCLUDED, ON_DEMAND_SOURCES, SOURCES
 from ..config import Settings
 from ..i18n import get_language, tr
@@ -140,10 +140,9 @@ class AboutDialog(QDialog):
             f"{tr('문의')}: <a href=\"mailto:{__email__}\">{__email__}</a><br>"
             f"{tr('라이선스')}: {tr('MIT 라이선스')}<br>"
             f'<a href="{__url__}">{__url__}</a><br>'
-            f'DOI: <a href="https://doi.org/{__doi__}">{__doi__}</a> · {tr("모든 버전")}: '
-            f'<a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a><br>'
+            f'DOI: <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a> ({tr("모든 버전")})<br>'
             f"{tr('인용')}: Lim, J. &amp; Park, S. (2026). <i>SUYA: Antarctic ocean temperature, salinity and air "
-            f"temperature monitor</i> ({__version__}). Zenodo. https://doi.org/{__doi__}<br><br>"
+            f"temperature monitor</i> ({__version__}). Zenodo. https://doi.org/{__concept_doi__}<br><br>"
             f"{tr('자료 출처')}: NOAA (GFS, OISST, METAR, WOA23), NASA JPL (MUR, SMAP), ESA (SMOS), "
             "US Navy / HYCOM.org, Argo Program (Ifremer), GOSUD, ECMWF ERA5, Open-Meteo (CC BY 4.0), "
             "Natural Earth, cmocean."

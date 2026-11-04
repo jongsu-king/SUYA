@@ -165,9 +165,6 @@ async def fetch_levels(
     url = _query(LEVEL_COLUMNS, f'platform_number="{platform}"', f"cycle_number={cycle}")
     response = await fetcher.request("GET", url, timeout=120.0, interactive=interactive)
     if response.status_code == 404:
-        # 갓 추가된 프로파일은 ERDDAP의 파일별 색인(사이클 최댓값)이 아직 옛 값이라 정확한 사이클 질의가
-        # 빈 결과(404)로 끝나는 일이 있습니다(2026-11-04, 5905620/35). 바로 앞 사이클부터 범위로 물으면
-        # 파일을 열어 주므로, 받아서 그 사이클 행만 골라 씁니다.
         url = _query(LEVEL_COLUMNS, f'platform_number="{platform}"', f"cycle_number>={max(cycle - 1, 0)}")
         response = await fetcher.request("GET", url, timeout=120.0, interactive=interactive)
         if response.status_code == 404:
@@ -187,7 +184,7 @@ async def collect(ctx: Context) -> CollectResult:
         try:
             levels, _ = await fetch_levels(ctx.fetcher, item["platform"], item["cycle"], item["lat"])
         except NoData:
-            levels = []  # 서버에 층별 값이 없는 프로파일은 빈 값으로 적어 두고 매 주기 다시 묻지 않습니다
+            levels = []
         ctx.store.save_argo_levels(item["platform"], item["cycle"], levels)
         return "ok" if levels else "empty"
 

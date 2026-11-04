@@ -20,7 +20,6 @@ from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, Rate
 from antarctic_monitor.i18n import render
 
 
-# ---- 사용자가 준 두 링크 ----
 def test_parse_nullschool_link_from_request():
     point = parse_location_url(
         "https://earth.nullschool.net/ko/#current/wind/surface/level/orthographic=-196.44,-86.24,479/loc=152.723,-80.012"
@@ -54,7 +53,6 @@ def test_longitude_normalization_and_distance():
     assert haversine_km(-90, 0, -80, 0) == pytest.approx(1112, abs=2)
 
 
-# ---- 해수 물성: UNESCO 1983 검증값 ----
 def test_freezing_point_check_value():
     assert seawater.freezing_point_c(40.0, 500.0) == pytest.approx(-2.588567, abs=1e-5)
 
@@ -77,7 +75,6 @@ def test_derive_handles_missing_values():
     assert seawater.derive(-1.0, 34.0)["above_freezing_c"] == pytest.approx(0.87, abs=0.01)
 
 
-# ---- 격자 ----
 def _grid():
     triples = [
         (-70.0, -10.0, 1.0), (-70.0, 10.0, 3.0), (-70.0, 170.0, None),
@@ -88,9 +85,9 @@ def _grid():
 
 def test_grid_stats_only_counts_south_of_60():
     stats = grid_stats(_grid())
-    assert stats["mean"] == 2.0  # 50°S의 100은 제외
+    assert stats["mean"] == 2.0
     assert stats["coverage"] == pytest.approx(2 / 3, abs=0.001)
-    assert stats["sectors"]["weddell"]["mean"] == 2.0  # -10, 10 모두 웨델해 섹터
+    assert stats["sectors"]["weddell"]["mean"] == 2.0
     assert stats["sectors"]["ross"]["mean"] is None
 
 
@@ -102,7 +99,7 @@ def test_grid_normalizes_0_360_longitudes():
 
 def test_sample_and_nearest_for_land_points():
     grid = grid_from_triples("t", "x", "°C", [(-70.0, 170.0, None), (-70.0, 160.0, 7.0), (-50.0, 170.0, 100.0)])
-    assert sample_nearest(grid, -70.0, 171.0) is None  # 육지 격자
+    assert sample_nearest(grid, -70.0, 171.0) is None
     nearest = find_nearest_valid(grid, -70.0, 171.0)
     assert nearest["value"] == 7.0
     assert 400 < nearest["distance_km"] < 430
@@ -113,7 +110,6 @@ def test_find_nearest_returns_none_when_all_missing():
     assert find_nearest_valid(grid, -70.0, 0.0) is None
 
 
-# ---- 저장소 ----
 @pytest.fixture
 def store(tmp_path):
     instance = Store(tmp_path / "test.db")
@@ -158,7 +154,7 @@ def test_argo_levels_survive_relisting_but_reset_when_mode_changes(store):
     assert store.argo_count_missing() == 0
     store.upsert_argo_listing([listing])
     assert store.argo_count_missing() == 0
-    store.upsert_argo_listing([listing | {"data_mode": "D"}])  # 지연 보정이 나오면 다시 받습니다
+    store.upsert_argo_listing([listing | {"data_mode": "D"}])
     assert store.argo_count_missing() == 1
 
 
@@ -172,7 +168,6 @@ def test_prune_removes_only_old_forecasts(store):
     assert [r["source"] for r in store.query_measurements()] == ["o"]
 
 
-# ---- 호출 예산 ----
 def _ctx(store, **settings):
     return Context(store, Fetcher(), Settings(**settings))
 
@@ -191,7 +186,6 @@ def test_budget_reserve_protects_priority_jobs(store):
     consume_budget(ctx, 70, reserve=0.3)
 
 
-# ---- HTTP 재시도 ----
 async def test_fetcher_retries_then_succeeds():
     calls = {"count": 0}
 
@@ -213,7 +207,6 @@ async def test_fetcher_gives_up_after_retries():
 
 
 async def test_interactive_requests_do_not_queue_behind_collection():
-    # 수집 작업이 호스트의 자리를 다 차지한 동안에도 화면에서 누른 요청은 바로 나갑니다.
     fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="ok"))), backoff=0.0)
     background = fetcher._semaphore("https://x.test/a")
     for _ in range(DEFAULT_HOST_LIMIT):
@@ -224,7 +217,6 @@ async def test_interactive_requests_do_not_queue_behind_collection():
     await fetcher.aclose()
 
 
-# ---- 지점 조회: 답 없는 소스는 기다리지 않고, 불완전한 결과는 오래 두지 않습니다 ----
 async def test_point_lookup_guard_reports_timeout():
     errors: list[dict] = []
     assert await pointquery._guard("HYCOM", asyncio.sleep(5), errors, timeout=0.05) is None
@@ -243,7 +235,7 @@ async def test_point_cache_keeps_partial_results_only_briefly():
     await cache.get(("p",), 10800.0, partial)
     await cache.get(("c",), 10800.0, complete)
     now = time.monotonic()
-    assert cache._values[("p",)][0] - now <= pointquery.PARTIAL_TTL + 1  # +1: 시계 해상도와 부동소수 오차
+    assert cache._values[("p",)][0] - now <= pointquery.PARTIAL_TTL + 1
     assert cache._values[("c",)][0] - now > pointquery.PARTIAL_TTL + 1
 
 
@@ -261,7 +253,6 @@ async def test_fetcher_does_not_retry_rate_limit():
     await fetcher.aclose()
 
 
-# ---- Windy 어댑터 ----
 async def test_windy_disabled_without_key(store):
     ctx = _ctx(store)
     result = await windy.collect(ctx)
@@ -295,7 +286,6 @@ async def test_windy_rejected_key_surfaces_error(store):
     await fetcher.aclose()
 
 
-# ---- 실시간 엔진 ----
 def _engine(store, monkeypatch, job, interval=100):
     monkeypatch.setitem(JOBS, "fake", job)
     settings = Settings(intervals={"fake": interval})
@@ -332,7 +322,7 @@ async def test_engine_failure_keeps_old_data_time_and_backs_off(store, monkeypat
     state = store.source_states()["fake"]
     assert state["last_status"] == "error"
     assert "서버 고장" in state["last_message"]
-    assert state["data_time"] == "2026-11-04T00:00:00Z"  # 실패해도 마지막 데이터 시각은 유지
+    assert state["data_time"] == "2026-11-04T00:00:00Z"
     assert state["last_success"] is not None
     assert delay < 3600
     await engine.ctx.fetcher.aclose()
@@ -385,7 +375,7 @@ async def test_engine_resumes_from_saved_schedule(store, monkeypatch):
     engine, _ = _engine(store, monkeypatch, job, interval=3600)
     await engine.run_once("fake")
     assert runs["count"] == 1
-    engine.start()  # 저장된 next_run이 미래이므로 재시작 직후 다시 돌지 않습니다
+    engine.start()
     await asyncio.sleep(0.1)
     assert runs["count"] == 1
     await engine.stop()
@@ -405,7 +395,6 @@ async def test_bus_drops_oldest_for_slow_subscriber():
     await stream.aclose()
 
 
-# ---- 설정 ----
 def test_dotenv_parser(tmp_path):
     path = tmp_path / ".env"
     path.write_text("# 주석\nA=1\nB = 'two'\n\nnot a line\n", encoding="utf-8")

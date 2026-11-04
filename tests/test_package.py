@@ -1,5 +1,6 @@
 """패키지 메타데이터와 동봉 문서가 서로 맞는지 확인합니다."""
 
+import os
 from pathlib import Path
 
 import antarctic_monitor
@@ -29,7 +30,7 @@ def test_copyright_holders_everywhere():
     assert "0009-0000-3395-1484" in authors_md and "0009-0000-3395-1484" in help_text.HELP_EN
     assert "HMOL" in help_text.HELP_EN and "CELLMATE" in help_text.HELP_EN
     assert "Incheon National University" in help_text.HELP_EN and "인천대학교" in help_text.HELP_KO
-    lowercase_name = "j" + "ongsu Lim"  # 이름 표기는 Jongsu Lim으로 통일 (소문자 표기가 남지 않게)
+    lowercase_name = "j" + "ongsu Lim"
     for name in ("README.md", "README.ko.md", "LICENSE", "AUTHORS.md", "pyproject.toml"):
         assert lowercase_name not in (ROOT / name).read_text(encoding="utf-8"), name
 
@@ -59,14 +60,14 @@ def test_citation_metadata_lists_both_authors():
         assert f"family-names: {family}" in cff and f"given-names: {given}" in cff
         assert author["email"] in cff
     assert "0009-0000-3395-1484" in cff and "date-released: " in cff and "license: MIT" in cff
-    version_doi, concept_doi = antarctic_monitor.__doi__, antarctic_monitor.__concept_doi__
-    assert (version_doi, concept_doi) == ("10.5281/zenodo.23937853", "10.5281/zenodo.23937852")
-    assert f"doi: {version_doi}\n" in cff and f"value: {concept_doi}\n" in cff
+    concept_doi = antarctic_monitor.__concept_doi__
+    assert concept_doi == "10.5281/zenodo.23937852"
+    assert f"doi: {concept_doi}\n" in cff and f"value: {concept_doi}\n" in cff
+    assert "value: 10.5281/zenodo.23937853\n" in cff
     for name in ("README.md", "README.ko.md", "AUTHORS.md", "CHANGELOG.md"):
-        text = (ROOT / name).read_text(encoding="utf-8")
-        assert version_doi in text and concept_doi in text, name
-    for html in (help_text.HELP_KO, help_text.HELP_EN):  # 프로그램 안 도움말에도 같은 DOI
-        assert version_doi in html and concept_doi in html
+        assert concept_doi in (ROOT / name).read_text(encoding="utf-8"), name
+    for html in (help_text.HELP_KO, help_text.HELP_EN):
+        assert concept_doi in html
 
     zenodo = json.loads((ROOT / ".zenodo.json").read_text(encoding="utf-8"))
     assert [c["name"] for c in zenodo["creators"]] == ["Lim, Jongsu", "Park, Suyeon"]
@@ -75,3 +76,12 @@ def test_citation_metadata_lists_both_authors():
     assert zenodo["upload_type"] == "software" and zenodo["license"].lower() == "mit"
     for name in ("CITATION.cff", ".zenodo.json"):
         assert "Academy-ro" not in (ROOT / name).read_text(encoding="utf-8"), name
+
+
+def test_frozen_build_keeps_the_matplotlib_cache(tmp_path, monkeypatch):
+    from antarctic_monitor.config import use_persistent_matplotlib_cache
+
+    monkeypatch.delenv("MPLCONFIGDIR", raising=False)
+    directory = use_persistent_matplotlib_cache(tmp_path)
+    assert directory == tmp_path / "matplotlib" and directory.is_dir()
+    assert os.environ["MPLCONFIGDIR"] == str(directory)

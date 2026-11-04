@@ -22,9 +22,9 @@ class CollectResult:
     rows: int = 0
     data_time: str | None = None
     message: str = ""
-    unchanged: bool = False  # 원천 데이터가 이전과 같아 저장할 것이 없음
-    backlog: bool = False  # 처리할 분량이 남아 곧바로 다시 실행해야 함
-    disabled: bool = False  # 설정이 없어 실행하지 않음
+    unchanged: bool = False
+    backlog: bool = False
+    disabled: bool = False
 
 
 def to_iso_utc(text: str) -> str:

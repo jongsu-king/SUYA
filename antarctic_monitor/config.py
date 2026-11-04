@@ -42,6 +42,20 @@ def default_excel_dir() -> Path:
     return Path.home() / "Documents" / APP_FOLDER
 
 
+def use_persistent_matplotlib_cache(base: Path | None = None) -> Path | None:
+    """설치판에서 matplotlib 글꼴 캐시를 사용자 데이터 폴더에 두어 실행할 때마다 다시 만들지 않게 합니다.
+
+    matplotlib를 import하기 전에 불러야 합니다.
+    """
+    directory = (base or app_data_dir()) / "matplotlib"
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return None
+    os.environ["MPLCONFIGDIR"] = str(directory)
+    return directory
+
+
 def load_dotenv(path: Path) -> dict[str, str]:
     """KEY=VALUE 형식만 읽는 최소 파서."""
     values: dict[str, str] = {}

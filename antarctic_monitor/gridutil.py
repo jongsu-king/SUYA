@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 
 from .geo import haversine_km, normalize_lon
 
-# Parkinson & Cavalieri 의 남극 해빙 섹터 구분
 SECTORS: tuple[tuple[str, str, float, float], ...] = (
     ("weddell", "웨델해", -60.0, 20.0),
     ("indian", "인도양", 20.0, 90.0),
@@ -24,9 +23,9 @@ class Grid:
     layer: str
     valid_time: str
     unit: str
-    lats: list[float]  # 오름차순
-    lons: list[float]  # 오름차순, [-180, 180)
-    values: list[float | None]  # lat 우선 행렬을 펼친 값
+    lats: list[float]
+    lons: list[float]
+    values: list[float | None]
     meta: dict = field(default_factory=dict)
 
     def at(self, i: int, j: int) -> float | None:
@@ -118,7 +117,7 @@ def find_nearest_valid(grid: Grid, lat: float, lon: float, max_km: float = 2000.
 def _in_sector(lon: float, west: float, east: float) -> bool:
     if west < east:
         return west <= lon < east
-    return lon >= west or lon < east  # 날짜변경선을 넘는 섹터
+    return lon >= west or lon < east
 
 
 def _percentile(sorted_values: list[float], fraction: float) -> float:

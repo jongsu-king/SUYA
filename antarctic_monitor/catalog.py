@@ -79,7 +79,6 @@ SOURCES: list[dict] = [
     },
 ]
 
-# 수집이 아니라 저장을 맡는 작업. 상태 표에는 함께 보여 줍니다.
 OUTPUT_JOBS: list[dict] = [{"id": "excel", "name": "엑셀 DB 저장"}]
 
 ON_DEMAND_SOURCES: list[dict] = [

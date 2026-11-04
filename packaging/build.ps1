@@ -1,5 +1,3 @@
-# Build the Windows installer. Needs Python with the project installed, PyInstaller, and Inno Setup 6.
-# Run from the repository root:  powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 $ErrorActionPreference = "Stop"
 Set-Location (Join-Path $PSScriptRoot "..")
 

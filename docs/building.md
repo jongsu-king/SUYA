@@ -66,8 +66,9 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 
 ## GitHub Actions 릴리스 / Releasing
 
-1. `antarctic_monitor/__init__.py`, `pyproject.toml`, `packaging/antarctic_monitor.spec`(Info.plist)의 버전을 올리고 `CHANGELOG.md`에 항목을 적습니다.
-   `tests/test_package.py`가 세 곳이 맞는지 확인합니다.
+1. 버전을 올립니다: `antarctic_monitor/__init__.py`, `pyproject.toml`, `packaging/windows/installer.iss`(기본값), `CITATION.cff`(`version`, `date-released`),
+   두 README의 내려받기 표·단추 파일 이름과 인용 문구, `AUTHORS.md`. `CHANGELOG.md`에 항목을 적습니다. `tests/test_package.py`가 버전과 DOI가 맞는지 확인합니다.
+   DOI는 개념 DOI(모든 버전)를 그대로 두고, 릴리스가 Zenodo에 보관된 뒤 새 버전 DOI를 `CITATION.cff`의 `identifiers`와 README 표에 추가합니다.
 2. 커밋하고 태그를 밉니다:
    ```bash
    git tag -a v0.2.0 -m "SUYA 0.2.0"

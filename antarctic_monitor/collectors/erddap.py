@@ -21,7 +21,7 @@ GRID_TIMEOUT = 240.0
 @dataclass(frozen=True)
 class LayerSpec:
     layer: str
-    variable: str  # measurements.variable
+    variable: str
     unit: str
     low: float
     high: float
@@ -33,7 +33,7 @@ class GriddedProduct:
     base: str
     dataset: str
     kind: str
-    z: str  # 고도·수심 차원 선택. 없으면 빈 문자열
+    z: str
     lat_range: tuple[float, float]
     lon_range: tuple[float, float]
     stride: int
@@ -55,7 +55,6 @@ OISST = GriddedProduct(
         "ice": LayerSpec("oisst_ice", "sea_ice_fraction", "fraction", 0.0, 1.0),
     },
 )
-# 남극해에서 관측 가능한 염분을 크게 벗어나는 위성값(해빙 오염 등)은 저장하지 않습니다.
 SSS_VALID = (28.0, 37.0)
 SMOS = GriddedProduct(
     source="smos",

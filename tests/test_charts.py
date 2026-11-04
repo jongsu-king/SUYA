@@ -22,7 +22,6 @@ def _dots(chart: Chart):
 
 
 def test_single_sample_is_drawn_as_a_dot(app):
-    # 수집을 막 시작한 날: 값이 하나뿐이면 선은 생길 수 없으므로 점과 안내문이 있어야 합니다.
     chart = Chart(height=120)
     now = datetime.now(timezone.utc)
     chart.line("t", [{"name": "SST", "color": "#123456", "times": [now], "values": [1.5]}], unit="°C")
@@ -36,11 +35,11 @@ def test_isolated_points_between_gaps_get_dots(app):
     chart = Chart(height=120)
     start = datetime(2026, 11, 1, tzinfo=timezone.utc)
     times = [start + timedelta(days=i) for i in range(6)]
-    values = [1.0, None, 2.0, None, 3.0, 3.5]  # 1.0과 2.0은 결측 사이에 홀로, 3.0-3.5는 선으로 이어짐
+    values = [1.0, None, 2.0, None, 3.0, 3.5]
     chart.line("t", [{"name": "x", "color": "#123456", "times": times, "values": values}])
     dots = _dots(chart)
     assert len(dots) == 1 and sorted(dots[0].get_ydata()) == [1.0, 2.0]
-    assert not chart.figure.axes[0].texts  # 표본이 넉넉하면 안내문은 없습니다
+    assert not chart.figure.axes[0].texts
 
 
 def test_all_missing_shows_message(app):

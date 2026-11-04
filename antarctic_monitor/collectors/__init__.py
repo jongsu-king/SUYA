@@ -11,7 +11,6 @@ Job = Callable[[Context], Awaitable[CollectResult]]
 
 
 async def _excel(ctx: Context) -> CollectResult:
-    # excel 모듈이 collectors를 쓰므로 순환 import를 피해 여기서 불러옵니다.
     from .. import excel
 
     return await excel.collect(ctx)

@@ -38,7 +38,6 @@ MODELS = {
     "gem_global": "GEM",
     "jma_gsm": "JMA GSM",
 }
-# 지도용 기온 격자: 2.5° x 10°, 87.5°S–50°S + 남극점
 GRID_LATS = [-87.5 + 2.5 * i for i in range(16)]
 GRID_LONS = [-180.0 + 10.0 * i for i in range(36)]
 GRID_CHUNK = 100
@@ -242,7 +241,7 @@ async def collect_gfs_grid(ctx: Context) -> CollectResult:
             if current.get("time"):
                 valid_time = to_iso_utc(current["time"])
             value = finite(current.get("temperature_2m"))
-            if point[0] == -90.0:  # 남극점은 모든 경도에서 같은 값
+            if point[0] == -90.0:
                 triples.extend((-90.0, lon, value) for lon in GRID_LONS)
             else:
                 triples.append((point[0], point[1], value))

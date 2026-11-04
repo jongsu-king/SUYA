@@ -1,6 +1,5 @@
 name: Release installers
 
-# Push a tag like v0.1.0 to build installers for every OS and attach them to the GitHub Release.
 on:
   push:
     tags: ["v*"]
@@ -68,7 +67,6 @@ jobs:
           merge-multiple: true
       - name: Checksums
         run: cd artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
-      # 릴리스 노트는 손으로 쓴 것을 유지합니다. 이 단계는 파일만 첨부합니다.
       - uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*

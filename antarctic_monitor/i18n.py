@@ -19,7 +19,6 @@ _SEP = "\x1e"
 _language = "ko"
 
 EN: dict[str, str] = {
-    # 수집 메시지
     "해당 조건의 데이터가 없습니다": "No data for this query",
     "원천 갱신 없음": "No new source data",
     "{layer} 유효 {pct}%": "{layer} valid {pct}%",
@@ -53,7 +52,6 @@ EN: dict[str, str] = {
     "새 자료 없음": "No new data",
     "엑셀 저장 프로세스 종료 코드 {code}": "Excel writer exit code {code}",
     "실시간 수집 시작": "Collecting continuously",
-    # 지점 조회
     "OISST 편차": "OISST anomaly",
     "1971–2000 대비": "vs 1971–2000",
     "OISST 해빙": "OISST sea ice",
@@ -67,27 +65,23 @@ EN: dict[str, str] = {
     "플로트 {platform}, {km} km": "float {platform}, {km} km",
     "Argo 현장 관측": "Argo in situ",
     "선박 {ship}": "ship {ship}",
-    # 좌표 입력
     "좌표가 숫자가 아닙니다": "Coordinates are not numbers",
     "위도 범위를 벗어났습니다: {lat}": "Latitude out of range: {lat}",
     "nullschool 링크에서 좌표를 찾지 못했습니다": "No coordinates found in the nullschool link",
     "Windy 링크에서 좌표를 찾지 못했습니다": "No coordinates found in the Windy link",
     "nullschool 또는 Windy 링크만 해석할 수 있습니다": "Only nullschool and Windy links can be read",
     "아직 수집되지 않은 레이어입니다: {layer}": "Layer not collected yet: {layer}",
-    # 해역
     "웨델해": "Weddell Sea",
     "인도양": "Indian Ocean",
     "서태평양": "Western Pacific",
     "로스해": "Ross Sea",
     "아문젠·벨링스하우젠해": "Amundsen-Bellingshausen Seas",
-    # 데이터 종류
     "현장 관측": "In situ",
     "위성": "Satellite",
     "분석": "Analysis",
     "모델": "Model",
     "예보": "Forecast",
     "기후값": "Climatology",
-    # 소스
     "METAR 기지 관측": "METAR station observations",
     "기온, 이슬점, 기압": "Air temperature, dew point, pressure",
     "기지별 약 1시간": "About hourly per station",
@@ -145,13 +139,11 @@ EN: dict[str, str] = {
     "계정 로그인 필요": "Requires an account login",
     "MEOP 해양 포유류 CTD": "MEOP marine mammal CTD",
     "실시간 API 없음": "No real-time API",
-    # 레이어
     "SST 편차 · OISST": "SST anomaly · OISST",
     "수온 · HYCOM": "Temperature · HYCOM",
     "염분 · HYCOM": "Salinity · HYCOM",
     "해빙 농도 · OISST": "Sea ice · OISST",
     "기온 2 m · GFS": "Air temperature 2 m · GFS",
-    # 표 머리글, 엑셀
     "수온": "Temperature",
     "염분": "Salinity",
     "수온 편차": "SST anomaly",
@@ -217,7 +209,6 @@ EN: dict[str, str] = {
     "층": "Level",
     "키 구분": "Key type",
     "압력 dbar": "Pressure dbar",
-    # 상태
     "정상": "OK",
     "갱신 없음": "Unchanged",
     "오류": "Error",
@@ -229,7 +220,6 @@ EN: dict[str, str] = {
     "{n}분": "{n} min",
     "{n}시간": "{n} h",
     "{n}일": "{n} d",
-    # 차트, 패널
     "처음 범위": "Reset view",
     "이전": "Back",
     "다음": "Forward",
@@ -290,7 +280,6 @@ EN: dict[str, str] = {
     "해빙 없음": "No sea ice",
     "기온, ERA5 일평균·최저·최고": "Air temperature, ERA5 daily mean, min and max",
     "일평균": "Daily mean",
-    # 대화상자
     "설정": "Settings",
     "testing (무료, 변형된 값)": "testing (free, altered values)",
     "professional (유료)": "professional (paid)",
@@ -308,7 +297,6 @@ EN: dict[str, str] = {
     "남극해 수온·염분 모니터": "Antarctic Ocean Monitor",
     "MIT 라이선스": "MIT License",
     "자료 출처": "Data sources",
-    # 메인 창
     "파일": "File",
     "설정…": "Settings…",
     "엑셀 DB 지금 저장": "Save Excel database now",

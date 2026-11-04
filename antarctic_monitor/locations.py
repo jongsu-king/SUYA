@@ -14,7 +14,7 @@ class Location:
     name_en: str
     lat: float
     lon: float
-    group: str  # link | station | ocean
+    group: str
 
     def as_dict(self) -> dict:
         return asdict(self)

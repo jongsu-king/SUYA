@@ -21,8 +21,8 @@ log = logging.getLogger(__name__)
 
 
 class Backend(QObject):
-    event = Signal(dict)  # 수집 엔진의 진행 상황
-    finished = Signal(int, object, object)  # 요청 번호, 결과, 오류
+    event = Signal(dict)
+    finished = Signal(int, object, object)
 
     def __init__(self, settings: Settings, collect: bool = True, sources: list[str] | None = None, parent=None):
         super().__init__(parent)
@@ -75,7 +75,6 @@ class Backend(QObject):
             if event is not None:
                 self.event.emit(event)
 
-    # ---- 요청 ----
     def call(self, factory: Callable[[], Awaitable[Any]], callback: Callable[[Any, Exception | None], None]) -> int:
         """코루틴을 엔진 스레드에서 실행하고, 결과를 화면 스레드의 callback으로 돌려줍니다."""
         request_id = next(self._ids)
@@ -84,7 +83,7 @@ class Backend(QObject):
         async def runner() -> None:
             try:
                 result = await factory()
-            except Exception as exc:  # 화면에 그대로 알립니다
+            except Exception as exc:
                 log.warning("요청 실패: %s", exc)
                 self.finished.emit(request_id, None, exc)
             else:

@@ -9,7 +9,6 @@ from antarctic_monitor.collectors.base import to_iso_utc
 from antarctic_monitor.locations import LOCATIONS
 
 
-# ---- Argo 품질 관리 ----
 ARGO_HEADER = (
     "direction,data_mode,pres,pres_qc,temp,temp_qc,psal,psal_qc,"
     "pres_adjusted,pres_adjusted_qc,temp_adjusted,temp_adjusted_qc,psal_adjusted,psal_adjusted_qc\n"
@@ -18,7 +17,6 @@ ARGO_HEADER = (
 
 
 def test_argo_drops_bad_salinity_flagged_4():
-    # 플로트 1902223 이 실제로 보낸 값: psal 0.014 (플래그 4), 보정값 -0.019 (플래그 4)
     text = ARGO_HEADER + 'A,A,1.04,1,-0.565,1,0.014,4,1.04,1,-0.565,1,-0.019,4\n'
     levels, dropped = argo.parse_levels(text, -61.66)
     assert levels[0]["temp"] == -0.565
@@ -50,7 +48,6 @@ def test_argo_levels_keep_only_the_requested_cycle():
 
 
 async def test_argo_fetch_levels_falls_back_to_a_cycle_range():
-    # 2026-11-04 플로트 5905620 #35: 정확한 사이클 질의는 404, 바로 앞 사이클부터의 범위 질의는 두 사이클을 돌려줬습니다.
     from urllib.parse import unquote
 
     import httpx
@@ -105,9 +102,7 @@ def test_argo_listing_parses_coordinates_and_mode():
     assert row["position_qc"] == "8"
 
 
-# ---- GOSUD ----
 def test_gosud_drops_flag_4():
-    # 실제 응답에 남위 59도 26°C(플래그 4)가 있었습니다
     text = (
         "ship_call_sign,time,latitude,longitude,SSTP,SSTP_QC,SSPS,SSPS_QC\n,UTC,,,,,,\n"
         "9V5255,2026-06-19T05:00:00Z,-59.3,20.8,26,4,NaN,0\n"
@@ -119,7 +114,6 @@ def test_gosud_drops_flag_4():
     }
 
 
-# ---- HYCOM ----
 HYCOM_ASCII = """Dataset {
     Grid {
      ARRAY:
@@ -150,7 +144,7 @@ water_temp.lon[3]
 def test_hycom_ascii_parser_reads_values_and_axes():
     parsed = hycom.parse_opendap_ascii(HYCOM_ASCII)
     assert parsed["values"][0] == pytest.approx(-0.05600095)
-    assert parsed["values"][2] is None  # NaN은 육지
+    assert parsed["values"][2] is None
     assert len(parsed["values"]) == 9
     assert parsed["maps"]["lat"] == [-65.0, -63.0, -61.0]
     assert parsed["maps"]["lon"] == [240.0, 288.0, 336.0]
@@ -173,13 +167,11 @@ def test_hycom_time_origin_and_nearest():
 
 def test_hycom_indices():
     assert hycom.lat_index(-65.0) == 375
-    assert hycom.lon_index(-60.0) == 3750  # 300°E
+    assert hycom.lon_index(-60.0) == 3750
     assert hycom.lon_index(0.0) == 0
 
 
-# ---- ERDDAP ----
 def test_satellite_salinity_rejects_impossible_values():
-    # SMAP 응답에 실제로 0.00과 42.83이 있었습니다
     rows = [
         {"latitude": -60.0, "longitude": 0.0, "sss": 0.0},
         {"latitude": -60.0, "longitude": 1.0, "sss": 42.83},
@@ -203,9 +195,7 @@ def test_griddap_url_encodes_brackets():
     assert url == "https://x/erddap/griddap/ds.json?time%5B(last)%5D"
 
 
-# ---- Open-Meteo ----
 def test_marine_flags_land_cell():
-    # 해발 1023 m 격자에서도 -1.8이 내려옵니다. 수온으로 쓰면 안 됩니다.
     payload = {"elevation": 1023.0, "current": {"time": "2026-11-04T02:15", "sea_surface_temperature": -1.8}}
     assert openmeteo.marine_value(payload) == (-1.8, "2026-11-04T02:15:00Z", True)
     ocean = {"elevation": 0.0, "current": {"time": "2026-11-04T02:15", "sea_surface_temperature": -1.7}}
@@ -230,16 +220,13 @@ def test_hourly_models_skip_missing_values():
     assert rows[0].dataset == "gfs_global"
 
 
-# ---- METAR ----
 def test_metar_keeps_station_without_dewpoint():
-    # 남극점은 이슬점이 자주 비어 있습니다
     payload = [{"icaoId": "NZSP", "obsTime": 1793757000, "temp": -46, "dewp": None, "lat": -89.98, "lon": 180, "altim": 690.0, "name": "Amundsen-South Pole, NZ, AQ"}]
     rows = metar.parse_reports(payload)
     assert {r.variable for r in rows} == {"air_temperature", "surface_pressure"}
     assert rows[0].location_id == "metar:NZSP"
 
 
-# ---- WOA ----
 def test_woa_csv_and_deep_fill():
     text = (
         'time,alt[unit="meters"],station,latitude[unit="degrees_north"],longitude[unit="degrees_east"],s_an[unit="1"]\n'
@@ -250,7 +237,6 @@ def test_woa_csv_and_deep_fill():
     assert woa._merge({0.0: 1.0, 1500.0: 2.0}, {0.0: 9.0, 2000.0: 3.0}) == {0.0: 1.0, 1500.0: 2.0, 2000.0: 3.0}
 
 
-# ---- Windy ----
 def test_windy_converts_kelvin_and_pascal():
     payload = {
         "ts": [1793757000000, 1793767800000],

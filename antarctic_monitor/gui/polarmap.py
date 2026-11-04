@@ -78,7 +78,7 @@ def sample_grid(prepared: dict, lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
 
 
 class PolarMapWidget(QWidget):
-    pointSelected = Signal(float, float, object)  # 위도, 경도, 이름(없으면 None)
+    pointSelected = Signal(float, float, object)
     cursorText = Signal(str)
 
     def __init__(self, parent=None):
@@ -114,7 +114,6 @@ class PolarMapWidget(QWidget):
         data = json.loads(LAND_FILE.read_text(encoding="utf-8"))
         return [np.array(ring, dtype=float) for polygon in data["coordinates"] for ring in polygon]
 
-    # ---- 투영 ----
     def _center(self) -> tuple[float, float]:
         return self.width() / 2.0 + self.offset.x(), self.height() / 2.0 + self.offset.y()
 
@@ -144,7 +143,6 @@ class PolarMapWidget(QWidget):
         cx, cy = self._center()
         return math.hypot(x - cx, y - cy) <= self.rim_radius()
 
-    # ---- 데이터 ----
     def set_theme(self, theme: Theme) -> None:
         self.theme = theme
         self._invalidate()
@@ -183,7 +181,6 @@ class PolarMapWidget(QWidget):
         self._invalidate()
         super().resizeEvent(event)
 
-    # ---- 그리기 ----
     def _render_raster(self) -> QImage | None:
         if not self.prepared or not self.scale:
             return None
@@ -314,7 +311,6 @@ class PolarMapWidget(QWidget):
             painter.drawText(box, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, self.empty_text)
         painter.end()
 
-    # ---- 입력 ----
     def _nearest_marker(self, x: float, y: float) -> tuple[str, dict] | None:
         best, best_distance = None, HIT_RADIUS
         if self.show_locations:
@@ -404,7 +400,6 @@ class PolarMapWidget(QWidget):
         applied = new_zoom / self.zoom
         position = event.position()
         cx, cy = self._center()
-        # 커서 아래 지점이 제자리에 있도록 중심을 옮깁니다.
         self.offset += QPointF((position.x() - cx) * (1 - applied), (position.y() - cy) * (1 - applied))
         self.zoom = new_zoom
         if self.zoom == 1.0:

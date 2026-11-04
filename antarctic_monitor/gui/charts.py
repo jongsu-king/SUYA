@@ -113,6 +113,11 @@ class Chart(QWidget):
         self.figure.set_facecolor(theme.surface)
         self.canvas.draw_idle()
 
+    def sizeHint(self) -> QSize:
+        """선호 높이를 최소 높이로 둡니다. 캔버스의 선호 크기는 현재 그림 크기라서, 글자 줄바꿈이 있는 패널에서는
+        스크롤 영역이 그 크기만큼 늘어나 차트 아래쪽이 창 밖으로 밀려났습니다."""
+        return QSize(320, self.toolbar.sizeHint().height() + self.canvas.minimumHeight())
+
     def _begin(self, title: str):
         self._title = title
         self.figure.clear()
@@ -159,7 +164,6 @@ class Chart(QWidget):
         if self._table:
             TableDialog(self._title, *self._table, parent=self).exec()
 
-    # ---- 시간-값 ----
     def line(
         self, title: str, series: list[dict], unit: str = "", digits: int = 1, now_line: bool = False,
         empty: str | None = None, y_limits: tuple[float, float] | None = None,
@@ -176,7 +180,6 @@ class Chart(QWidget):
             xs = mdates.date2num(s["times"])
             ys = np.array([np.nan if v is None else v for v in s["values"]], dtype=float)
             ax.plot(xs, ys, color=s["color"], linewidth=1.2, label=s["name"], linestyle=s.get("style", "-"))
-            # 선은 이웃한 값이 있어야 보입니다. 수집을 막 시작해 값이 한두 개뿐이거나 결측 사이에 홀로 있는 값은 점으로 찍습니다.
             valid = ~np.isnan(ys)
             most_points = max(most_points, int(valid.sum()))
             before = np.concatenate(([False], valid[:-1]))
@@ -202,10 +205,10 @@ class Chart(QWidget):
         all_times = sorted({moment for s in usable for moment in s["times"]})
         lookups = [(s, dict(zip(s["times"], s["values"]))) for s in usable]
         positions = mdates.date2num(all_times)
-        if len(all_times) == 1:  # 시각이 하나뿐이면 그 점을 가운데 두고 하루 폭으로 봅니다.
+        if len(all_times) == 1:
             ax.set_xlim(positions[0] - 0.5, positions[0] + 0.5)
         span_days = positions[-1] - positions[0] if len(all_times) > 1 else 1.0
-        if span_days <= 2:  # 이틀 이하 구간은 날짜만으로는 눈금이 같은 글자로 반복되므로 시각까지 적습니다.
+        if span_days <= 2:
             ax.xaxis.set_major_locator(mdates.AutoDateLocator(tz=LOCAL_TZ, minticks=3, maxticks=6))
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M", tz=LOCAL_TZ))
         if most_points <= 2:
@@ -238,7 +241,6 @@ class Chart(QWidget):
         )
         self.canvas.draw_idle()
 
-    # ---- 수심 프로파일 ----
     def depth(self, title: str, series: list[dict], xlabel: str, unit: str = "", digits: int = 2) -> None:
         """series: [{name, color, depths, values, style?, marker?}]. 표층을 넓게 보도록 제곱근 축을 씁니다."""
         usable = [s for s in series if len(s["depths"])]
@@ -281,7 +283,6 @@ class Chart(QWidget):
         self._set_table([tr("자료"), tr("수심 m"), xlabel], rows)
         self.canvas.draw_idle()
 
-    # ---- 기압 고도 ----
     def pressure(self, title: str, series: list[dict], digits: int = 1) -> None:
         """series: [{name, color, pressures, values}]"""
         usable = [s for s in series if len(s["pressures"])]
@@ -323,7 +324,6 @@ class Chart(QWidget):
         )
         self.canvas.draw_idle()
 
-    # ---- T-S 다이어그램 ----
     def ts(self, title: str, series: list[dict]) -> None:
         """series: [{name, color, salts, temps, depths}]. 회색 등치선은 σt, 가는 선은 어는점입니다."""
         usable = [s for s in series if len(s["salts"])]
@@ -367,11 +367,10 @@ class Chart(QWidget):
         )
         self.canvas.draw_idle()
 
-    # ---- 마우스 ----
     def _on_move(self, event) -> None:
         if not self._hover or event.inaxes is None or event.xdata is None or event.ydata is None:
             return
-        if self.toolbar.mode:  # 확대·이동 중에는 값을 띄우지 않습니다
+        if self.toolbar.mode:
             return
         text = self._hover(event)
         if text:

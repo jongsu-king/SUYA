@@ -21,7 +21,7 @@ def latest_metar(store: Store) -> list[dict]:
     since = iso(utcnow() - timedelta(hours=24))
     latest: dict[str, dict] = {}
     for row in store.iter_measurements(source="metar", variable="air_temperature", since=since):
-        latest[row["dataset"]] = row  # 시간 오름차순이라 마지막 값이 최신입니다
+        latest[row["dataset"]] = row
     return [
         {
             "icao": icao, "name": row["quality"], "lat": row["lat"], "lon": row["lon"],

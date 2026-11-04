@@ -50,7 +50,7 @@ class EventBus:
                 try:
                     yield await asyncio.wait_for(queue.get(), timeout=15.0)
                 except asyncio.TimeoutError:
-                    yield None  # 연결 유지용 신호
+                    yield None
         finally:
             self._subscribers.discard(queue)
 
@@ -134,7 +134,7 @@ class Engine:
                 status = "rate_limited"
                 result.message = str(exc)
                 delay = max(interval, RATE_LIMIT_DELAY)
-            except Exception as exc:  # 한 소스의 실패가 다른 소스를 멈추면 안 됩니다
+            except Exception as exc:
                 log.warning("수집 실패 %s: %s", name, exc)
                 status = "error"
                 result.message = str(exc) if is_encoded(str(exc)) else f"{type(exc).__name__}: {exc}"[:400]

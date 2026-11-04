@@ -110,7 +110,7 @@ class Measurement:
     source: str
     dataset: str
     variable: str
-    kind: str  # observation | satellite | analysis | model | forecast | climatology
+    kind: str
     lat: float
     lon: float
     obs_time: str
@@ -141,7 +141,6 @@ class Store:
         with self._lock:
             self._conn.close()
 
-    # ---- 측정값 ----
     def upsert_measurements(self, rows: Iterable[Measurement]) -> int:
         now = iso()
         params = [
@@ -248,7 +247,6 @@ class Store:
             self._conn.execute("DELETE FROM runs WHERE id NOT IN (SELECT id FROM runs ORDER BY id DESC LIMIT 5000)")
             self._conn.commit()
 
-    # ---- 격자 ----
     def save_grid(self, grid: Grid) -> dict:
         stats = grid_stats(grid)
         payload = gzip.compress(json.dumps(grid.as_dict(), separators=(",", ":")).encode(), compresslevel=6)
@@ -339,7 +337,6 @@ class Store:
             ).fetchall()
         return [{"valid_time": r["valid_time"], "stats": json.loads(r["stats_json"])} for r in reversed(rows)]
 
-    # ---- Argo ----
     def upsert_argo_listing(self, rows: Iterable[dict]) -> int:
         now = iso()
         count = 0
@@ -436,7 +433,6 @@ class Store:
             data["levels"] = json.loads(data.pop("levels_json"))
             yield data
 
-    # ---- 수집 상태 ----
     def record_run(
         self, source: str, started_at: str, status: str, rows: int, data_time: str | None, message: str | None,
         next_run: str | None,
@@ -490,7 +486,6 @@ class Store:
             rows = self._conn.execute("SELECT * FROM runs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
 
-    # ---- 키-값 ----
     def kv_get(self, key: str) -> str | None:
         with self._lock:
             row = self._conn.execute("SELECT value FROM kv WHERE key = ?", (key,)).fetchone()

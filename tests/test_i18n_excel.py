@@ -18,12 +18,11 @@ def korean():
     set_language("ko")
 
 
-# ---- i18n ----
 def test_tr_switches_language_and_formats():
     assert tr("해역 {n}곳", n=3) == "해역 3곳"
     set_language("en")
     assert tr("해역 {n}곳", n=3) == "3 sea areas"
-    assert tr("없는 문장") == "없는 문장"  # 표에 없으면 원문 그대로
+    assert tr("없는 문장") == "없는 문장"
 
 
 def test_every_english_entry_keeps_placeholders():
@@ -47,7 +46,6 @@ def test_unsupported_language_rejected():
         set_language("fr")
 
 
-# ---- excel ----
 def _store(tmp_path) -> Store:
     store = Store(tmp_path / "t.db")
     store.upsert_measurements([
@@ -87,10 +85,10 @@ def test_sync_writes_month_files_with_expected_sheets(tmp_path):
     assert water[1][1] == "웨델해" and water[1][7] == -1.5
     assert water[1][0] == datetime(2026, 11, 2, 12, 0)
     vertical = list(names["수온염분_수직"].iter_rows(values_only=True))
-    assert vertical[1][4:7] == (100.0, 0.2, 34.1)  # 수온·염분이 한 행으로 합쳐짐
+    assert vertical[1][4:7] == (100.0, 0.2, 34.1)
     forecast = list(names["모델예보"].iter_rows(values_only=True))
-    assert forecast[1][5] == -2.0  # ECMWF 열
-    assert list(names["선박관측"].iter_rows(values_only=True)) [1:] == []  # 10월 자료는 11월 파일에 없음
+    assert forecast[1][5] == -2.0
+    assert list(names["선박관측"].iter_rows(values_only=True)) [1:] == []
     points = list(names["지점조회"].iter_rows(values_only=True))
     assert points[1][3] == "oisst"
     argo = openpyxl.load_workbook(tmp_path / "xl" / "argo_levels_2026-11.xlsx", read_only=True).worksheets[0]
@@ -114,9 +112,9 @@ def test_months_to_write_skips_finished_months(tmp_path):
     store = _store(tmp_path)
     folder = tmp_path / "xl"
     now = datetime(2027, 3, 15, tzinfo=timezone.utc)
-    assert excel.months_to_write(store, folder, now) == ["2026-10", "2026-11"]  # 파일이 아직 없음
+    assert excel.months_to_write(store, folder, now) == ["2026-10", "2026-11"]
     excel.sync(store, folder, ["2026-10", "2026-11"])
-    assert excel.months_to_write(store, folder, now) == ["2027-03"]  # 지난 달들은 끝났고 파일도 있음
+    assert excel.months_to_write(store, folder, now) == ["2027-03"]
     store.close()
 
 

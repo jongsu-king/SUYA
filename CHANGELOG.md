@@ -6,12 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-04
+
+Bug-fix release. Archived on Zenodo under the concept DOI https://doi.org/10.5281/zenodo.23937852;
+the version DOI appears on the release page and in `CITATION.cff` once Zenodo has archived the release.
+
 ### Added
 - The About dialog and the built-in user guide show the Zenodo DOI and how to cite the program.
 - Dependabot keeps Python packages and GitHub Actions versions current with one grouped
   pull request per week.
+- Download buttons for each operating system at the top of both READMEs, and release notes that
+  begin with a download table, so the installers are easy to find.
+
+### Changed
+- The program, `CITATION.cff`, `AUTHORS.md` and the READMEs cite the concept DOI
+  (10.5281/zenodo.23937852), which always resolves to the latest archived release; the DOI of each
+  version is listed next to it. A version DOI only exists after Zenodo has archived the release, so
+  it can never be built into the program of that same version.
 
 ### Fixed
+- The installed program rebuilt matplotlib's font cache on every start (about six seconds on macOS)
+  because the frozen build pointed matplotlib at a temporary folder that was deleted on exit. The
+  cache now lives in the user data folder (`matplotlib/` next to `antarctic.db`) and is reused.
+- Once a detail tab showed a wrapped note or error line, its scroll area grew to the charts'
+  preferred height instead of the visible height, so the bottom of the T-S diagram ended up below
+  the window edge with no obvious scrollbar. Charts now report their minimum height as the
+  preferred one and the vertical-profile tab shares the visible height between its charts.
 - The vertical-profile tab could wait on HYCOM indefinitely while the HYCOM grid or profile
   collector held the host's connection slots. Point lookups now use their own small per-host
   lane, every source in a point lookup has a time limit (HYCOM 120 s, WOA23 60 s, others 90 s) after which

@@ -28,7 +28,7 @@ class Scale:
     lut: np.ndarray
 
     def to_unit(self, values: np.ndarray) -> np.ndarray:
-        if len(self.domain) == 3:  # 0을 중심으로 양쪽을 따로 늘립니다
+        if len(self.domain) == 3:
             low, middle, high = self.domain
             return np.where(
                 values < middle,

@@ -33,7 +33,6 @@ DARK = Theme(
     series=("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300"),
 )
 
-# 같은 대상은 항상 같은 색을 씁니다.
 SERIES_INDEX = {
     "argo": 0, "hycom": 1, "woa": 2,
     "gfs_global": 0, "ecmwf_ifs025": 1, "icon_global": 2, "gem_global": 3, "jma_gsm": 4, "windy": 5,

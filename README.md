@@ -16,15 +16,23 @@ installation needed: download the installer, open it, and the data starts arrivi
 
 ## Download
 
-| Operating system | Download | Size | Notes |
+**Latest release: [SUYA 0.1.1](https://github.com/jongsu-king/SUYA/releases/latest)** — click the button for your operating system:
+
+[![Windows 10/11: download the installer (.exe)](https://img.shields.io/badge/Windows%2010%20%2F%2011-Download%20installer%20(.exe)-0078d4?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-windows-x64-setup.exe)
+[![macOS Apple Silicon: download the disk image (.dmg)](https://img.shields.io/badge/macOS%20Apple%20Silicon-Download%20.dmg-1d1d1f?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-arm64.dmg)
+[![macOS Intel: download the disk image (.dmg)](https://img.shields.io/badge/macOS%20Intel-Download%20.dmg-6e6e73?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-x86_64.dmg)
+[![Linux x86_64: download the archive (.tar.gz)](https://img.shields.io/badge/Linux%20x86__64-Download%20.tar.gz-e95420?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-linux-x86_64.tar.gz)
+
+| Operating system | File | Size | Notes |
 |---|---|---|---|
-| **Windows 10 / 11** (64-bit) | [SUYA-0.1.0-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-windows-x64-setup.exe) | ≈ 50 MB | Installer with English/Korean wizard; no admin rights required |
-| **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.0-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-arm64.dmg) | ≈ 60 MB | Drag to Applications |
-| **macOS 12+** Intel | [SUYA-0.1.0-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-x86_64.dmg) | ≈ 65 MB | Drag to Applications |
-| **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.0-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-linux-x86_64.tar.gz) | ≈ 110 MB | Extract and run `./install.sh` |
+| **Windows 10 / 11** (64-bit) | [SUYA-0.1.1-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-windows-x64-setup.exe) | ≈ 50 MB | Installer with English/Korean wizard; no admin rights required |
+| **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.1-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-arm64.dmg) | ≈ 60 MB | Drag to Applications. Apple menu → *About This Mac* says "Chip Apple M…" |
+| **macOS 12+** Intel | [SUYA-0.1.1-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-x86_64.dmg) | ≈ 65 MB | Drag to Applications. *About This Mac* says "Processor … Intel" |
+| **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.1-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-linux-x86_64.tar.gz) | ≈ 110 MB | Extract and run `./install.sh` |
 | Any OS with Python 3.11+ | `pip install git+https://github.com/jongsu-king/SUYA.git` | — | Then run `suya` |
 
-All versions, checksums (`SHA256SUMS.txt`) and release notes: **[Releases page](https://github.com/jongsu-king/SUYA/releases)**.
+The same files are listed under **Assets** at the bottom of the [latest release page](https://github.com/jongsu-king/SUYA/releases/latest),
+next to `SHA256SUMS.txt` and the release notes; older versions are on the [Releases page](https://github.com/jongsu-king/SUYA/releases).
 The builds are produced by [GitHub Actions](.github/workflows/release.yml) from the tagged source. They are not code-signed
 (see [First-run warnings](#2-2-first-run-warnings)).
 
@@ -464,14 +472,16 @@ sync working when adding a source, and add a parser test with a real response sh
 
 If SUYA helps in a publication, cite the **data providers** (they did the hard part) and cite this software:
 
-> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937853
+> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.1) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937852
 
 | DOI | Use it for |
 |---|---|
-| [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | **this version (0.1.0)** — cite it when the exact version matters |
-| [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **concept DOI** — all versions; always resolves to the latest release |
+| [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **concept DOI** — all versions; always resolves to the latest archived release. Use it unless the exact version matters |
+| *version DOI of 0.1.1* | issued by Zenodo when it archives the 0.1.1 release; shown on the [release page](https://github.com/jongsu-king/SUYA/releases/tag/v0.1.1) and under `identifiers` in [CITATION.cff](CITATION.cff) |
+| [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | version 0.1.0 |
 
-Every GitHub release is archived automatically on [Zenodo](https://zenodo.org/records/23937853) and receives its own version DOI.
+Every GitHub release is archived automatically on [Zenodo](https://doi.org/10.5281/zenodo.23937852) and receives its own version DOI.
+That DOI only exists after the archive is made, so the program and `CITATION.cff` carry the concept DOI.
 Machine-readable citation metadata is in [CITATION.cff](CITATION.cff) — GitHub's **Cite this repository** button (right-hand
 sidebar) builds APA and BibTeX entries from it — and in [.zenodo.json](.zenodo.json), which Zenodo reads when it archives a release.
 
@@ -479,12 +489,12 @@ sidebar) builds APA and BibTeX entries from it — and in [.zenodo.json](.zenodo
 @software{lim_park_suya_2026,
   author    = {Lim, Jongsu and Park, Suyeon},
   title     = {{SUYA}: Antarctic ocean temperature, salinity and air temperature monitor},
-  version   = {0.1.0},
+  version   = {0.1.1},
   year      = {2026},
   month     = {11},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.23937853},
-  url       = {https://doi.org/10.5281/zenodo.23937853}
+  doi       = {10.5281/zenodo.23937852},
+  url       = {https://doi.org/10.5281/zenodo.23937852}
 }
 ```
 

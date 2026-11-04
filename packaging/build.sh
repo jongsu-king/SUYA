@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Build a standalone program for the current OS (macOS .dmg or Linux .tar.gz).
-# Windows uses packaging\build.ps1. Run from the repository root with the project's Python environment active.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -15,7 +13,6 @@ case "$(uname -s)" in
     APP="dist/SUYA.app"
     "$APP/Contents/MacOS/suya" self-test --out dist/self-test.txt
     cat dist/self-test.txt
-    # 서명하지 않은 ad-hoc 서명. 처음 열 때는 우클릭 > 열기가 필요합니다.
     codesign --force --deep --sign - "$APP"
     STAGE=$(mktemp -d)
     cp -R "$APP" "$STAGE/"

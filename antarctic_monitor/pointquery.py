@@ -23,8 +23,8 @@ ARGO_REPRESENTATIVE_KM = 100.0
 ARGO_REPRESENTATIVE_DAYS = 10
 OBS_RADIUS_KM = 400.0
 TTL = {"air": 900.0, "water": 1800.0, "profile": 10800.0, "series": 3600.0}
-PARTIAL_TTL = 120.0  # 일부 소스가 답하지 않은 결과는 오래 들고 있지 않고 곧 다시 물어봅니다
-GUARD_TIMEOUT = {"HYCOM": 120.0, "WOA23": 60.0}  # 그 밖의 소스는 DEFAULT_GUARD_TIMEOUT
+PARTIAL_TTL = 120.0
+GUARD_TIMEOUT = {"HYCOM": 120.0, "WOA23": 60.0}
 DEFAULT_GUARD_TIMEOUT = 90.0
 
 
@@ -32,7 +32,7 @@ class TTLCache:
     """같은 지점을 다시 눌러도 원천 서버를 또 치지 않게 합니다. 동시 요청은 하나로 묶습니다."""
 
     def __init__(self):
-        self._values: dict[tuple, tuple[float, Any]] = {}  # key -> (만료 시각, 값)
+        self._values: dict[tuple, tuple[float, Any]] = {}
         self._locks: dict[tuple, asyncio.Lock] = {}
 
     async def get(self, key: tuple, ttl: float, build: Callable[[], Awaitable[Any]]) -> Any:
@@ -260,7 +260,7 @@ def nearest_argo(ctx: Context, lat: float, lon: float, radius_km: float = ARGO_R
     since = iso(utcnow() - timedelta(days=ARGO_WINDOW_DAYS))
     best = None
     for item in ctx.store.argo_list(since=since):
-        if item.get("n_levels") == 0:  # 서버에 층별 값이 없다고 확인된 프로파일
+        if item.get("n_levels") == 0:
             continue
         distance = haversine_km(lat, lon, item["lat"], item["lon"])
         if distance > radius_km:

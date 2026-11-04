@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from . import __concept_doi__, __doi__, __email__, __url__, __version__
+from . import __concept_doi__, __email__, __url__, __version__
 from .i18n import get_language
 
 _STYLE = """
@@ -23,7 +23,7 @@ HELP_KO = _STYLE + f"""
 <h1>SUYA {__version__} — 남극해 수온·염분 모니터 사용 설명서</h1>
 <p class="note">Copyright © 2026 임종수 (Jongsu Lim) &lt;{__email__}&gt;, 인천대학교 물리학과 학부연구생, HMOL 연구실 (ORCID 0009-0000-3395-1484) ·
 박수연 (Suyeon Park) &lt;dbsnt110@inu.ac.kr&gt;, 인천대학교 신소재공학과 석사과정, CELLMATE 연구실 · MIT 라이선스 · <a href="{__url__}">{__url__}</a> ·
-DOI <a href="https://doi.org/{__doi__}">{__doi__}</a></p>
+DOI <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a></p>
 
 <h2>1. 이 프로그램이 하는 일</h2>
 <p>남극해(대략 40°S 이남)의 <b>수온, 염분, 기온</b>을 공개 데이터 API에서 <b>계속 자동으로 받아</b>
@@ -162,17 +162,18 @@ suya --lang en       영어로 실행</pre>
 
 <h2>10. 인용</h2>
 <p>논문이나 보고서에 쓸 때는 데이터를 제공한 기관(5장)을 인용하고, 이 프로그램은 아래처럼 인용해 주세요.
-릴리스마다 Zenodo가 고유 DOI를 발급하며, 개념 DOI <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a>는 항상 최신 버전으로 연결됩니다.
+릴리스마다 Zenodo가 버전 DOI를 발급하고, 개념 DOI <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a>는 모든 버전을 묶어 항상 최신 릴리스로 연결됩니다.
+아래 인용은 개념 DOI를 쓰며, 특정 버전을 밝혀야 하면 Zenodo 기록에서 그 버전의 DOI를 고르세요.
 저장소의 <code>CITATION.cff</code>와 GitHub의 "Cite this repository" 버튼에서 APA·BibTeX 형식을 바로 받을 수 있습니다.</p>
 <pre>Lim, J. &amp; Park, S. (2026). SUYA: Antarctic ocean temperature, salinity and air temperature monitor ({__version__}).
-Zenodo. https://doi.org/{__doi__}</pre>
+Zenodo. https://doi.org/{__concept_doi__}</pre>
 """
 
 HELP_EN = _STYLE + f"""
 <h1>SUYA {__version__} — Antarctic Ocean Monitor user guide</h1>
 <p class="note">Copyright © 2026 Jongsu Lim &lt;{__email__}&gt;, Undergraduate Researcher, Hybrid Materials &amp; Optoelectronics Laboratory (HMOL), Department of Physics, Incheon National University (ORCID 0009-0000-3395-1484) ·
 Suyeon Park &lt;dbsnt110@inu.ac.kr&gt;, M.S. Student, Clean Energy and Materials Lab (CELLMATE), Department of Materials Science and Engineering, Incheon National University · MIT License · <a href="{__url__}">{__url__}</a> ·
-DOI <a href="https://doi.org/{__doi__}">{__doi__}</a></p>
+DOI <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a></p>
 
 <h2>1. What the program does</h2>
 <p>It <b>continuously downloads</b> ocean <b>temperature, salinity and air temperature</b> for the Southern Ocean
@@ -311,10 +312,11 @@ suya --lang ko       run in Korean</pre>
 
 <h2>10. Citing</h2>
 <p>In a paper or report, cite the organisations that provide the data (section 5) and cite this program as below.
-Zenodo issues a DOI for every release; the concept DOI <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a> always resolves to the latest version.
+Zenodo issues a version DOI for every release; the concept DOI <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a> groups all versions and always resolves to the latest release.
+The citation below uses the concept DOI; pick the version DOI from the Zenodo record when the exact version matters.
 <code>CITATION.cff</code> in the repository and GitHub's "Cite this repository" button give APA and BibTeX entries.</p>
 <pre>Lim, J. &amp; Park, S. (2026). SUYA: Antarctic ocean temperature, salinity and air temperature monitor ({__version__}).
-Zenodo. https://doi.org/{__doi__}</pre>
+Zenodo. https://doi.org/{__concept_doi__}</pre>
 """
 
 

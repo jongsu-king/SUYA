@@ -1,8 +1,5 @@
-; Inno Setup 6 script. Build after PyInstaller:  ISCC.exe packaging\windows\installer.iss
-; Produces dist\SUYA-<version>-windows-x64-setup.exe
-
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.1.1"
 #endif
 #define AppName "SUYA"
 #define AppPublisher "Jongsu Lim, Suyeon Park (Incheon National University)"
@@ -55,5 +52,4 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-; 사용자 데이터(%APPDATA%\SUYA, 문서\SUYA)는 지우지 않습니다.
 Type: filesandordirs; Name: "{app}\_internal"

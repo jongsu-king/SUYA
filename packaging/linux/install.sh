@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Installs the unpacked Linux build for the current user (no root needed).
-#   ~/.local/opt/suya      program files
-#   ~/.local/bin/suya      launcher
-#   ~/.local/share/applications         menu entry
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TARGET="$HOME/.local/opt/suya"
