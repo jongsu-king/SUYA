@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- The About dialog and the built-in user guide show the Zenodo DOI and how to cite the program.
+- Dependabot keeps Python packages and GitHub Actions versions current with one grouped
+  pull request per week.
+
 ## [0.1.0] - 2026-11-04
 
 First public release of **SUYA** (Antarctic Ocean Monitor).

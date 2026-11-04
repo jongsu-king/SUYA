@@ -10,6 +10,8 @@ __author__ = "Jongsu Lim"
 __email__ = "imjongsu1102@gmail.com"
 __license__ = "MIT"
 __url__ = "https://github.com/jongsu-king/SUYA"
+__doi__ = "10.5281/zenodo.23937853"  # 이 버전의 Zenodo DOI (릴리스마다 바뀜)
+__concept_doi__ = "10.5281/zenodo.23937852"  # 모든 버전을 묶는 DOI (항상 최신 릴리스로 연결)
 
 # 저작권자 전원. 프로그램 정보 창, 도움말, 설치 파일에 같은 내용을 씁니다.
 AUTHORS = (

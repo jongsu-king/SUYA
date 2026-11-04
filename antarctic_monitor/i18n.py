@@ -332,6 +332,8 @@ EN: dict[str, str] = {
     "제3자 고지…": "Third-party notices…",
     "제3자 고지": "Third-party notices",
     "저작권": "Copyright",
+    "모든 버전": "all versions",
+    "인용": "Cite as",
     "문의": "Contact",
     "프로그램 정보…": "About…",
     "수심": "Depth",

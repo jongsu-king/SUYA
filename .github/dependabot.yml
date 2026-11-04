@@ -1,0 +1,29 @@
+# Weekly dependency updates. Python packages are grouped into one pull request so the
+# test matrix runs once per week instead of once per package; GitHub Actions versions
+# used by ci.yml and release.yml are checked the same way.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    groups:
+      python-packages:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"

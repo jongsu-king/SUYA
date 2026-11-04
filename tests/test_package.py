@@ -59,11 +59,14 @@ def test_citation_metadata_lists_both_authors():
         assert f"family-names: {family}" in cff and f"given-names: {given}" in cff
         assert author["email"] in cff
     assert "0009-0000-3395-1484" in cff and "date-released: " in cff and "license: MIT" in cff
-    version_doi, concept_doi = "10.5281/zenodo.23937853", "10.5281/zenodo.23937852"
+    version_doi, concept_doi = antarctic_monitor.__doi__, antarctic_monitor.__concept_doi__
+    assert (version_doi, concept_doi) == ("10.5281/zenodo.23937853", "10.5281/zenodo.23937852")
     assert f"doi: {version_doi}\n" in cff and f"value: {concept_doi}\n" in cff
     for name in ("README.md", "README.ko.md", "AUTHORS.md", "CHANGELOG.md"):
         text = (ROOT / name).read_text(encoding="utf-8")
         assert version_doi in text and concept_doi in text, name
+    for html in (help_text.HELP_KO, help_text.HELP_EN):  # 프로그램 안 도움말에도 같은 DOI
+        assert version_doi in html and concept_doi in html
 
     zenodo = json.loads((ROOT / ".zenodo.json").read_text(encoding="utf-8"))
     assert [c["name"] for c in zenodo["creators"]] == ["Lim, Jongsu", "Park, Suyeon"]
