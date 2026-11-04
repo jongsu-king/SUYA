@@ -420,7 +420,8 @@ powershell -File packaging\build.ps1      # Windows setup.exe (Inno Setup 6 필�
 ```
 
 `v*` 태그를 푸시하면 [GitHub Actions](.github/workflows/release.yml)가 Windows·macOS(arm64, x86_64)·Linux 설치 파일을 빌드하고 각 OS에서 테스트와 self-test를 돌린 뒤
-`SHA256SUMS.txt`와 함께 Release에 올립니다. [ci.yml](.github/workflows/ci.yml)은 push마다 3개 OS × Python 3.11~3.13에서 테스트합니다. 자세한 내용은 [docs/building.md](docs/building.md).
+`SHA256SUMS.txt`와 함께 Release에 올립니다. [ci.yml](.github/workflows/ci.yml)은 push마다 Linux·Windows에서는 Python 3.11~3.13으로, macOS에서는 설치 파일을 만드는 Python 3.12로 테스트합니다
+(GitHub의 macOS 러너가 부족해 macOS 잡을 하나로 줄여 검사가 멈추지 않게 했습니다). 자세한 내용은 [docs/building.md](docs/building.md).
 
 ## 15. 저장소 구조
 

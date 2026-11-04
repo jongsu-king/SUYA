@@ -30,7 +30,7 @@ packaging/
   windows/installer.iss    Inno Setup 6 스크립트
   linux/                   .desktop 파일과 사용자 설치 스크립트
 .github/workflows/
-  ci.yml                   push·PR마다 3개 OS × 3개 파이썬에서 테스트
+  ci.yml                   push·PR마다 테스트: Linux·Windows는 Python 3.11~3.13, macOS는 설치 파일과 같은 3.12 하나
   release.yml              v* 태그마다 설치 파일 빌드 후 Release에 첨부
 tests/                  pytest (네트워크 불필요, 실제 응답 형태를 고정값으로 사용)
 docs/                   상세 문서와 화면 캡처
