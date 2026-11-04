@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import time
 
 import httpx
 import pytest
@@ -40,6 +41,31 @@ async def test_latest_release_picks_the_asset_for_this_platform():
     linux = await updates.latest_release(fetcher, system="linux", machine="x86_64")
     assert linux["asset"] is None
     await fetcher.aclose()
+
+
+async def test_latest_release_explains_the_github_rate_limit():
+    headers = {"x-ratelimit-remaining": "0", "x-ratelimit-reset": str(int(time.time()) + 20 * 60)}
+    body = {"message": "API rate limit exceeded for 203.0.113.9.", "documentation_url": "https://example.test/docs"}
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(403, json=body, headers=headers))), backoff=0.0)
+    with pytest.raises(FetchError) as caught:
+        await updates.latest_release(fetcher, system="darwin", machine="arm64")
+    text = render(str(caught.value))
+    assert "GitHub" in text and "20" in text and "203.0.113.9" not in text
+    await fetcher.aclose()
+
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(429, text="slow down"))), backoff=0.0)
+    with pytest.raises(FetchError) as caught:
+        await updates.latest_release(fetcher, system="darwin", machine="arm64")
+    assert "GitHub" in render(str(caught.value)) and "slow down" not in str(caught.value)
+    await fetcher.aclose()
+
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(404, json={"message": "Not Found"}))), backoff=0.0)
+    with pytest.raises(FetchError, match="HTTP 404"):
+        await updates.latest_release(fetcher, system="darwin", machine="arm64")
+    await fetcher.aclose()
+
+    assert "1" in render(updates.rate_limit_message("130", now=100.0))
+    assert "분" not in render(updates.rate_limit_message("not a number"))
 
 
 async def test_download_verifies_the_checksum(tmp_path):
