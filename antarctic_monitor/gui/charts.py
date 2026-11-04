@@ -147,14 +147,14 @@ class Chart(QWidget):
         self.canvas.draw_idle()
 
     def _legend(self, ax, handles: int) -> None:
+        """범례는 그림 위쪽 바깥에 둡니다. 축 안에 두면 어디에 놓아도 선과 겹치는 차트가 있습니다."""
         if handles < 2:
             return
-        t = self.theme
-        legend = ax.legend(
-            fontsize=8, frameon=True, fancybox=False, framealpha=0.9, edgecolor=t.ink, facecolor=t.surface,
-            labelcolor=t.ink, borderpad=0.3, handlelength=1.8, loc="best",
+        items, labels = ax.get_legend_handles_labels()
+        self.figure.legend(
+            items, labels, loc="outside upper right", ncol=min(len(labels), 4), fontsize=8, frameon=False,
+            labelcolor=self.theme.ink, handlelength=1.8, columnspacing=1.0, borderaxespad=0.2,
         )
-        legend.get_frame().set_linewidth(0.5)
 
     def _set_table(self, headers: list[str], rows: list[list[str]]) -> None:
         self._table = (headers, rows)

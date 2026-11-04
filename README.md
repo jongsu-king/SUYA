@@ -477,7 +477,7 @@ If SUYA helps in a publication, cite the **data providers** (they did the hard p
 | DOI | Use it for |
 |---|---|
 | [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **concept DOI** — all versions; always resolves to the latest archived release. Use it unless the exact version matters |
-| *version DOI of 0.1.1* | issued by Zenodo when it archives the 0.1.1 release; shown on the [release page](https://github.com/jongsu-king/SUYA/releases/tag/v0.1.1) and under `identifiers` in [CITATION.cff](CITATION.cff) |
+| [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) | version 0.1.1 (this release) |
 | [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | version 0.1.0 |
 
 Every GitHub release is archived automatically on [Zenodo](https://doi.org/10.5281/zenodo.23937852) and receives its own version DOI.

@@ -459,7 +459,7 @@ Pull request와 이슈를 환영합니다. 변경은 Qt 앱 안에서(웹 프런
 | DOI | 용도 |
 |---|---|
 | [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **개념 DOI** — 모든 버전을 묶는 DOI. 항상 최신 보관본으로 연결되므로, 정확한 버전을 밝혀야 하는 경우가 아니면 이것을 쓰세요 |
-| *0.1.1의 버전 DOI* | Zenodo가 0.1.1 릴리스를 보관할 때 발급. [릴리스 페이지](https://github.com/jongsu-king/SUYA/releases/tag/v0.1.1)와 [CITATION.cff](CITATION.cff)의 `identifiers`에 적힙니다 |
+| [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) | 0.1.1 버전 (이번 릴리스) |
 | [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | 0.1.0 버전 |
 
 GitHub 릴리스는 [Zenodo](https://doi.org/10.5281/zenodo.23937852)에 자동으로 보관되며 릴리스마다 버전 DOI가 발급됩니다.

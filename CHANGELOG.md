@@ -11,10 +11,14 @@ All notable changes to this project are documented here. The format follows
   vertical-profile tab shows the climatology at once for any point looked up before, even while
   the NCEI server is slow or down.
 
+### Changed
+- Chart legends sit above the plot, outside the axes, so they never cover the data; the T-S
+  diagram and the salinity profile were the worst affected.
+
 ## [0.1.1] - 2026-11-04
 
-Bug-fix release. Archived on Zenodo under the concept DOI https://doi.org/10.5281/zenodo.23937852;
-the version DOI appears on the release page and in `CITATION.cff` once Zenodo has archived the release.
+Bug-fix release. Version DOI: https://doi.org/10.5281/zenodo.23945830 (concept DOI for all
+versions: 10.5281/zenodo.23937852).
 
 ### Added
 - The About dialog and the built-in user guide show the Zenodo DOI and how to cite the program.

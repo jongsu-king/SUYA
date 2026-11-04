@@ -42,6 +42,21 @@ def test_isolated_points_between_gaps_get_dots(app):
     assert not chart.figure.axes[0].texts
 
 
+def test_legend_sits_outside_the_axes(app):
+    chart = Chart(height=120)
+    now = datetime.now(timezone.utc)
+    times = [now - timedelta(hours=i) for i in range(3)]
+    chart.line(
+        "t",
+        [
+            {"name": "a", "color": "#123456", "times": times, "values": [1.0, 2.0, 3.0]},
+            {"name": "b", "color": "#654321", "times": times, "values": [2.0, 3.0, 4.0]},
+        ],
+    )
+    assert chart.figure.axes[0].get_legend() is None
+    assert chart.figure.legends and [t.get_text() for t in chart.figure.legends[0].get_texts()] == ["a", "b"]
+
+
 def test_all_missing_shows_message(app):
     chart = Chart(height=120)
     chart.line("t", [{"name": "x", "color": "#123456", "times": [datetime.now(timezone.utc)], "values": [None]}])
