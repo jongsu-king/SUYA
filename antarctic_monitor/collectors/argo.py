@@ -92,9 +92,14 @@ def parse_listing(text: str) -> list[dict]:
     return output
 
 
-def parse_levels(text: str, lat: float) -> tuple[list[dict], dict]:
-    """프로파일 한 개의 층별 값을 고릅니다. 상승 관측이 있으면 그것만 씁니다."""
+def parse_levels(text: str, lat: float, cycle: int | None = None) -> tuple[list[dict], dict]:
+    """프로파일 한 개의 층별 값을 고릅니다. 상승 관측이 있으면 그것만 씁니다.
+
+    cycle을 주면 cycle_number 열이 있는 응답에서 그 사이클 행만 씁니다(범위 질의로 받은 경우).
+    """
     rows = parse_csv(text)
+    if cycle is not None and rows and "cycle_number" in rows[0]:
+        rows = [r for r in rows if _as_int(r.get("cycle_number")) == cycle]
     if any((r.get("direction") or "").strip() == "A" for r in rows):
         rows = [r for r in rows if (r.get("direction") or "").strip() == "A"]
     levels, seen, dropped = [], set(), {"temp": 0, "salt": 0}
@@ -141,19 +146,35 @@ async def fetch_listing(fetcher: Fetcher, lat_max: float = LIST_LAT, days: int =
     return parse_listing(response.text)
 
 
-async def fetch_levels(fetcher: Fetcher, platform: str, cycle: int, lat: float) -> tuple[list[dict], dict]:
-    url = _query(
-        "direction,data_mode,pres,pres_qc,temp,temp_qc,psal,psal_qc,"
-        "pres_adjusted,pres_adjusted_qc,temp_adjusted,temp_adjusted_qc,psal_adjusted,psal_adjusted_qc",
-        f'platform_number="{platform}"',
-        f"cycle_number={cycle}",
-    )
-    response = await fetcher.request("GET", url, timeout=120.0)
+LEVEL_COLUMNS = (
+    "cycle_number,direction,data_mode,pres,pres_qc,temp,temp_qc,psal,psal_qc,"
+    "pres_adjusted,pres_adjusted_qc,temp_adjusted,temp_adjusted_qc,psal_adjusted,psal_adjusted_qc"
+)
+
+
+def _as_int(value) -> int | None:
+    try:
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+async def fetch_levels(
+    fetcher: Fetcher, platform: str, cycle: int, lat: float, interactive: bool = False
+) -> tuple[list[dict], dict]:
+    url = _query(LEVEL_COLUMNS, f'platform_number="{platform}"', f"cycle_number={cycle}")
+    response = await fetcher.request("GET", url, timeout=120.0, interactive=interactive)
     if response.status_code == 404:
-        raise NoData(msg("프로파일 없음: {platform}/{cycle}", platform=platform, cycle=cycle))
+        # 갓 추가된 프로파일은 ERDDAP의 파일별 색인(사이클 최댓값)이 아직 옛 값이라 정확한 사이클 질의가
+        # 빈 결과(404)로 끝나는 일이 있습니다(2026-11-04, 5905620/35). 바로 앞 사이클부터 범위로 물으면
+        # 파일을 열어 주므로, 받아서 그 사이클 행만 골라 씁니다.
+        url = _query(LEVEL_COLUMNS, f'platform_number="{platform}"', f"cycle_number>={max(cycle - 1, 0)}")
+        response = await fetcher.request("GET", url, timeout=120.0, interactive=interactive)
+        if response.status_code == 404:
+            raise NoData(msg("프로파일 없음: {platform}/{cycle}", platform=platform, cycle=cycle))
     if response.status_code >= 400:
         raise FetchError(f"Argo HTTP {response.status_code}")
-    return parse_levels(response.text, lat)
+    return parse_levels(response.text, lat, cycle=cycle)
 
 
 async def collect(ctx: Context) -> CollectResult:
@@ -162,22 +183,28 @@ async def collect(ctx: Context) -> CollectResult:
     ctx.store.upsert_argo_listing(listing)
     pending = ctx.store.argo_missing_levels(BATCH)
 
-    async def one(item: dict) -> bool:
-        levels, _ = await fetch_levels(ctx.fetcher, item["platform"], item["cycle"], item["lat"])
+    async def one(item: dict) -> str:
+        try:
+            levels, _ = await fetch_levels(ctx.fetcher, item["platform"], item["cycle"], item["lat"])
+        except NoData:
+            levels = []  # 서버에 층별 값이 없는 프로파일은 빈 값으로 적어 두고 매 주기 다시 묻지 않습니다
         ctx.store.save_argo_levels(item["platform"], item["cycle"], levels)
-        return True
+        return "ok" if levels else "empty"
 
     results = await asyncio.gather(*(one(p) for p in pending), return_exceptions=True)
-    fetched = sum(1 for r in results if r is True)
+    fetched = sum(1 for r in results if r == "ok")
+    empty = sum(1 for r in results if r == "empty")
     failed = [r for r in results if isinstance(r, Exception)]
     remaining = ctx.store.argo_count_missing()
 
     ctx.store.upsert_measurements(_surface_measurements(ctx, listing))
     latest = max((p["time"] for p in listing), default=None)
     message = msg("최근 {days}일 프로파일 {listed}개, 층별 값 {fetched}개 수신, 대기 {remaining}개", days=LIST_DAYS, listed=len(listing), fetched=fetched, remaining=remaining)
+    if empty:
+        message = join(message, msg("층별 값 없음 {n}개", n=empty))
     if failed:
         message = join(message, msg("실패 {n}개", n=len(failed)))
-    if pending and fetched == 0 and failed:
+    if pending and fetched == 0 and empty == 0 and failed:
         raise FetchError(msg("Argo 프로파일을 받지 못했습니다: {error}", error=str(failed[0])))
     return CollectResult(rows=fetched, data_time=latest, message=message, backlog=remaining > 0 and fetched > 0)
 

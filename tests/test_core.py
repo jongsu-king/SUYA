@@ -2,11 +2,12 @@
 
 import asyncio
 import math
+import time
 
 import httpx
 import pytest
 
-from antarctic_monitor import seawater
+from antarctic_monitor import pointquery, seawater
 from antarctic_monitor.collectors import JOBS, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
@@ -15,7 +16,8 @@ from antarctic_monitor.db import Measurement, Store
 from antarctic_monitor.engine import Engine, EventBus
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
-from antarctic_monitor.http import FetchError, Fetcher, RateLimited
+from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited
+from antarctic_monitor.i18n import render
 
 
 # ---- 사용자가 준 두 링크 ----
@@ -208,6 +210,41 @@ async def test_fetcher_gives_up_after_retries():
     with pytest.raises(FetchError):
         await fetcher.get_text("https://x.test/")
     await fetcher.aclose()
+
+
+async def test_interactive_requests_do_not_queue_behind_collection():
+    # 수집 작업이 호스트의 자리를 다 차지한 동안에도 화면에서 누른 요청은 바로 나갑니다.
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, text="ok"))), backoff=0.0)
+    background = fetcher._semaphore("https://x.test/a")
+    for _ in range(DEFAULT_HOST_LIMIT):
+        await background.acquire()
+    assert await asyncio.wait_for(fetcher.get_text("https://x.test/b", interactive=True), 1.0) == "ok"
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(fetcher.get_text("https://x.test/c"), 0.2)
+    await fetcher.aclose()
+
+
+# ---- 지점 조회: 답 없는 소스는 기다리지 않고, 불완전한 결과는 오래 두지 않습니다 ----
+async def test_point_lookup_guard_reports_timeout():
+    errors: list[dict] = []
+    assert await pointquery._guard("HYCOM", asyncio.sleep(5), errors, timeout=0.05) is None
+    assert errors[0]["source"] == "HYCOM" and "시간 초과" in render(errors[0]["message"])
+
+
+async def test_point_cache_keeps_partial_results_only_briefly():
+    cache = pointquery.TTLCache()
+
+    async def partial():
+        return {"errors": [{"source": "HYCOM", "message": "x"}]}
+
+    async def complete():
+        return {"errors": []}
+
+    await cache.get(("p",), 10800.0, partial)
+    await cache.get(("c",), 10800.0, complete)
+    now = time.monotonic()
+    assert cache._values[("p",)][0] - now <= pointquery.PARTIAL_TTL
+    assert cache._values[("c",)][0] - now > pointquery.PARTIAL_TTL
 
 
 async def test_fetcher_does_not_retry_rate_limit():

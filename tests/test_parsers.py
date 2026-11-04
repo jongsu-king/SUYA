@@ -33,6 +33,45 @@ def test_argo_uses_raw_in_realtime_mode():
     assert levels[0]["salt"] == 34.411
 
 
+ARGO_RANGE_HEADER = (
+    "cycle_number,direction,data_mode,pres,pres_qc,temp,temp_qc,psal,psal_qc,"
+    "pres_adjusted,pres_adjusted_qc,temp_adjusted,temp_adjusted_qc,psal_adjusted,psal_adjusted_qc\n"
+    ",,,decibar,,degree_Celsius,,PSU,,decibar,,degree_Celsius,,PSU,\n"
+)
+ARGO_RANGE_ROWS = (
+    "34,A,A,5.0,1,1.0,1,34.0,1,5.0,1,1.0,1,34.0,1\n"
+    "35,A,A,6.0,1,2.0,1,34.5,1,6.0,1,2.0,1,34.5,1\n"
+)
+
+
+def test_argo_levels_keep_only_the_requested_cycle():
+    levels, _ = argo.parse_levels(ARGO_RANGE_HEADER + ARGO_RANGE_ROWS, -56.7, cycle=35)
+    assert [lv["temp"] for lv in levels] == [2.0]
+
+
+async def test_argo_fetch_levels_falls_back_to_a_cycle_range():
+    # 2026-11-04 플로트 5905620 #35: 정확한 사이클 질의는 404, 바로 앞 사이클부터의 범위 질의는 두 사이클을 돌려줬습니다.
+    from urllib.parse import unquote
+
+    import httpx
+
+    from antarctic_monitor.http import Fetcher
+
+    queries = []
+
+    def handler(request):
+        queries.append(unquote(request.url.query.decode()))
+        if "cycle_number=35" in queries[-1]:
+            return httpx.Response(404, text='Error { code=404; message="Not Found: Your query produced no matching results. (nRows = 0)"; }')
+        return httpx.Response(200, text=ARGO_RANGE_HEADER + ARGO_RANGE_ROWS)
+
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(handler)), backoff=0.0)
+    levels, _ = await argo.fetch_levels(fetcher, "5905620", 35, -56.7)
+    assert [lv["temp"] for lv in levels] == [2.0]
+    assert len(queries) == 2 and "cycle_number>=34" in queries[1]
+    await fetcher.aclose()
+
+
 def test_argo_prefers_adjusted_in_delayed_mode():
     text = ARGO_HEADER + "A,D,100.0,1,0.5,1,34.0,1,100.1,1,0.52,1,34.2,1\n"
     levels, _ = argo.parse_levels(text, -65.0)

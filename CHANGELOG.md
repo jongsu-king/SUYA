@@ -12,6 +12,15 @@ All notable changes to this project are documented here. The format follows
   pull request per week.
 
 ### Fixed
+- The vertical-profile tab could wait on HYCOM indefinitely while the HYCOM grid or profile
+  collector held the host's connection slots. Point lookups now use their own small per-host
+  lane, every source in a point lookup has a time limit (HYCOM 120 s, WOA23 60 s, others 90 s) after which
+  the rest of the panel is shown with a "no answer" note, and a partial result is cached for
+  two minutes instead of hours.
+- Argo: a profile that ERDDAP listed but answered with "no matching results" (its per-file
+  index was stale) was retried every cycle and marked the whole source as failing. Levels are
+  now fetched by cycle range as a fallback, a profile that really has no levels is stored as
+  empty and skipped, and the source only reports failure when nothing at all could be fetched.
 - Time-series charts looked empty on the first day: a single sample, or a value isolated between
   gaps, cannot form a line. Such values are now drawn as dots, a one-time-step axis is centred on
   the sample, and a note says how many samples exist until the line fills in.

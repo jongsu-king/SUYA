@@ -23,36 +23,44 @@ ARGO_REPRESENTATIVE_KM = 100.0
 ARGO_REPRESENTATIVE_DAYS = 10
 OBS_RADIUS_KM = 400.0
 TTL = {"air": 900.0, "water": 1800.0, "profile": 10800.0, "series": 3600.0}
+PARTIAL_TTL = 120.0  # 일부 소스가 답하지 않은 결과는 오래 들고 있지 않고 곧 다시 물어봅니다
+GUARD_TIMEOUT = {"HYCOM": 120.0, "WOA23": 60.0}  # 그 밖의 소스는 DEFAULT_GUARD_TIMEOUT
+DEFAULT_GUARD_TIMEOUT = 90.0
 
 
 class TTLCache:
     """같은 지점을 다시 눌러도 원천 서버를 또 치지 않게 합니다. 동시 요청은 하나로 묶습니다."""
 
     def __init__(self):
-        self._values: dict[tuple, tuple[float, Any]] = {}
+        self._values: dict[tuple, tuple[float, Any]] = {}  # key -> (만료 시각, 값)
         self._locks: dict[tuple, asyncio.Lock] = {}
 
     async def get(self, key: tuple, ttl: float, build: Callable[[], Awaitable[Any]]) -> Any:
         cached = self._values.get(key)
-        if cached and time.monotonic() - cached[0] < ttl:
+        if cached and time.monotonic() < cached[0]:
             return cached[1]
         lock = self._locks.setdefault(key, asyncio.Lock())
         async with lock:
             cached = self._values.get(key)
-            if cached and time.monotonic() - cached[0] < ttl:
+            if cached and time.monotonic() < cached[0]:
                 return cached[1]
             value = await build()
-            self._values[key] = (time.monotonic(), value)
+            keep = min(ttl, PARTIAL_TTL) if isinstance(value, dict) and value.get("errors") else ttl
+            self._values[key] = (time.monotonic() + keep, value)
             if len(self._values) > 500:
                 oldest = min(self._values, key=lambda k: self._values[k][0])
                 self._values.pop(oldest, None)
             return value
 
 
-async def _guard(label: str, coro: Awaitable[Any], errors: list[dict]) -> Any:
-    """소스 하나가 실패해도 나머지는 보여 주고, 실패 사실은 화면에 남깁니다."""
+async def _guard(label: str, coro: Awaitable[Any], errors: list[dict], timeout: float | None = None) -> Any:
+    """소스 하나가 실패하거나 답이 없어도 나머지는 보여 주고, 그 사실은 화면에 남깁니다."""
+    limit = GUARD_TIMEOUT.get(label, DEFAULT_GUARD_TIMEOUT) if timeout is None else timeout
     try:
-        return await coro
+        return await asyncio.wait_for(coro, limit)
+    except asyncio.TimeoutError:
+        errors.append({"source": label, "message": msg("응답 시간 초과 ({seconds}초)", seconds=int(limit))})
+        return None
     except Exception as exc:
         errors.append({"source": label, "message": f"{exc}"[:240] or type(exc).__name__})
         return None
@@ -252,6 +260,8 @@ def nearest_argo(ctx: Context, lat: float, lon: float, radius_km: float = ARGO_R
     since = iso(utcnow() - timedelta(days=ARGO_WINDOW_DAYS))
     best = None
     for item in ctx.store.argo_list(since=since):
+        if item.get("n_levels") == 0:  # 서버에 층별 값이 없다고 확인된 프로파일
+            continue
         distance = haversine_km(lat, lon, item["lat"], item["lon"])
         if distance > radius_km:
             continue
@@ -297,7 +307,9 @@ async def profile(ctx: Context, lat: float, lon: float) -> dict:
         levels = stored.get("levels") if stored else None
         if not levels:
             fetched = await _guard(
-                "Argo", argo_collector.fetch_levels(ctx.fetcher, near["platform"], near["cycle"], near["lat"]), errors
+                "Argo",
+                argo_collector.fetch_levels(ctx.fetcher, near["platform"], near["cycle"], near["lat"], interactive=True),
+                errors,
             )
             if fetched:
                 levels = fetched[0]

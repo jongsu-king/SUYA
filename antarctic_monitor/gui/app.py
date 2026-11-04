@@ -559,7 +559,7 @@ class MainWindow(QMainWindow):
         self.detail_loaded[tab] = key
         panel = self.panels[tab]
         if not silent:
-            panel.set_loading(tr("HYCOM 응답 대기 중 (최대 약 1분)…") if tab == "profile" else tr("받는 중…"))
+            panel.set_loading(tr("HYCOM 응답 대기 중 (최대 약 2분)…") if tab == "profile" else tr("받는 중…"))
 
         def done(data, error):
             if self.detail_loaded.get(tab) != key:

@@ -81,14 +81,14 @@ def lon_index(lon: float) -> int:
     return round((lon % 360.0) / LON_STEP) % NLON
 
 
-async def _fetch(fetcher: Fetcher, variable: str, suffix: str, timeout: float) -> str:
+async def _fetch(fetcher: Fetcher, variable: str, suffix: str, timeout: float, interactive: bool = False) -> str:
     """호스트를 차례로 시도합니다. 첫 호스트의 500이 곧 실패를 뜻하지 않기 때문입니다."""
     path = VARIABLES[variable]["path"]
     errors = []
     for host in HOSTS:
         url = f"https://{host}/thredds/dodsC/{path}{suffix}"
         try:
-            response = await fetcher.request("GET", url, timeout=timeout)
+            response = await fetcher.request("GET", url, timeout=timeout, interactive=interactive)
         except FetchError as exc:
             errors.append(str(exc))
             continue
@@ -98,10 +98,10 @@ async def _fetch(fetcher: Fetcher, variable: str, suffix: str, timeout: float) -
     raise FetchError("; ".join(errors))
 
 
-async def time_axis(fetcher: Fetcher, variable: str) -> tuple[list[float], datetime]:
+async def time_axis(fetcher: Fetcher, variable: str, interactive: bool = False) -> tuple[list[float], datetime]:
     das, axis = await asyncio.gather(
-        _fetch(fetcher, variable, ".das", 60.0),
-        _fetch(fetcher, variable, ".ascii?time", 60.0),
+        _fetch(fetcher, variable, ".das", 60.0, interactive),
+        _fetch(fetcher, variable, ".ascii?time", 60.0, interactive),
     )
     return parse_opendap_ascii(axis)["maps"]["time"], parse_time_origin(das)
 
@@ -187,10 +187,11 @@ async def fetch_profile(fetcher: Fetcher, lat: float, lon: float) -> dict:
     now = utcnow()
 
     async def one(variable: str) -> dict:
-        hours, origin = await time_axis(fetcher, variable)
+        # 사용자가 지점을 눌러 기다리는 요청이므로 격자 수집과 같은 줄에 서지 않습니다(interactive).
+        hours, origin = await time_axis(fetcher, variable, interactive=True)
         time_index, valid = nearest_time(hours, origin, now)
         selector = f"{variable}%5B{time_index}%5D%5B0:1:39%5D%5B{li}%5D%5B{lj}%5D"
-        parsed = parse_opendap_ascii(await _fetch(fetcher, variable, f".ascii?{selector}", 150.0))
+        parsed = parse_opendap_ascii(await _fetch(fetcher, variable, f".ascii?{selector}", 150.0, interactive=True))
         return {"parsed": parsed, "valid": valid}
 
     temperature, salinity = await asyncio.gather(one("water_temp"), one("salinity"))
