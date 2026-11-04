@@ -458,7 +458,7 @@ NOAA World Ocean Atlas 2023 · ECMWF ERA5·IFS, DWD ICON, ECCC GEM, JMA GSM(Open
 
 | | |
 |---|---|
-| **임종수** (Jongsu Lim) | 개발·관리 · 인천대학교 물리학과 학부연구생, Hybrid Materials & Optoelectronics Laboratory(HMOL) 연구실 · 인천광역시 연수구 아카데미로 119 (22012) · ORCID [0009-0000-3395-1484](https://orcid.org/0009-0000-3395-1484) · imjongsu1102@gmail.com · https://sites.google.com/view/h-mol · https://github.com/jongsu-king |
+| **임종수** (Jongsu Lim) | 개발·관리 · 인천대학교 물리학과 학부연구생, Hybrid Materials & Optoelectronics Laboratory(HMOL) 연구실 · ORCID [0009-0000-3395-1484](https://orcid.org/0009-0000-3395-1484) · imjongsu1102@gmail.com · https://sites.google.com/view/h-mol · https://github.com/jongsu-king |
 | **박수연** (Suyeon Park) | 공동 저작자 · 인천대학교 신소재공학과 석사과정, Clean Energy and Materials Lab(CELLMATE) 연구실 · dbsnt110@inu.ac.kr · https://cellmate.inu.ac.kr/ |
 
 [AUTHORS.md](AUTHORS.md)도 참고하세요. SUYA의 소스 코드는 [MIT 라이선스](LICENSE)로 배포합니다.

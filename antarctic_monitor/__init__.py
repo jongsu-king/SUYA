@@ -22,7 +22,6 @@ AUTHORS = (
             "Department of Physics, Incheon National University"
         ),
         "affiliation_ko": "인천대학교 물리학과 학부연구생, Hybrid Materials & Optoelectronics Laboratory (HMOL)",
-        "address": "119 Academy-ro, Yeonsu-gu, Incheon 22012, Republic of Korea",
         "orcid": "0009-0000-3395-1484",
         "url": "https://sites.google.com/view/h-mol",
     },
@@ -35,7 +34,6 @@ AUTHORS = (
             "Department of Materials Science and Engineering, Incheon National University"
         ),
         "affiliation_ko": "인천대학교 신소재공학과 석사과정, Clean Energy and Materials Lab (CELLMATE)",
-        "address": "119 Academy-ro, Yeonsu-gu, Incheon 22012, Republic of Korea",
         "orcid": "",
         "url": "https://cellmate.inu.ac.kr/",
     },

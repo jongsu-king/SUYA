@@ -476,7 +476,7 @@ Natural Earth coastlines · cmocean colormaps (Thyng et al. 2016). Exact terms a
 
 | | |
 |---|---|
-| **Jongsu Lim** (임종수) | Author and maintainer · Undergraduate Researcher, Hybrid Materials & Optoelectronics Laboratory (HMOL), Department of Physics, Incheon National University, 119 Academy-ro, Yeonsu-gu, Incheon 22012, Republic of Korea · ORCID [0009-0000-3395-1484](https://orcid.org/0009-0000-3395-1484) · imjongsu1102@gmail.com · https://sites.google.com/view/h-mol · https://github.com/jongsu-king |
+| **Jongsu Lim** (임종수) | Author and maintainer · Undergraduate Researcher, Hybrid Materials & Optoelectronics Laboratory (HMOL), Department of Physics, Incheon National University · ORCID [0009-0000-3395-1484](https://orcid.org/0009-0000-3395-1484) · imjongsu1102@gmail.com · https://sites.google.com/view/h-mol · https://github.com/jongsu-king |
 | **Suyeon Park** (박수연) | Co-author · M.S. Student, Clean Energy and Materials Lab (CELLMATE), Department of Materials Science and Engineering, Incheon National University · dbsnt110@inu.ac.kr · https://cellmate.inu.ac.kr/ |
 
 See also [AUTHORS.md](AUTHORS.md). SUYA's source code is released under the [MIT License](LICENSE): use, modify and
