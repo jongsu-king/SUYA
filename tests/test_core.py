@@ -239,6 +239,25 @@ async def test_point_cache_keeps_partial_results_only_briefly():
     assert cache._values[("c",)][0] - now > pointquery.PARTIAL_TTL + 1
 
 
+async def test_climatology_is_kept_in_the_store(store):
+    calls = {"count": 0}
+
+    def handler(request):
+        calls["count"] += 1
+        return httpx.Response(200, text="time,altitude,latitude,longitude,value\n1,0.0,-62,150,1.5\n1,10.0,-62,150,1.2\n")
+
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(handler)), backoff=0.0)
+    errors: list[dict] = []
+    first = await pointquery._climatology(Context(store, fetcher, Settings()), -62.0, 150.0, 11, errors)
+    assert first["levels"] and calls["count"] == 4 and not errors
+    await fetcher.aclose()
+
+    offline = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(500))), backoff=0.0)
+    second = await pointquery._climatology(Context(store, offline, Settings()), -62.0, 150.0, 11, errors)
+    assert second == first and not errors
+    await offline.aclose()
+
+
 async def test_fetcher_does_not_retry_rate_limit():
     calls = {"count": 0}
 

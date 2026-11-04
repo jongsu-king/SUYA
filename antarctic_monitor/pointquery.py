@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from datetime import timedelta
 from typing import Any, Awaitable, Callable
@@ -290,6 +291,21 @@ def _with_derived(levels: list[dict], lat: float) -> list[dict]:
     return output
 
 
+async def _climatology(ctx: Context, lat: float, lon: float, month: int, errors: list[dict]) -> dict | None:
+    """기후값은 바뀌지 않으므로 한 번 받은 격자점은 데이터베이스에 두고 다시 묻지 않습니다.
+
+    NCEI 서버가 느리거나 멈춰 있어도 이미 본 지점은 바로 나옵니다.
+    """
+    key = f"woa23:{lat:.3f}:{lon:.3f}:{month:02d}"
+    cached = await asyncio.to_thread(ctx.store.kv_get, key)
+    if cached:
+        return json.loads(cached)
+    climate = await _guard("WOA23", woa.fetch_profile(ctx.fetcher, lat, lon, month), errors)
+    if climate:
+        await asyncio.to_thread(ctx.store.kv_set, key, json.dumps(climate))
+    return climate
+
+
 async def profile(ctx: Context, lat: float, lon: float) -> dict:
     """깊이별 수온·염분: 모델, 기후값, 가장 가까운 현장 관측을 함께 돌려줍니다."""
     errors: list[dict] = []
@@ -298,7 +314,7 @@ async def profile(ctx: Context, lat: float, lon: float) -> dict:
     month = utcnow().month
     model, climate = await asyncio.gather(
         _guard("HYCOM", hycom.fetch_profile(ctx.fetcher, query_lat, query_lon), errors),
-        _guard("WOA23", woa.fetch_profile(ctx.fetcher, query_lat, query_lon, month), errors),
+        _climatology(ctx, query_lat, query_lon, month, errors),
     )
     near = await asyncio.to_thread(nearest_argo, ctx, query_lat, query_lon)
     argo_series = None

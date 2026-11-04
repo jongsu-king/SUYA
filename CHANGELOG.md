@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- WOA23 climatology profiles are kept in the database per grid point and month, so the
+  vertical-profile tab shows the climatology at once for any point looked up before, even while
+  the NCEI server is slow or down.
+
 ## [0.1.1] - 2026-11-04
 
 Bug-fix release. Archived on Zenodo under the concept DOI https://doi.org/10.5281/zenodo.23937852;
