@@ -16,19 +16,19 @@ installation needed: download the installer, open it, and the data starts arrivi
 
 ## Download
 
-**Latest release: [SUYA 0.1.1](https://github.com/jongsu-king/SUYA/releases/latest)** — click the button for your operating system:
+**Latest release: [SUYA 0.1.2](https://github.com/jongsu-king/SUYA/releases/latest)** — click the button for your operating system:
 
-[![Windows 10/11: download the installer (.exe)](https://img.shields.io/badge/Windows%2010%20%2F%2011-Download%20installer%20(.exe)-0078d4?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-windows-x64-setup.exe)
-[![macOS Apple Silicon: download the disk image (.dmg)](https://img.shields.io/badge/macOS%20Apple%20Silicon-Download%20.dmg-1d1d1f?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-arm64.dmg)
-[![macOS Intel: download the disk image (.dmg)](https://img.shields.io/badge/macOS%20Intel-Download%20.dmg-6e6e73?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-x86_64.dmg)
-[![Linux x86_64: download the archive (.tar.gz)](https://img.shields.io/badge/Linux%20x86__64-Download%20.tar.gz-e95420?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-linux-x86_64.tar.gz)
+[![Windows 10/11: download the installer (.exe)](https://img.shields.io/badge/Windows%2010%20%2F%2011-Download%20installer%20(.exe)-0078d4?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-windows-x64-setup.exe)
+[![macOS Apple Silicon: download the disk image (.dmg)](https://img.shields.io/badge/macOS%20Apple%20Silicon-Download%20.dmg-1d1d1f?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-arm64.dmg)
+[![macOS Intel: download the disk image (.dmg)](https://img.shields.io/badge/macOS%20Intel-Download%20.dmg-6e6e73?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-x86_64.dmg)
+[![Linux x86_64: download the archive (.tar.gz)](https://img.shields.io/badge/Linux%20x86__64-Download%20.tar.gz-e95420?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-linux-x86_64.tar.gz)
 
 | Operating system | File | Size | Notes |
 |---|---|---|---|
-| **Windows 10 / 11** (64-bit) | [SUYA-0.1.1-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-windows-x64-setup.exe) | ≈ 50 MB | Installer with English/Korean wizard; no admin rights required |
-| **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.1-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-arm64.dmg) | ≈ 60 MB | Drag to Applications. Apple menu → *About This Mac* says "Chip Apple M…" |
-| **macOS 12+** Intel | [SUYA-0.1.1-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-x86_64.dmg) | ≈ 65 MB | Drag to Applications. *About This Mac* says "Processor … Intel" |
-| **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.1-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-linux-x86_64.tar.gz) | ≈ 110 MB | Extract and run `./install.sh` |
+| **Windows 10 / 11** (64-bit) | [SUYA-0.1.2-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-windows-x64-setup.exe) | ≈ 50 MB | Installer with English/Korean wizard; no admin rights required |
+| **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.2-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-arm64.dmg) | ≈ 60 MB | Drag to Applications. Apple menu → *About This Mac* says "Chip Apple M…" |
+| **macOS 12+** Intel | [SUYA-0.1.2-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-x86_64.dmg) | ≈ 65 MB | Drag to Applications. *About This Mac* says "Processor … Intel" |
+| **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.2-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-linux-x86_64.tar.gz) | ≈ 110 MB | Extract and run `./install.sh` |
 | Any OS with Python 3.11+ | `pip install git+https://github.com/jongsu-king/SUYA.git` | — | Then run `suya` |
 
 The same files are listed under **Assets** at the bottom of the [latest release page](https://github.com/jongsu-king/SUYA/releases/latest),
@@ -479,12 +479,13 @@ sync working when adding a source, and add a parser test with a real response sh
 
 If SUYA helps in a publication, cite the **data providers** (they did the hard part) and cite this software:
 
-> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.1) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937852
+> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.2) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937852
 
 | DOI | Use it for |
 |---|---|
 | [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **concept DOI** — all versions; always resolves to the latest archived release. Use it unless the exact version matters |
-| [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) | version 0.1.1 (this release) |
+| *version DOI of 0.1.2* | issued by Zenodo when it archives the 0.1.2 release and added here afterwards |
+| [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) | version 0.1.1 |
 | [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | version 0.1.0 |
 
 Every GitHub release is archived automatically on [Zenodo](https://doi.org/10.5281/zenodo.23937852) and receives its own version DOI.
@@ -496,7 +497,7 @@ sidebar) builds APA and BibTeX entries from it — and in [.zenodo.json](.zenodo
 @software{lim_park_suya_2026,
   author    = {Lim, Jongsu and Park, Suyeon},
   title     = {{SUYA}: Antarctic ocean temperature, salinity and air temperature monitor},
-  version   = {0.1.1},
+  version   = {0.1.2},
   year      = {2026},
   month     = {11},
   publisher = {Zenodo},
