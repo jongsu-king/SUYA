@@ -345,6 +345,8 @@ EN: dict[str, str] = {
     "이 운영체제용 설치 파일이 릴리스에 없습니다": "The release has no installer for this operating system",
     "내려받은 파일의 SHA-256이 다릅니다": "The downloaded file's SHA-256 does not match",
     "이 설치본은 스스로 업데이트할 수 없습니다": "This installation cannot update itself",
+    "SUYA가 이미 실행 중입니다. 창이 보이지 않으면 Dock이나 작업 표시줄을 확인하세요.": "SUYA is already running. If you cannot see its window, look in the Dock or the taskbar.",
+    "혼합층 깊이 (10 m 기준 수온에서 0.2 °C 차): {items}": "Mixed-layer depth (0.2 °C from the 10 m temperature): {items}",
     "이 설치본은 스스로 업데이트할 수 없습니다. 새 버전 {version}의 내려받기 페이지를 열까요?": "This installation cannot update itself. Open the download page for version {version}?",
     "수심": "Depth",
     "기지·해역": "Stations and areas",

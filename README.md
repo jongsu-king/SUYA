@@ -171,7 +171,7 @@ within 2000 km) for water values. Air temperature is for the clicked point itsel
 | Tab | Contents | Sources called |
 |---|---|---|
 | **Surface** | Representative SST and salinity, freezing point, margin above freezing, density σt, and a table of every source with value, kind, data time, age and notes | OISST, MUR, Open-Meteo Marine, HYCOM (stored grid), SMOS, SMAP, stored Argo and GOSUD |
-| **Vertical profile** | Temperature and salinity against depth (Argo in situ, HYCOM model, WOA23 climatology; square-root depth axis so the upper ocean is readable) and a T-S diagram with σt contours and the freezing line | HYCOM 40 levels (up to 1 min), WOA23, stored Argo |
+| **Vertical profile** | Temperature and salinity against depth (Argo in situ, HYCOM model, WOA23 climatology; square-root depth axis so the upper ocean is readable), a T-S diagram with σt contours and the freezing line, and a note with each profile's mixed-layer depth (0.2 °C from the 10 m temperature) | HYCOM 40 levels (up to 2 min), WOA23 (kept in the database once fetched), stored Argo |
 | **Air temperature** | Eight GFS current values; 7-day forecasts from five models with a "now" line; 48 h of METAR from the nearest station within 400 km; temperature by pressure level 1000–10 hPa (GFS and ECMWF) | Open-Meteo, stored METAR, Windy (with a key) |
 | **Time series** | Last 30 days of OISST SST, satellite salinity (SMOS, SMAP), sea-ice concentration and ERA5 daily air temperature with a min–max band | OISST, SMOS, SMAP, ERA5 |
 

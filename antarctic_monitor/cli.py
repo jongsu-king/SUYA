@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import faulthandler
 import json
 import logging
 import logging.handlers
@@ -187,12 +188,22 @@ def _exit(code: int) -> None:
     os._exit(code)
 
 
+_crash_log = None
+
+
 def _configure_logging(command: str) -> None:
-    if command == "gui":
+    global _crash_log
+    if command in ("gui", "daemon"):
         folder = app_data_dir()
         folder.mkdir(parents=True, exist_ok=True)
+        try:
+            _crash_log = open(folder / "crash.log", "a", encoding="utf-8")
+            faulthandler.enable(file=_crash_log, all_threads=True)
+        except OSError:
+            _crash_log = None
+    if command == "gui":
         handler: logging.Handler = logging.handlers.RotatingFileHandler(
-            folder / "monitor.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8"
+            app_data_dir() / "monitor.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8"
         )
     else:
         handler = logging.StreamHandler()
@@ -249,7 +260,16 @@ def main(argv: list[str] | None = None) -> None:
     if command == "collect":
         sys.exit(1 if asyncio.run(_collect_once(_resolve_sources(args.sources))) else 0)
     if command == "daemon":
-        asyncio.run(_daemon(_resolve_sources(args.sources)))
+        from .instance import InstanceLock
+
+        lock = InstanceLock(load_settings().db_path.parent)
+        if not lock.acquire():
+            print(tr("SUYA가 이미 실행 중입니다. 창이 보이지 않으면 Dock이나 작업 표시줄을 확인하세요."), file=sys.stderr)
+            sys.exit(1)
+        try:
+            asyncio.run(_daemon(_resolve_sources(args.sources)))
+        finally:
+            lock.release()
         return
     if command == "export":
         _export(args)

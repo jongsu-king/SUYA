@@ -21,7 +21,7 @@ from .base import CollectResult, Context, finite, to_iso_utc
 BASE = "https://erddap.ifremer.fr/erddap/tabledap/ArgoFloats.csv"
 LIST_LAT = -55.0
 LIST_DAYS = 30
-BATCH = 60
+BATCH = 120
 GOOD_QC = {"1", "2"}
 VALID_TEMP = (-3.0, 40.0)
 VALID_SALT = (20.0, 42.0)

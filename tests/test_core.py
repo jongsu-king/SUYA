@@ -258,6 +258,26 @@ async def test_climatology_is_kept_in_the_store(store):
     await offline.aclose()
 
 
+def test_mixed_layer_depth_uses_the_temperature_criterion():
+    levels = [{"depth_m": d, "temp": 1.0 if d <= 50 else 1.0 - 0.05 * (d - 50)} for d in (0, 5, 10, 20, 30, 40, 50, 60, 75, 100)]
+    assert seawater.mixed_layer_depth(levels) == 60.0
+    assert seawater.mixed_layer_depth([{"depth_m": 0, "temp": 1.0}, {"depth_m": 5, "temp": 0.0}]) is None
+    assert seawater.mixed_layer_depth([{"depth_m": d, "temp": 1.0} for d in (0, 10, 50, 100)]) is None
+    assert seawater.mixed_layer_depth([{"depth_m": 10, "salt": 34.0}]) is None
+
+
+def test_second_instance_is_refused(tmp_path):
+    from antarctic_monitor.instance import InstanceLock
+
+    first = InstanceLock(tmp_path)
+    assert first.acquire()
+    second = InstanceLock(tmp_path)
+    assert not second.acquire()
+    first.release()
+    assert second.acquire()
+    second.release()
+
+
 def test_release_check_compares_versions():
     assert updates.is_newer("v0.1.2", "0.1.1") and updates.is_newer("1.0", "0.9.9") and updates.is_newer("0.1.10", "0.1.9")
     assert not updates.is_newer("v0.1.1", "0.1.1") and not updates.is_newer("0.0.9", "0.1.1") and not updates.is_newer("", "0.1.1")

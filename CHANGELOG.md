@@ -17,6 +17,14 @@ All notable changes to this project are documented here. The format follows
   *install automatically* (with a 20-second prompt to postpone); *Help ▸ Check for updates…* runs the
   check on demand. pip installations are only pointed to the download page. The Windows installer
   accepts `/relaunch=1` to start the program again after a silent update.
+- Only one copy of the program runs per data folder: a second start (window or `suya daemon`)
+  explains that SUYA is already running and exits instead of collecting everything twice.
+- Native crashes are written to `crash.log` in the data folder (Python's fault handler), so a
+  crash inside Qt or a driver leaves a trace to report.
+- The vertical-profile note shows the mixed-layer depth of each profile (temperature criterion:
+  0.2 °C from the 10 m value, de Boyer Montégut et al. 2004).
+- Argo fetches up to 120 profiles per hourly run instead of 60, so the first day's backlog clears
+  in about half the time.
 
 ### Changed
 - Chart legends sit above the plot, outside the axes, so they never cover the data; the T-S

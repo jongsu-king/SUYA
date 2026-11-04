@@ -22,6 +22,7 @@ from ..config import Settings, load_settings, save_user_settings
 from ..db import iso, utcnow
 from ..geo import parse_location_url, validate
 from ..i18n import LANGUAGES, get_language, render, saved_language, set_language, tr
+from ..instance import InstanceLock
 from ..locations import LOCATIONS, location_label
 from .backend import Backend
 from .charts import Chart
@@ -888,21 +889,28 @@ def run_gui(
         set_language(dialog.language())
         save_user_settings({"MONITOR_LANG": dialog.language()})
     settings = load_settings()
+    lock = InstanceLock(settings.db_path.parent)
+    if not lock.acquire():
+        QMessageBox.information(None, "SUYA", tr("SUYA가 이미 실행 중입니다. 창이 보이지 않으면 Dock이나 작업 표시줄을 확인하세요."))
+        return 0
     updates.cleanup()
     backend = Backend(settings, collect=collect, sources=sources)
     backend.start()
     code = 0
-    while True:
-        window = MainWindow(backend, settings)
-        window.show()
-        window.start()
-        if snapshot:
-            def capture() -> None:
-                window.grab().save(snapshot)
-                window.close()
+    try:
+        while True:
+            window = MainWindow(backend, settings)
+            window.show()
+            window.start()
+            if snapshot:
+                def capture() -> None:
+                    window.grab().save(snapshot)
+                    window.close()
 
-            QTimer.singleShot(int(snapshot_after * 1000), capture)
-        code = app.exec()
-        if not window.relaunch:
-            break
+                QTimer.singleShot(int(snapshot_after * 1000), capture)
+            code = app.exec()
+            if not window.relaunch:
+                break
+    finally:
+        lock.release()
     return code

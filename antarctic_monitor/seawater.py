@@ -45,6 +45,25 @@ def depth_from_pressure(pressure_dbar: float, lat: float) -> float:
     return (((-1.82e-15 * p + 2.279e-10) * p - 2.2512e-5) * p + 9.72659) * p / gravity
 
 
+def mixed_layer_depth(levels: list[dict], reference_m: float = 10.0, delta_c: float = 0.2) -> float | None:
+    """온도 기준 혼합층 깊이(m): 기준 수심(10 m)의 수온에서 0.2 °C 이상 벗어나는 첫 깊이. de Boyer Montégut et al. (2004).
+
+    기준 수심 아래 자료가 없거나 프로파일 안에서 그 차이에 이르지 않으면 None.
+    """
+    rows = sorted(
+        (float(lv["depth_m"]), float(lv["temp"]))
+        for lv in levels
+        if lv.get("temp") is not None and lv.get("depth_m") is not None
+    )
+    reference = next((temp for depth, temp in rows if depth >= reference_m), None)
+    if reference is None:
+        return None
+    for depth, temp in rows:
+        if depth > reference_m and abs(temp - reference) >= delta_c:
+            return depth
+    return None
+
+
 def derive(temperature_c: float | None, salinity: float | None, pressure_dbar: float = 0.0) -> dict:
     """수온·염분이 모두 있을 때 파생값을 만듭니다. 없으면 None."""
     if salinity is None or salinity <= 0:
