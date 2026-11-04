@@ -461,9 +461,14 @@ sync working when adding a source, and add a parser test with a real response sh
 
 ## 17. Citing and data credits
 
-If SUYA helps in a publication, cite the **data providers** (they did the hard part) and link this repository:
+If SUYA helps in a publication, cite the **data providers** (they did the hard part) and cite this software:
 
 > Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.0) [Computer software]. https://github.com/jongsu-king/SUYA
+
+Machine-readable citation metadata is in [CITATION.cff](CITATION.cff) — GitHub's **Cite this repository** button (right-hand
+sidebar) builds APA and BibTeX entries from it — and in [.zenodo.json](.zenodo.json), which [Zenodo](https://zenodo.org/) reads
+when it archives a release. Each archived release receives its own DOI plus a concept DOI that always resolves to the latest
+version; as soon as the first archive is issued, the DOI is listed here, in `CITATION.cff` and in the release notes.
 
 Data: NOAA NCEI OISST v2.1 (Huang et al. 2021) · NOAA NCEP GFS · NOAA Aviation Weather Center METAR · NASA JPL MUR SST v4.1 ·
 ESA SMOS and NASA SMAP sea-surface salinity via NOAA CoastWatch · US Naval Research Laboratory HYCOM ESPC-D-V02 · International Argo Program

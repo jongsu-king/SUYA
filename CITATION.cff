@@ -1,0 +1,43 @@
+# Citation metadata (Citation File Format 1.2.0). GitHub reads this file for the
+# "Cite this repository" button; Zenodo and other archives import it as well.
+# https://citation-file-format.github.io/
+cff-version: 1.2.0
+message: "If you use SUYA in your research, please cite it using the metadata in this file."
+type: software
+title: "SUYA: Antarctic ocean temperature, salinity and air temperature monitor"
+abstract: >-
+  SUYA is a desktop program that continuously collects Antarctic sea surface and
+  subsurface temperature, salinity and coastal air temperature from public
+  scientific APIs (NOAA METAR, Open-Meteo, NOAA OISST and MUR, SMOS and SMAP
+  salinity, HYCOM ESPC-D-V02, Argo floats, GOSUD, World Ocean Atlas 2023 and the
+  Windy Point Forecast API), stores every value with its provenance in SQLite and
+  monthly Excel workbooks, and shows the data on a south-polar stereographic map
+  with per-location profiles and time series. The interface is available in
+  Korean and English.
+authors:
+  - family-names: Lim
+    given-names: Jongsu
+    email: imjongsu1102@gmail.com
+    orcid: "https://orcid.org/0009-0000-3395-1484"
+    affiliation: "Hybrid Materials & Optoelectronics Laboratory (HMOL), Department of Physics, Incheon National University"
+  - family-names: Park
+    given-names: Suyeon
+    email: dbsnt110@inu.ac.kr
+    affiliation: "Clean Energy and Materials Lab (CELLMATE), Department of Materials Science and Engineering, Incheon National University"
+version: 0.1.0
+date-released: 2026-11-04
+license: MIT
+repository-code: "https://github.com/jongsu-king/SUYA"
+url: "https://github.com/jongsu-king/SUYA"
+keywords:
+  - Antarctica
+  - Southern Ocean
+  - sea surface temperature
+  - salinity
+  - air temperature
+  - Argo
+  - HYCOM
+  - OISST
+  - oceanography
+  - data collection
+  - PySide6

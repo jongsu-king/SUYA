@@ -26,3 +26,5 @@ First public release of **SUYA** (Antarctic Ocean Monitor).
 - Korean and English interface, chosen on first start and switchable from the View menu.
 - Command line: `gui`, `daemon`, `collect`, `export`, `excel-sync`, `sources`, `self-test`.
 - Installer builds for Windows (Inno Setup), macOS (DMG) and Linux (tar.gz) via GitHub Actions.
+- Citation metadata: `CITATION.cff` for GitHub's "Cite this repository" button and `.zenodo.json`
+  for Zenodo DOI archiving of releases.

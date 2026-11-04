@@ -63,7 +63,7 @@ build-backend = "hatchling.build"
 packages = ["antarctic_monitor"]
 
 [tool.hatch.build.targets.sdist]
-include = ["antarctic_monitor", "tests", "packaging", "docs", "README.md", "README.ko.md", "LICENSE", "AUTHORS.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md"]
+include = ["antarctic_monitor", "tests", "packaging", "docs", "README.md", "README.ko.md", "LICENSE", "AUTHORS.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md", "CITATION.cff", ".zenodo.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

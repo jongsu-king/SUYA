@@ -46,3 +46,24 @@ def test_version_consistent():
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert f'version = "{antarctic_monitor.__version__}"' in text
     assert antarctic_monitor.__version__ in (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"version: {antarctic_monitor.__version__}\n" in (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+
+
+def test_citation_metadata_lists_both_authors():
+    import json
+
+    cff = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    assert cff.startswith("# Citation metadata") and "cff-version: 1.2.0" in cff
+    for author in antarctic_monitor.AUTHORS:
+        family, given = author["name"].split()[-1], author["name"].split()[0]
+        assert f"family-names: {family}" in cff and f"given-names: {given}" in cff
+        assert author["email"] in cff
+    assert "0009-0000-3395-1484" in cff and "date-released: " in cff and "license: MIT" in cff
+
+    zenodo = json.loads((ROOT / ".zenodo.json").read_text(encoding="utf-8"))
+    assert [c["name"] for c in zenodo["creators"]] == ["Lim, Jongsu", "Park, Suyeon"]
+    assert zenodo["creators"][0]["orcid"] == "0009-0000-3395-1484"
+    assert all("Incheon National University" in c["affiliation"] for c in zenodo["creators"])
+    assert zenodo["upload_type"] == "software" and zenodo["license"].lower() == "mit"
+    for name in ("CITATION.cff", ".zenodo.json"):
+        assert "Academy-ro" not in (ROOT / name).read_text(encoding="utf-8"), name

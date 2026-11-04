@@ -1,0 +1,32 @@
+{
+  "title": "SUYA: Antarctic ocean temperature, salinity and air temperature monitor",
+  "upload_type": "software",
+  "description": "<p>SUYA is a desktop program that continuously collects Antarctic sea surface and subsurface temperature, salinity and coastal air temperature from public scientific APIs (NOAA METAR, Open-Meteo, NOAA OISST and MUR, SMOS and SMAP salinity, HYCOM ESPC-D-V02, Argo floats, GOSUD, World Ocean Atlas 2023 and the Windy Point Forecast API), stores every value with its provenance in SQLite and monthly Excel workbooks, and shows the data on a south-polar stereographic map with per-location profiles and time series. The interface is available in Korean and English.</p><p>Source code, documentation and installers for Windows, macOS and Linux: <a href=\"https://github.com/jongsu-king/SUYA\">https://github.com/jongsu-king/SUYA</a></p>",
+  "creators": [
+    {
+      "name": "Lim, Jongsu",
+      "affiliation": "Hybrid Materials & Optoelectronics Laboratory (HMOL), Department of Physics, Incheon National University",
+      "orcid": "0009-0000-3395-1484"
+    },
+    {
+      "name": "Park, Suyeon",
+      "affiliation": "Clean Energy and Materials Lab (CELLMATE), Department of Materials Science and Engineering, Incheon National University"
+    }
+  ],
+  "access_right": "open",
+  "license": "mit",
+  "language": "eng",
+  "keywords": [
+    "Antarctica",
+    "Southern Ocean",
+    "sea surface temperature",
+    "salinity",
+    "air temperature",
+    "Argo",
+    "HYCOM",
+    "OISST",
+    "oceanography",
+    "data collection",
+    "PySide6"
+  ]
+}
