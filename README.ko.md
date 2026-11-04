@@ -17,10 +17,10 @@
 
 | 운영체제 | 내려받기 | 크기 | 비고 |
 |---|---|---|---|
-| **Windows 10 / 11** (64비트) | [SUYA-0.1.0-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-windows-x64-setup.exe) | ≈ 70 MB | 한국어·영어 설치 마법사. 관리자 권한 없이 설치 가능 |
-| **macOS 12 이상** Apple Silicon (M1–M4) | [SUYA-0.1.0-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-arm64.dmg) | ≈ 64 MB | 응용 프로그램 폴더로 끌어 놓기 |
-| **macOS 12 이상** Intel | [SUYA-0.1.0-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-x86_64.dmg) | ≈ 70 MB | 응용 프로그램 폴더로 끌어 놓기 |
-| **Linux** x86_64 (glibc 2.35 이상, Ubuntu 22.04+) | [SUYA-0.1.0-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-linux-x86_64.tar.gz) | ≈ 90 MB | 풀고 `./install.sh` |
+| **Windows 10 / 11** (64비트) | [SUYA-0.1.0-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-windows-x64-setup.exe) | ≈ 50 MB | 한국어·영어 설치 마법사. 관리자 권한 없이 설치 가능 |
+| **macOS 12 이상** Apple Silicon (M1–M4) | [SUYA-0.1.0-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-arm64.dmg) | ≈ 60 MB | 응용 프로그램 폴더로 끌어 놓기 |
+| **macOS 12 이상** Intel | [SUYA-0.1.0-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-x86_64.dmg) | ≈ 65 MB | 응용 프로그램 폴더로 끌어 놓기 |
+| **Linux** x86_64 (glibc 2.35 이상, Ubuntu 22.04+) | [SUYA-0.1.0-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-linux-x86_64.tar.gz) | ≈ 110 MB | 풀고 `./install.sh` |
 | 파이썬 3.11 이상이 있는 모든 OS | `pip install git+https://github.com/jongsu-king/SUYA.git` | — | 설치 후 `suya` 실행 |
 
 모든 버전, 체크섬(`SHA256SUMS.txt`), 릴리스 노트: **[Releases 페이지](https://github.com/jongsu-king/SUYA/releases)**.

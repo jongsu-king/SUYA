@@ -18,10 +18,10 @@ installation needed: download the installer, open it, and the data starts arrivi
 
 | Operating system | Download | Size | Notes |
 |---|---|---|---|
-| **Windows 10 / 11** (64-bit) | [SUYA-0.1.0-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-windows-x64-setup.exe) | ≈ 70 MB | Installer with English/Korean wizard; no admin rights required |
-| **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.0-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-arm64.dmg) | ≈ 64 MB | Drag to Applications |
-| **macOS 12+** Intel | [SUYA-0.1.0-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-x86_64.dmg) | ≈ 70 MB | Drag to Applications |
-| **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.0-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-linux-x86_64.tar.gz) | ≈ 90 MB | Extract and run `./install.sh` |
+| **Windows 10 / 11** (64-bit) | [SUYA-0.1.0-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-windows-x64-setup.exe) | ≈ 50 MB | Installer with English/Korean wizard; no admin rights required |
+| **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.0-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-arm64.dmg) | ≈ 60 MB | Drag to Applications |
+| **macOS 12+** Intel | [SUYA-0.1.0-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-macos-x86_64.dmg) | ≈ 65 MB | Drag to Applications |
+| **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.0-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.0-linux-x86_64.tar.gz) | ≈ 110 MB | Extract and run `./install.sh` |
 | Any OS with Python 3.11+ | `pip install git+https://github.com/jongsu-king/SUYA.git` | — | Then run `suya` |
 
 All versions, checksums (`SHA256SUMS.txt`) and release notes: **[Releases page](https://github.com/jongsu-king/SUYA/releases)**.
