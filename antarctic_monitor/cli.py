@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import gc
 import json
 import logging
 import logging.handlers
@@ -160,14 +161,36 @@ def _self_test(args: argparse.Namespace) -> None:
         window.grab()
         lines.append("gui ok")
         lines.append(f"excel ok {excel.sync(backend.store, settings.excel_dir)['files']}")
-        window.close()
+        window.close()  # closeEvent stops the backend thread and closes the database
         app.processEvents()
+        # 창과 백엔드는 시그널/콜백으로 서로를 참조하므로 인터프리터가 끝날 때가 아니라 지금 정리합니다.
+        window.deleteLater()
+        app.processEvents()
+        del window, backend
+        gc.collect()
     lines.append(f"version {__version__}")
     text = "\n".join(lines) + "\n"
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")
     if sys.stdout:
         print(text, end="")
+
+
+def _exit(code: int) -> None:
+    """Leave without the interpreter's final garbage collection.
+
+    Tearing Qt objects down from that last collection aborts some PySide6 builds (seen on Linux with
+    Python 3.11: "none_dealloc: deallocating None"), so everything is flushed here and the process ends at once.
+    """
+    gc.collect()
+    logging.shutdown()
+    for stream in (sys.stdout, sys.stderr):
+        if stream:
+            try:
+                stream.flush()
+            except OSError:
+                pass
+    os._exit(code)
 
 
 def _configure_logging(command: str) -> None:
@@ -243,7 +266,7 @@ def main(argv: list[str] | None = None) -> None:
         return
     if command == "self-test":
         _self_test(args)
-        return
+        _exit(0)
     if command == "sources":
         for source in SOURCES:
             print(f"{source['id']:20s} {tr(source['name'])} | {tr(source['measures'])} | {tr(source['cadence'])}")
@@ -251,12 +274,11 @@ def main(argv: list[str] | None = None) -> None:
 
     from .gui.app import run_gui
 
-    sys.exit(
-        run_gui(
-            collect=not getattr(args, "no_collect", False),
-            sources=_resolve_sources(getattr(args, "sources", None)),
-            snapshot=getattr(args, "snapshot", None),
-            snapshot_after=getattr(args, "snapshot_after", 8.0),
-            forced_language=args.lang,
-        )
+    code = run_gui(
+        collect=not getattr(args, "no_collect", False),
+        sources=_resolve_sources(getattr(args, "sources", None)),
+        snapshot=getattr(args, "snapshot", None),
+        snapshot_after=getattr(args, "snapshot_after", 8.0),
+        forced_language=args.lang,
     )
+    _exit(code)
