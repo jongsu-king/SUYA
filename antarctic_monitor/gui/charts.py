@@ -204,6 +204,10 @@ class Chart(QWidget):
         positions = mdates.date2num(all_times)
         if len(all_times) == 1:  # 시각이 하나뿐이면 그 점을 가운데 두고 하루 폭으로 봅니다.
             ax.set_xlim(positions[0] - 0.5, positions[0] + 0.5)
+        span_days = positions[-1] - positions[0] if len(all_times) > 1 else 1.0
+        if span_days <= 2:  # 이틀 이하 구간은 날짜만으로는 눈금이 같은 글자로 반복되므로 시각까지 적습니다.
+            ax.xaxis.set_major_locator(mdates.AutoDateLocator(tz=LOCAL_TZ, minticks=3, maxticks=6))
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M", tz=LOCAL_TZ))
         if most_points <= 2:
             ax.text(
                 0.5, 0.06, tr("표본 {n}개 — 수집이 이어지면 선으로 채워집니다", n=most_points),
