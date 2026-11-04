@@ -105,6 +105,25 @@ class Fetcher:
             raise FetchError(f"HTTP {response.status_code}: {_short_body(response)}")
         return response.json()
 
+    async def download(self, url: str, path, *, timeout: float = 900.0, progress=None, interactive: bool = True):
+        """큰 파일을 조각으로 받아 path에 씁니다. progress(받은 바이트, 전체 바이트)를 조각마다 부릅니다."""
+        try:
+            async with self._semaphore(url, interactive):
+                async with self._client.stream("GET", url, timeout=timeout) as response:
+                    if response.status_code >= 400:
+                        raise FetchError(f"HTTP {response.status_code}")
+                    total = int(response.headers.get("content-length") or 0)
+                    received = 0
+                    with open(path, "wb") as handle:
+                        async for chunk in response.aiter_bytes(1 << 16):
+                            handle.write(chunk)
+                            received += len(chunk)
+                            if progress:
+                                progress(received, total)
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            raise FetchError(f"{urlparse(url).netloc}: {type(exc).__name__}") from exc
+        return path
+
 
 def _short_body(response: httpx.Response, limit: int = 200) -> str:
     return " ".join(response.text.split())[:limit]

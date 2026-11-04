@@ -8,7 +8,7 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt, QTimer, QUrl
+from PySide6.QtCore import QSettings, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
@@ -65,6 +65,8 @@ def parse_location_text(text: str) -> tuple[float, float, str | None]:
 
 
 class MainWindow(QMainWindow):
+    update_progress = Signal(int, int)
+
     def __init__(self, backend: Backend, settings: Settings):
         super().__init__()
         self.backend = backend
@@ -97,6 +99,14 @@ class MainWindow(QMainWindow):
         self.clock.timeout.connect(self._tick)
         self.clock.start()
         self.backend.event.connect(self.on_event)
+        self.update_progress.connect(self._show_update_progress)
+        self._deferred_update: str | None = None
+        self._updating = False
+        self.update_timer = QTimer(self, interval=24 * 3600 * 1000)
+        self.update_timer.timeout.connect(lambda: self.check_updates(manual=False))
+        if self.settings_.update_mode != "off":
+            QTimer.singleShot(15_000, lambda: self.check_updates(manual=False))
+            self.update_timer.start()
 
     def _build_menu(self) -> None:
         bar = self.menuBar()
@@ -138,24 +148,98 @@ class MainWindow(QMainWindow):
         help_menu.addAction(tr("업데이트 확인…"), self.check_updates)
         help_menu.addAction(tr("프로그램 정보…"), lambda: AboutDialog(self).exec())
 
-    def check_updates(self) -> None:
-        self.statusBar().showMessage(tr("업데이트 확인 중…"))
+    def check_updates(self, manual: bool = True) -> None:
+        if self._updating:
+            return
+        if manual:
+            self.statusBar().showMessage(tr("업데이트 확인 중…"))
 
         def done(result, error):
             if error or not result:
-                self.statusBar().showMessage(tr("업데이트 확인 실패: {error}", error=render(str(error))), 8000)
+                if manual:
+                    self.statusBar().showMessage(tr("업데이트 확인 실패: {error}", error=render(str(error))), 8000)
                 return
             if not result["newer"]:
-                self.statusBar().showMessage(tr("최신 버전입니다 ({version})", version=__version__), 6000)
+                if manual:
+                    self.statusBar().showMessage(tr("최신 버전입니다 ({version})", version=__version__), 6000)
+                return
+            if not manual and self._deferred_update == result["version"]:
                 return
             self.statusBar().clearMessage()
-            answer = QMessageBox.question(
-                self, tr("업데이트 확인"), tr("새 버전 {version}이 있습니다. 내려받기 페이지를 열까요?", version=result["version"]),
-            )
-            if answer == QMessageBox.StandardButton.Yes:
-                QDesktopServices.openUrl(QUrl(result["url"]))
+            self._offer_update(result, automatic=not manual and self.settings_.update_mode == "auto")
 
         self.backend.call(lambda: updates.latest_release(self.backend.ctx.fetcher), done)
+
+    def _offer_update(self, release: dict, automatic: bool) -> None:
+        version = release["version"]
+        if not (updates.can_self_update() and release.get("asset")):
+            answer = QMessageBox.question(
+                self, tr("업데이트 확인"),
+                tr("이 설치본은 스스로 업데이트할 수 없습니다. 새 버전 {version}의 내려받기 페이지를 열까요?", version=version),
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                QDesktopServices.openUrl(QUrl(release["url"]))
+            else:
+                self._deferred_update = version
+            return
+        box = QMessageBox(self)
+        box.setWindowTitle(tr("업데이트 확인"))
+        box.setIcon(QMessageBox.Icon.Information)
+        install = box.addButton(tr("지금 설치"), QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(tr("나중에"), QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(install)
+        if automatic:
+            remaining = {"seconds": 20}
+            countdown = QTimer(box, interval=1000)
+
+            def tick() -> None:
+                remaining["seconds"] -= 1
+                if remaining["seconds"] <= 0:
+                    countdown.stop()
+                    install.click()
+                else:
+                    box.setText(tr("새 버전 {version}을 {seconds}초 뒤에 설치하고 다시 시작합니다.", version=version, seconds=remaining["seconds"]))
+
+            countdown.timeout.connect(tick)
+            box.setText(tr("새 버전 {version}을 {seconds}초 뒤에 설치하고 다시 시작합니다.", version=version, seconds=remaining["seconds"]))
+            countdown.start()
+        else:
+            box.setText(tr("새 버전 {version}이 있습니다. 지금 내려받아 설치하고 다시 시작할까요?", version=version))
+        box.exec()
+        if box.clickedButton() is install:
+            self._start_update(release)
+        else:
+            self._deferred_update = version
+
+    def _start_update(self, release: dict) -> None:
+        self._updating = True
+        self.statusBar().showMessage(tr("업데이트 내려받는 중… {percent}%", percent=0))
+
+        def progress(received: int, total: int) -> None:
+            self.update_progress.emit(received, total)
+
+        def downloaded(path, error):
+            if error:
+                self._updating = False
+                self.statusBar().showMessage(tr("업데이트 실패: {error}", error=render(str(error))), 10000)
+                return
+            self.statusBar().showMessage(tr("업데이트 설치 중…"))
+            self.backend.call_sync(updates.install, path, callback=installed)
+
+        def installed(_result, error):
+            if error:
+                self._updating = False
+                self.statusBar().showMessage(tr("업데이트 실패: {error}", error=render(str(error))), 10000)
+                return
+            self.relaunch = False
+            self.close()
+
+        fetcher = self.backend.ctx.fetcher
+        self.backend.call(lambda: updates.download(fetcher, release, progress=progress), downloaded)
+
+    def _show_update_progress(self, received: int, total: int) -> None:
+        percent = int(received * 100 / total) if total else 0
+        self.statusBar().showMessage(tr("업데이트 내려받는 중… {percent}%", percent=percent))
 
     def _build(self) -> None:
         self.cursor_label = QLabel()
@@ -461,8 +545,13 @@ class MainWindow(QMainWindow):
             windy_api_key=values["WINDY_API_KEY"] or None,
             windy_key_tier=values["WINDY_KEY_TIER"],
             excel_dir=Path(values["MONITOR_EXCEL_DIR"]),
+            update_mode=values["MONITOR_UPDATE_MODE"],
         )
         self.settings_ = self.backend.ctx.settings
+        if self.settings_.update_mode == "off":
+            self.update_timer.stop()
+        elif not self.update_timer.isActive():
+            self.update_timer.start()
         self.statusBar().showMessage(tr("설정"), 3000)
 
     def change_language(self, code: str) -> None:
@@ -799,6 +888,7 @@ def run_gui(
         set_language(dialog.language())
         save_user_settings({"MONITOR_LANG": dialog.language()})
     settings = load_settings()
+    updates.cleanup()
     backend = Backend(settings, collect=collect, sources=sources)
     backend.start()
     code = 0

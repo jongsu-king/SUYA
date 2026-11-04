@@ -267,7 +267,8 @@ async def test_release_check_reads_github():
     payload = {"tag_name": "v9.9.9", "html_url": "https://example.test/releases/v9.9.9"}
     fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=payload))), backoff=0.0)
     result = await updates.latest_release(fetcher)
-    assert result == {"version": "9.9.9", "url": payload["html_url"], "newer": True}
+    assert (result["version"], result["url"], result["newer"]) == ("9.9.9", payload["html_url"], True)
+    assert result["asset"] is None and result["checksums"] is None
     await fetcher.aclose()
 
 

@@ -1,12 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller build. Run from the repository root:  pyinstaller packaging/antarctic_monitor.spec"""
 
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(SPECPATH).resolve().parent
 ICONS = ROOT / "packaging" / "icons"
 APP_NAME = "SUYA"
+VERSION = re.search(r'__version__ = "([^"]+)"', (ROOT / "antarctic_monitor" / "__init__.py").read_text(encoding="utf-8")).group(1)
 EXE_NAME = "suya" if sys.platform != "win32" else "SUYA"
 icon = {
     "win32": ICONS / "icon.ico",
@@ -85,8 +87,8 @@ if sys.platform == "darwin":
         bundle_identifier="io.github.jongsu-king.suya",
         info_plist={
             "CFBundleDisplayName": APP_NAME,
-            "CFBundleShortVersionString": "0.1.0",
-            "CFBundleVersion": "0.1.0",
+            "CFBundleShortVersionString": VERSION,
+            "CFBundleVersion": VERSION,
             "NSHighResolutionCapable": True,
             "NSHumanReadableCopyright": "Copyright © 2026 Jongsu Lim and Suyeon Park. MIT License.",
             "LSMinimumSystemVersion": "12.0",
