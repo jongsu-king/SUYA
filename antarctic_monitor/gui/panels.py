@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from ..catalog import KIND_LABEL
 from ..i18n import render, tr
+from ..seawater import mixed_layer_depth
 from .charts import Chart
 from .format import age, coord_text, num, parse_time, percent, short_time
 from .theme import LIGHT, Theme, series_color
@@ -258,6 +259,13 @@ class ProfilePanel(DetailPanel):
                 tr("WOA23: {month}월 기후값 (1500 m 아래 연평균)", month=woa["month"])
                 if woa["levels"] else f"WOA23: {render(woa['reason'])}"
             )
+        mixed = []
+        for source, name, item in names:
+            depth = mixed_layer_depth(item["levels"]) if item and item.get("levels") else None
+            if depth is not None:
+                mixed.append(f"{name} {depth:.0f} m")
+        if mixed:
+            lines.append(tr("혼합층 깊이 (10 m 기준 수온에서 0.2 °C 차): {items}", items=" · ".join(mixed)))
         self.note.setText("\n".join(lines))
 
 

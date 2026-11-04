@@ -168,7 +168,7 @@ python -m antarctic_monitor
 | 탭 | 내용 | 호출하는 소스 |
 |---|---|---|
 | **표층** | 대표 수온·염분, 어는점, 어는점과의 차, 밀도 σt, 소스별 값 표(값·종류·자료 시각·경과·비고) | OISST, MUR, Open-Meteo Marine, HYCOM(저장된 격자), SMOS, SMAP, 저장된 Argo·GOSUD |
-| **수직 프로파일** | 깊이별 수온·염분(Argo 실측·HYCOM 모델·WOA23 기후값, 표층이 잘 보이도록 제곱근 수심축)과 T-S 다이어그램(σt 등치선, 어는점 선) | HYCOM 40층(최대 1분), WOA23, 저장된 Argo |
+| **수직 프로파일** | 깊이별 수온·염분(Argo 실측·HYCOM 모델·WOA23 기후값, 표층이 잘 보이도록 제곱근 수심축), T-S 다이어그램(σt 등치선, 어는점 선), 프로파일별 혼합층 깊이(10 m 수온에서 0.2 °C 차) 안내 | HYCOM 40층(최대 2분), WOA23(한 번 받으면 DB에 보관), 저장된 Argo |
 | **기온** | GFS 현재값 8종, 5개 모델 7일 예보 비교("지금" 선 포함), 400 km 안 가장 가까운 기지의 METAR 48시간, 기압 고도별 기온 1000~10 hPa(GFS·ECMWF) | Open-Meteo, 저장된 METAR, Windy(키 있을 때) |
 | **시계열** | 최근 30일 OISST 수온, 위성 염분(SMOS·SMAP), 해빙 농도, ERA5 일별 기온(최저~최고 띠) | OISST, SMOS, SMAP, ERA5 |
 
