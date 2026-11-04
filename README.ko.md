@@ -15,19 +15,19 @@
 
 ## 내려받기
 
-**최신 버전: [SUYA 0.1.1](https://github.com/jongsu-king/SUYA/releases/latest)** — 운영체제에 맞는 단추를 누르면 바로 내려받습니다:
+**최신 버전: [SUYA 0.1.2](https://github.com/jongsu-king/SUYA/releases/latest)** — 운영체제에 맞는 단추를 누르면 바로 내려받습니다:
 
-[![Windows 10/11: 설치 파일(.exe) 내려받기](https://img.shields.io/badge/Windows%2010%20%2F%2011-Download%20installer%20(.exe)-0078d4?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-windows-x64-setup.exe)
-[![macOS Apple Silicon: 디스크 이미지(.dmg) 내려받기](https://img.shields.io/badge/macOS%20Apple%20Silicon-Download%20.dmg-1d1d1f?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-arm64.dmg)
-[![macOS Intel: 디스크 이미지(.dmg) 내려받기](https://img.shields.io/badge/macOS%20Intel-Download%20.dmg-6e6e73?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-x86_64.dmg)
-[![Linux x86_64: 압축 파일(.tar.gz) 내려받기](https://img.shields.io/badge/Linux%20x86__64-Download%20.tar.gz-e95420?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-linux-x86_64.tar.gz)
+[![Windows 10/11: 설치 파일(.exe) 내려받기](https://img.shields.io/badge/Windows%2010%20%2F%2011-Download%20installer%20(.exe)-0078d4?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-windows-x64-setup.exe)
+[![macOS Apple Silicon: 디스크 이미지(.dmg) 내려받기](https://img.shields.io/badge/macOS%20Apple%20Silicon-Download%20.dmg-1d1d1f?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-arm64.dmg)
+[![macOS Intel: 디스크 이미지(.dmg) 내려받기](https://img.shields.io/badge/macOS%20Intel-Download%20.dmg-6e6e73?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-x86_64.dmg)
+[![Linux x86_64: 압축 파일(.tar.gz) 내려받기](https://img.shields.io/badge/Linux%20x86__64-Download%20.tar.gz-e95420?style=for-the-badge)](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-linux-x86_64.tar.gz)
 
 | 운영체제 | 파일 | 크기 | 비고 |
 |---|---|---|---|
-| **Windows 10 / 11** (64비트) | [SUYA-0.1.1-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-windows-x64-setup.exe) | ≈ 50 MB | 한국어·영어 설치 마법사. 관리자 권한 없이 설치 가능 |
-| **macOS 12 이상** Apple Silicon (M1–M4) | [SUYA-0.1.1-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-arm64.dmg) | ≈ 60 MB | 응용 프로그램 폴더로 끌어 놓기. Apple 메뉴 → *이 Mac에 관하여*에 "칩 Apple M…"으로 나오는 Mac |
-| **macOS 12 이상** Intel | [SUYA-0.1.1-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-macos-x86_64.dmg) | ≈ 65 MB | 응용 프로그램 폴더로 끌어 놓기. *이 Mac에 관하여*에 "프로세서 … Intel"로 나오는 Mac |
-| **Linux** x86_64 (glibc 2.35 이상, Ubuntu 22.04+) | [SUYA-0.1.1-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.1-linux-x86_64.tar.gz) | ≈ 110 MB | 풀고 `./install.sh` |
+| **Windows 10 / 11** (64비트) | [SUYA-0.1.2-windows-x64-setup.exe](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-windows-x64-setup.exe) | ≈ 50 MB | 한국어·영어 설치 마법사. 관리자 권한 없이 설치 가능 |
+| **macOS 12 이상** Apple Silicon (M1–M4) | [SUYA-0.1.2-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-arm64.dmg) | ≈ 60 MB | 응용 프로그램 폴더로 끌어 놓기. Apple 메뉴 → *이 Mac에 관하여*에 "칩 Apple M…"으로 나오는 Mac |
+| **macOS 12 이상** Intel | [SUYA-0.1.2-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-x86_64.dmg) | ≈ 65 MB | 응용 프로그램 폴더로 끌어 놓기. *이 Mac에 관하여*에 "프로세서 … Intel"로 나오는 Mac |
+| **Linux** x86_64 (glibc 2.35 이상, Ubuntu 22.04+) | [SUYA-0.1.2-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-linux-x86_64.tar.gz) | ≈ 110 MB | 풀고 `./install.sh` |
 | 파이썬 3.11 이상이 있는 모든 OS | `pip install git+https://github.com/jongsu-king/SUYA.git` | — | 설치 후 `suya` 실행 |
 
 같은 파일이 [최신 릴리스 페이지](https://github.com/jongsu-king/SUYA/releases/latest) 맨 아래 **Assets**에 `SHA256SUMS.txt`, 릴리스 노트와 함께 있습니다.
@@ -460,12 +460,13 @@ Pull request와 이슈를 환영합니다. 변경은 Qt 앱 안에서(웹 프런
 
 논문이나 보고서에 쓸 때는 **데이터 제공 기관**을 인용하고(어려운 일은 그들이 했습니다) 이 소프트웨어도 함께 인용해 주세요:
 
-> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.1) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937852
+> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.2) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937852
 
 | DOI | 용도 |
 |---|---|
 | [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **개념 DOI** — 모든 버전을 묶는 DOI. 항상 최신 보관본으로 연결되므로, 정확한 버전을 밝혀야 하는 경우가 아니면 이것을 쓰세요 |
-| [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) | 0.1.1 버전 (이번 릴리스) |
+| *0.1.2의 버전 DOI* | Zenodo가 0.1.2 릴리스를 보관할 때 발급되며 그 뒤 여기에 적습니다 |
+| [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) | 0.1.1 버전 |
 | [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | 0.1.0 버전 |
 
 GitHub 릴리스는 [Zenodo](https://doi.org/10.5281/zenodo.23937852)에 자동으로 보관되며 릴리스마다 버전 DOI가 발급됩니다.
@@ -477,7 +478,7 @@ APA·BibTeX 항목을 만들어 줍니다. [.zenodo.json](.zenodo.json)은 Zenod
 @software{lim_park_suya_2026,
   author    = {Lim, Jongsu and Park, Suyeon},
   title     = {{SUYA}: Antarctic ocean temperature, salinity and air temperature monitor},
-  version   = {0.1.1},
+  version   = {0.1.2},
   year      = {2026},
   month     = {11},
   publisher = {Zenodo},

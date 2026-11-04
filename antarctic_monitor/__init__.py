@@ -4,7 +4,7 @@ Copyright (c) 2026 Jongsu Lim <imjongsu1102@gmail.com> and Suyeon Park <dbsnt110
 Incheon National University. MIT License, see LICENSE.
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 __app_name__ = "SUYA"
 __author__ = "Jongsu Lim"
 __email__ = "imjongsu1102@gmail.com"
