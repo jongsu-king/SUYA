@@ -3,6 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/jongsu-king/SUYA?label=release)](https://github.com/jongsu-king/SUYA/releases/latest)
 [![Tests](https://github.com/jongsu-king/SUYA/actions/workflows/ci.yml/badge.svg)](https://github.com/jongsu-king/SUYA/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23937852.svg)](https://doi.org/10.5281/zenodo.23937852)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![Languages](https://img.shields.io/badge/UI-한국어%20%7C%20English-lightgrey)
 
@@ -445,12 +446,29 @@ Pull request와 이슈를 환영합니다. 변경은 Qt 앱 안에서(웹 프런
 
 논문이나 보고서에 쓸 때는 **데이터 제공 기관**을 인용하고(어려운 일은 그들이 했습니다) 이 소프트웨어도 함께 인용해 주세요:
 
-> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.0) [Computer software]. https://github.com/jongsu-king/SUYA
+> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937853
 
+| DOI | 용도 |
+|---|---|
+| [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | **이 버전(0.1.0)** — 정확한 버전을 밝혀야 할 때 |
+| [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **개념 DOI** — 모든 버전을 묶는 DOI. 항상 최신 릴리스로 연결 |
+
+GitHub 릴리스는 [Zenodo](https://zenodo.org/records/23937853)에 자동으로 보관되며 릴리스마다 버전 DOI가 발급됩니다.
 기계가 읽는 인용 정보는 [CITATION.cff](CITATION.cff)에 있습니다. GitHub 오른쪽 사이드바의 **Cite this repository** 버튼이 이 파일로
-APA·BibTeX 항목을 만들어 줍니다. [.zenodo.json](.zenodo.json)은 [Zenodo](https://zenodo.org/)가 릴리스를 보관할 때 읽는 저자·소속·라이선스
-정보입니다. 보관된 릴리스마다 고유 DOI가, 그리고 항상 최신 버전으로 연결되는 개념 DOI가 발급되며, 첫 보관이 끝나는 대로 여기와
-`CITATION.cff`, 릴리스 노트에 DOI를 적습니다.
+APA·BibTeX 항목을 만들어 줍니다. [.zenodo.json](.zenodo.json)은 Zenodo가 릴리스를 보관할 때 읽는 저자·소속·라이선스 정보입니다.
+
+```bibtex
+@software{lim_park_suya_2026,
+  author    = {Lim, Jongsu and Park, Suyeon},
+  title     = {{SUYA}: Antarctic ocean temperature, salinity and air temperature monitor},
+  version   = {0.1.0},
+  year      = {2026},
+  month     = {11},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23937853},
+  url       = {https://doi.org/10.5281/zenodo.23937853}
+}
+```
 
 데이터: NOAA NCEI OISST v2.1(Huang et al. 2021) · NOAA NCEP GFS · NOAA Aviation Weather Center METAR · NASA JPL MUR SST v4.1 ·
 ESA SMOS와 NASA SMAP 표층 염분(NOAA CoastWatch 배포) · 미 해군연구소 HYCOM ESPC-D-V02 · International Argo Program(doi:10.17882/42182, Ifremer 배포) · GOSUD ·

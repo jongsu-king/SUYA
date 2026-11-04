@@ -26,6 +26,14 @@ authors:
     affiliation: "Clean Energy and Materials Lab (CELLMATE), Department of Materials Science and Engineering, Incheon National University"
 version: 0.1.0
 date-released: 2026-11-04
+doi: 10.5281/zenodo.23937853
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23937852
+    description: "Concept DOI for all versions of SUYA; always resolves to the latest release"
+  - type: doi
+    value: 10.5281/zenodo.23937853
+    description: "Version DOI for SUYA 0.1.0"
 license: MIT
 repository-code: "https://github.com/jongsu-king/SUYA"
 url: "https://github.com/jongsu-king/SUYA"

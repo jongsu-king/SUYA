@@ -48,6 +48,8 @@ Homepage = "https://github.com/jongsu-king/SUYA"
 Repository = "https://github.com/jongsu-king/SUYA"
 Issues = "https://github.com/jongsu-king/SUYA/issues"
 Releases = "https://github.com/jongsu-king/SUYA/releases"
+DOI = "https://doi.org/10.5281/zenodo.23937852"
+Zenodo = "https://zenodo.org/records/23937853"
 
 [project.scripts]
 suya = "antarctic_monitor.cli:main"

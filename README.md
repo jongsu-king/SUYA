@@ -3,6 +3,7 @@
 [![Release](https://img.shields.io/github/v/release/jongsu-king/SUYA?label=release)](https://github.com/jongsu-king/SUYA/releases/latest)
 [![Tests](https://github.com/jongsu-king/SUYA/actions/workflows/ci.yml/badge.svg)](https://github.com/jongsu-king/SUYA/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23937852.svg)](https://doi.org/10.5281/zenodo.23937852)
 ![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 ![Languages](https://img.shields.io/badge/UI-English%20%7C%20한국어-lightgrey)
 
@@ -463,12 +464,29 @@ sync working when adding a source, and add a parser test with a real response sh
 
 If SUYA helps in a publication, cite the **data providers** (they did the hard part) and cite this software:
 
-> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.0) [Computer software]. https://github.com/jongsu-king/SUYA
+> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.23937853
 
+| DOI | Use it for |
+|---|---|
+| [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853) | **this version (0.1.0)** — cite it when the exact version matters |
+| [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **concept DOI** — all versions; always resolves to the latest release |
+
+Every GitHub release is archived automatically on [Zenodo](https://zenodo.org/records/23937853) and receives its own version DOI.
 Machine-readable citation metadata is in [CITATION.cff](CITATION.cff) — GitHub's **Cite this repository** button (right-hand
-sidebar) builds APA and BibTeX entries from it — and in [.zenodo.json](.zenodo.json), which [Zenodo](https://zenodo.org/) reads
-when it archives a release. Each archived release receives its own DOI plus a concept DOI that always resolves to the latest
-version; as soon as the first archive is issued, the DOI is listed here, in `CITATION.cff` and in the release notes.
+sidebar) builds APA and BibTeX entries from it — and in [.zenodo.json](.zenodo.json), which Zenodo reads when it archives a release.
+
+```bibtex
+@software{lim_park_suya_2026,
+  author    = {Lim, Jongsu and Park, Suyeon},
+  title     = {{SUYA}: Antarctic ocean temperature, salinity and air temperature monitor},
+  version   = {0.1.0},
+  year      = {2026},
+  month     = {11},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.23937853},
+  url       = {https://doi.org/10.5281/zenodo.23937853}
+}
+```
 
 Data: NOAA NCEI OISST v2.1 (Huang et al. 2021) · NOAA NCEP GFS · NOAA Aviation Weather Center METAR · NASA JPL MUR SST v4.1 ·
 ESA SMOS and NASA SMAP sea-surface salinity via NOAA CoastWatch · US Naval Research Laboratory HYCOM ESPC-D-V02 · International Argo Program

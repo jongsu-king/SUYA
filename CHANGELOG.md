@@ -7,6 +7,7 @@ All notable changes to this project are documented here. The format follows
 ## [0.1.0] - 2026-11-04
 
 First public release of **SUYA** (Antarctic Ocean Monitor).
+Archived on Zenodo: https://doi.org/10.5281/zenodo.23937853 (concept DOI for all versions: 10.5281/zenodo.23937852).
 
 ### Added
 - Continuous collection engine with per-source intervals, exponential back-off, rate-limit handling,
