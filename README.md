@@ -452,6 +452,7 @@ antarctic_monitor/        Python package (CLI name: suya)
 ├── geo.py                coordinate parsing (nullschool / Windy URLs), haversine
 ├── i18n.py               English/Korean strings; language-neutral stored messages
 ├── help_text.py          built-in user guide (both languages)
+├── updates.py            Help ▸ Check for updates: compares the running version with the latest GitHub release
 ├── catalog.py, locations.py   source descriptions, map layers, the 24 points
 ├── gui/                  PySide6: app (main window), polarmap, charts, panels, dialogs, help, backend
 └── data/                 coastline (Natural Earth), cmocean tables, LICENSE and notices copies

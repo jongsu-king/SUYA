@@ -434,6 +434,7 @@ antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
 ├── geo.py                좌표 해석(nullschool·Windy 주소), 거리 계산
 ├── i18n.py               한국어·영어 문자열, 언어 중립 저장 메시지
 ├── help_text.py          내장 사용 설명서(두 언어)
+├── updates.py            도움말 ▸ 업데이트 확인: 실행 중인 버전과 GitHub 최신 릴리스 비교
 ├── catalog.py, locations.py   소스 설명, 지도 레이어, 24개 지점
 ├── gui/                  PySide6: app(메인 창), polarmap, charts, panels, dialogs, help, backend
 └── data/                 해안선(Natural Earth), cmocean 색표, LICENSE·고지 사본
