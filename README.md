@@ -272,6 +272,10 @@ all tested against the UNESCO 1983 check values.
 | macOS | `~/Library/Application Support/SUYA/` | `~/Documents/SUYA/` |
 | Linux | `~/.local/share/SUYA/` | `~/Documents/SUYA/` |
 
+Besides the database, the data folder holds `settings.env` (settings), `monitor.log` (2 MB × 3, rotated), `crash.log` (written only
+when the program crashes natively; empty otherwise), `suya.lock` (keeps a second copy from starting; a lock left behind by a crash is
+ignored), `matplotlib/` (font cache, installer builds only) and, while an update is being downloaded, `updates/` (deleted at the next start).
+
 ### SQLite (`antarctic.db`)
 
 | Table | Contents | Primary key |
@@ -419,19 +423,21 @@ release's SHA-256 list. The Windy key, if you enter one, stays in your local `se
 | Start over | Quit and delete `antarctic.db` in the data folder |
 | macOS "is damaged and can't be opened" | Caused by the missing signature: `xattr -dr com.apple.quarantine /Applications/SUYA.app` |
 | Window is tiny / huge | Window size and position are remembered per user; delete the `SUYA` entry in your OS's Qt settings (`~/.config/SUYA` on Linux, `~/Library/Preferences/com.suya.monitor.plist` on macOS, registry `HKCU\Software\SUYA` on Windows) |
+| "SUYA is already running" | Another copy holds `suya.lock` in the data folder: a window (look in the Dock or taskbar) or `suya daemon`. Quit it first. A lock left behind by a crash is ignored automatically |
+| The program disappears without a message | A native crash leaves a Python traceback in `crash.log` in the data folder; send it together with `monitor.log` |
 
 **Can I use it offline?** The window opens and shows stored data (`--no-collect`), but nothing new arrives.
 **Does it work for the Arctic?** No; the map, sectors and points are hard-wired to the Southern Ocean. The collectors are generic, so a northern version would be a new map and point list.
 **Can I add a source?** Yes: a collector is one async function returning `CollectResult`, registered in `collectors/__init__.py` and `config.DEFAULT_INTERVALS`, plus a `catalog.py` entry. See `collectors/gosud.py` for the smallest example.
 **Why not a web app?** It was one at first. A desktop program keeps the data on your machine, needs no server, and works behind institutional firewalls.
 
-Bug reports: [Issues](https://github.com/jongsu-king/SUYA/issues) or imjongsu1102@gmail.com. Please attach `monitor.log` and say which OS and version you use.
+Bug reports: [Issues](https://github.com/jongsu-king/SUYA/issues) or imjongsu1102@gmail.com. Please attach `monitor.log` (and `crash.log` if it is not empty) and say which OS and version you use.
 
 ## 14. Development, tests and builds
 
 ```bash
 pip install -e ".[dev,build]"
-python -m pytest -q                       # 73 tests, no network needed
+python -m pytest -q                       # no network needed
 QT_QPA_PLATFORM=offscreen python -m antarctic_monitor self-test
 bash packaging/build.sh                   # macOS .dmg / Linux .tar.gz
 powershell -File packaging\build.ps1      # Windows setup.exe (needs Inno Setup 6)
@@ -458,12 +464,13 @@ antarctic_monitor/        Python package (CLI name: suya)
 ├── geo.py                coordinate parsing (nullschool / Windy URLs), haversine
 ├── i18n.py               English/Korean strings; language-neutral stored messages
 ├── help_text.py          built-in user guide (both languages)
-├── updates.py            Help ▸ Check for updates: compares the running version with the latest GitHub release
+├── updates.py            update check and self-update: latest GitHub release, download, SHA-256 check, install, relaunch
+├── instance.py           single-instance lock (suya.lock in the data folder)
 ├── catalog.py, locations.py   source descriptions, map layers, the 24 points
 ├── gui/                  PySide6: app (main window), polarmap, charts, panels, dialogs, help, backend
 └── data/                 coastline (Natural Earth), cmocean tables, LICENSE and notices copies
 packaging/                PyInstaller spec, icon generator, Inno Setup script, build scripts, Linux desktop file
-tests/                    pytest suite (73 tests)
+tests/                    pytest suite (no network needed)
 docs/                     detailed documentation and screenshots
 .github/workflows/        ci.yml (tests), release.yml (installers)
 ```

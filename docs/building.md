@@ -7,7 +7,7 @@ git clone https://github.com/jongsu-king/SUYA.git
 cd suya
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -e ".[dev,build]"
-python -m pytest -q                                     # 73 tests, no network
+python -m pytest -q                                     # no network needed
 QT_QPA_PLATFORM=offscreen python -m antarctic_monitor self-test
 python -m antarctic_monitor                             # run from source
 ```

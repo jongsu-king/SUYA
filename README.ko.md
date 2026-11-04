@@ -265,6 +265,10 @@ python -m antarctic_monitor
 | macOS | `~/Library/Application Support/SUYA/` | `~/Documents/SUYA/` |
 | Linux | `~/.local/share/SUYA/` | `~/Documents/SUYA/` |
 
+데이터 폴더에는 데이터베이스 외에 `settings.env`(설정), `monitor.log`(2 MB × 3개 순환), `crash.log`(프로그램이 네이티브 충돌을 일으켰을 때만
+기록되고 평소에는 비어 있음), `suya.lock`(두 번째 복사본이 뜨지 않게 하는 잠금; 충돌로 남은 잠금은 무시됨), 설치판의 `matplotlib/`(글꼴 캐시),
+그리고 업데이트를 내려받는 동안의 `updates/`(다음 시작 때 삭제)가 있습니다.
+
 ### SQLite (`antarctic.db`)
 
 | 표 | 내용 | 기본 키 |
@@ -401,19 +405,21 @@ Open-Meteo는 스스로 정한 하루 9,000 호출 상한 안에 머뭅니다(�
 | 처음부터 다시 | 프로그램을 끄고 데이터 폴더의 `antarctic.db`를 지웁니다 |
 | macOS "손상되었기 때문에 열 수 없습니다" | 서명이 없어서 나오는 경고: `xattr -dr com.apple.quarantine /Applications/SUYA.app` |
 | 창이 너무 작거나 큼 | 창 크기·위치는 사용자별로 기억됩니다. OS의 Qt 설정에서 `SUYA` 항목을 지우세요(Linux `~/.config/SUYA`, macOS `~/Library/Preferences/com.suya.monitor.plist`, Windows 레지스트리 `HKCU\Software\SUYA`) |
+| "SUYA가 이미 실행 중입니다" | 다른 복사본이 데이터 폴더의 `suya.lock`을 쥐고 있습니다: 창(Dock이나 작업 표시줄 확인) 또는 `suya daemon`. 먼저 끄세요. 충돌로 남은 잠금은 자동으로 무시됩니다 |
+| 프로그램이 말없이 사라짐 | 네이티브 충돌은 데이터 폴더의 `crash.log`에 파이썬 역추적을 남깁니다. `monitor.log`와 함께 보내 주세요 |
 
 **오프라인에서도 되나요?** 창은 열리고 저장된 데이터는 보입니다(`--no-collect`). 새 자료는 들어오지 않습니다.
 **북극도 되나요?** 아니요. 지도·해역·지점이 남극해에 맞춰져 있습니다. 수집기는 범용이라 북극판은 새 지도와 지점 목록을 만드는 일입니다.
 **소스를 추가할 수 있나요?** 네. 수집기는 `CollectResult`를 돌려주는 비동기 함수 하나이고, `collectors/__init__.py`와 `config.DEFAULT_INTERVALS`에 등록하고 `catalog.py`에 설명을 추가하면 됩니다. 가장 작은 예는 `collectors/gosud.py`.
 **왜 웹앱이 아닌가요?** 처음엔 웹앱이었습니다. 데스크톱 프로그램은 데이터가 내 컴퓨터에 남고, 서버가 필요 없고, 기관 방화벽 안에서도 동작합니다.
 
-버그 신고: [Issues](https://github.com/jongsu-king/SUYA/issues) 또는 imjongsu1102@gmail.com. `monitor.log`와 운영체제·버전을 함께 알려 주세요.
+버그 신고: [Issues](https://github.com/jongsu-king/SUYA/issues) 또는 imjongsu1102@gmail.com. `monitor.log`(비어 있지 않다면 `crash.log`도)와 운영체제·버전을 함께 알려 주세요.
 
 ## 14. 개발, 테스트, 빌드
 
 ```bash
 pip install -e ".[dev,build]"
-python -m pytest -q                       # 테스트 73개 (네트워크 불필요)
+python -m pytest -q                       # 네트워크 불필요
 QT_QPA_PLATFORM=offscreen python -m antarctic_monitor self-test
 bash packaging/build.sh                   # macOS .dmg / Linux .tar.gz
 powershell -File packaging\build.ps1      # Windows setup.exe (Inno Setup 6 필요)
@@ -439,12 +445,13 @@ antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
 ├── geo.py                좌표 해석(nullschool·Windy 주소), 거리 계산
 ├── i18n.py               한국어·영어 문자열, 언어 중립 저장 메시지
 ├── help_text.py          내장 사용 설명서(두 언어)
-├── updates.py            도움말 ▸ 업데이트 확인: 실행 중인 버전과 GitHub 최신 릴리스 비교
+├── updates.py            업데이트 확인과 자체 업데이트: GitHub 최신 릴리스 조회, 내려받기, SHA-256 대조, 설치, 재실행
+├── instance.py           중복 실행 방지 잠금(데이터 폴더의 suya.lock)
 ├── catalog.py, locations.py   소스 설명, 지도 레이어, 24개 지점
 ├── gui/                  PySide6: app(메인 창), polarmap, charts, panels, dialogs, help, backend
 └── data/                 해안선(Natural Earth), cmocean 색표, LICENSE·고지 사본
 packaging/                PyInstaller 명세, 아이콘 생성기, Inno Setup 스크립트, 빌드 스크립트, Linux desktop 파일
-tests/                    pytest (73개)
+tests/                    pytest (네트워크 불필요)
 docs/                     상세 문서와 화면 캡처
 .github/workflows/        ci.yml(테스트), release.yml(설치 파일)
 ```
