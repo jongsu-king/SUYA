@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 - WOA23 climatology profiles are kept in the database per grid point and month, so the
   vertical-profile tab shows the climatology at once for any point looked up before, even while
   the NCEI server is slow or down.
+- *Help ▸ Check for updates…* compares the running version with the latest GitHub release and
+  offers to open the download page. Nothing is checked unless you click it.
 
 ### Changed
 - Chart legends sit above the plot, outside the axes, so they never cover the data; the T-S

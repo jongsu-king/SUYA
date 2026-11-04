@@ -7,7 +7,7 @@ import time
 import httpx
 import pytest
 
-from antarctic_monitor import pointquery, seawater
+from antarctic_monitor import pointquery, seawater, updates
 from antarctic_monitor.collectors import JOBS, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
@@ -256,6 +256,19 @@ async def test_climatology_is_kept_in_the_store(store):
     second = await pointquery._climatology(Context(store, offline, Settings()), -62.0, 150.0, 11, errors)
     assert second == first and not errors
     await offline.aclose()
+
+
+def test_release_check_compares_versions():
+    assert updates.is_newer("v0.1.2", "0.1.1") and updates.is_newer("1.0", "0.9.9") and updates.is_newer("0.1.10", "0.1.9")
+    assert not updates.is_newer("v0.1.1", "0.1.1") and not updates.is_newer("0.0.9", "0.1.1") and not updates.is_newer("", "0.1.1")
+
+
+async def test_release_check_reads_github():
+    payload = {"tag_name": "v9.9.9", "html_url": "https://example.test/releases/v9.9.9"}
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(200, json=payload))), backoff=0.0)
+    result = await updates.latest_release(fetcher)
+    assert result == {"version": "9.9.9", "url": payload["html_url"], "newer": True}
+    await fetcher.aclose()
 
 
 async def test_fetcher_does_not_retry_rate_limit():

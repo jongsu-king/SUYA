@@ -387,7 +387,8 @@ megabytes. With pruning (60 snapshots per layer) the database settles around 100
 month and are kept. Excel workbooks are 2–20 MB per month.
 
 **Privacy.** SUYA contacts only the data hosts listed in section 5, sends only coordinates and dataset names, and sends nothing about you.
-There is no telemetry, no update check, no account. The Windy key, if you enter one, stays in your local `settings.env`. The log file
+There is no telemetry, no automatic update check, no account. *Help ▸ Check for updates…* asks GitHub for the latest release
+number only when you click it. The Windy key, if you enter one, stays in your local `settings.env`. The log file
 (`monitor.log`, 2 MB × 3 rotating) records collection results and errors, nothing else.
 
 ## 12. Limitations

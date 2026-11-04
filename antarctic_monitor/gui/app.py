@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton, QSplitter, QTabWidget, QVBoxLayout, QWidget,
 )
 
-from .. import exporter, pointquery, queries
+from .. import __version__, exporter, pointquery, queries, updates
 from ..catalog import KIND_LABEL, LAYERS, OUTPUT_JOBS, SOURCES
 from ..collectors import JOBS
 from ..config import Settings, load_settings, save_user_settings
@@ -135,7 +135,27 @@ class MainWindow(QMainWindow):
         help_menu.addAction(tr("라이선스…"), lambda: HelpDialog(self, HelpDialog.TAB_LICENSE).exec())
         help_menu.addAction(tr("제3자 고지…"), lambda: HelpDialog(self, HelpDialog.TAB_NOTICES).exec())
         help_menu.addSeparator()
+        help_menu.addAction(tr("업데이트 확인…"), self.check_updates)
         help_menu.addAction(tr("프로그램 정보…"), lambda: AboutDialog(self).exec())
+
+    def check_updates(self) -> None:
+        self.statusBar().showMessage(tr("업데이트 확인 중…"))
+
+        def done(result, error):
+            if error or not result:
+                self.statusBar().showMessage(tr("업데이트 확인 실패: {error}", error=render(str(error))), 8000)
+                return
+            if not result["newer"]:
+                self.statusBar().showMessage(tr("최신 버전입니다 ({version})", version=__version__), 6000)
+                return
+            self.statusBar().clearMessage()
+            answer = QMessageBox.question(
+                self, tr("업데이트 확인"), tr("새 버전 {version}이 있습니다. 내려받기 페이지를 열까요?", version=result["version"]),
+            )
+            if answer == QMessageBox.StandardButton.Yes:
+                QDesktopServices.openUrl(QUrl(result["url"]))
+
+        self.backend.call(lambda: updates.latest_release(self.backend.ctx.fetcher), done)
 
     def _build(self) -> None:
         self.cursor_label = QLabel()
