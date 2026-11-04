@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+*.spec.bak
+
+# Collected data, generated workbooks and secrets stay out of the repository.
+# Only the top-level data/ folder is ignored; antarctic_monitor/data/ ships with the program.
+/data/
+/exports/
+.env
+settings.env
+*.db
+*.db-wal
+*.db-shm
+*.xlsx
+!docs/**/*.xlsx
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

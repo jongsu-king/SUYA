@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=SUYA
+Name[ko]=남극해 수온·염분 모니터
+Comment=Collects and displays Antarctic ocean temperature, salinity and air temperature
+Comment[ko]=남극해 수온·염분·기온을 수집하고 보여 줍니다
+Exec=suya
+Icon=suya
+Terminal=false
+Categories=Science;Education;Geoscience;
+Keywords=Antarctica;ocean;salinity;temperature;Argo;

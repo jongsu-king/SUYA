@@ -1,0 +1,71 @@
+[project]
+name = "suya"
+version = "0.1.0"
+description = "Desktop program that continuously collects Antarctic ocean temperature, salinity and air temperature from public APIs, stores them in SQLite and monthly Excel workbooks, and shows them on a polar map."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Jongsu Lim", email = "imjongsu1102@gmail.com" },
+    { name = "Suyeon Park", email = "dbsnt110@inu.ac.kr" },
+]
+maintainers = [{ name = "Jongsu Lim", email = "imjongsu1102@gmail.com" }]
+keywords = ["antarctica", "southern ocean", "salinity", "sea surface temperature", "argo", "hycom", "oisst", "pyside6"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: X11 Applications :: Qt",
+    "Environment :: Win32 (MS Windows)",
+    "Environment :: MacOS X",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: Korean",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: Hydrology",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+    "httpx>=0.27",
+    "matplotlib>=3.9",
+    "numpy>=2.0",
+    "PySide6-Essentials>=6.8",
+    "XlsxWriter>=3.2",
+]
+
+[project.optional-dependencies]
+dev = ["openpyxl>=3.1", "pytest>=8", "pytest-asyncio>=0.24"]
+build = ["pyinstaller>=6.11", "cmocean>=3.0"]
+
+[project.urls]
+Homepage = "https://github.com/jongsu-king/SUYA"
+Repository = "https://github.com/jongsu-king/SUYA"
+Issues = "https://github.com/jongsu-king/SUYA/issues"
+Releases = "https://github.com/jongsu-king/SUYA/releases"
+
+[project.scripts]
+suya = "antarctic_monitor.cli:main"
+
+[project.gui-scripts]
+suya-gui = "antarctic_monitor.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["antarctic_monitor"]
+
+[tool.hatch.build.targets.sdist]
+include = ["antarctic_monitor", "tests", "packaging", "docs", "README.md", "README.ko.md", "LICENSE", "AUTHORS.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
