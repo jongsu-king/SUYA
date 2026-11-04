@@ -439,7 +439,8 @@ powershell -File packaging\build.ps1      # Windows setup.exe (needs Inno Setup 
 
 Pushing a `v*` tag makes [GitHub Actions](.github/workflows/release.yml) build the Windows, macOS (arm64 and x86_64) and Linux installers,
 run the tests and the self-test on each, and attach the files with `SHA256SUMS.txt` to the release. [ci.yml](.github/workflows/ci.yml) runs the
-tests on every push for three operating systems × Python 3.11–3.13. Details: [docs/building.md](docs/building.md).
+tests on every push on Linux and Windows with Python 3.11–3.13 and on macOS with Python 3.12, the version the installers are built with
+(GitHub's macOS runners are scarce, so one macOS job keeps the checks from stalling). Details: [docs/building.md](docs/building.md).
 
 ## 15. Repository layout
 
