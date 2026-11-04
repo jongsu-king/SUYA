@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import gc
 import json
 import logging
 import logging.handlers
@@ -163,11 +162,7 @@ def _self_test(args: argparse.Namespace) -> None:
         lines.append(f"excel ok {excel.sync(backend.store, settings.excel_dir)['files']}")
         window.close()  # closeEvent stops the backend thread and closes the database
         app.processEvents()
-        # 창과 백엔드는 시그널/콜백으로 서로를 참조하므로 인터프리터가 끝날 때가 아니라 지금 정리합니다.
-        window.deleteLater()
-        app.processEvents()
-        del window, backend
-        gc.collect()
+        # Qt 객체는 여기서 일부러 해제하지 않습니다. main()이 os._exit로 끝내므로 종료 시점의 소멸자 경쟁이 없습니다.
     lines.append(f"version {__version__}")
     text = "\n".join(lines) + "\n"
     if args.out:
@@ -181,8 +176,9 @@ def _exit(code: int) -> None:
 
     Tearing Qt objects down from that last collection aborts some PySide6 builds (seen on Linux with
     Python 3.11: "none_dealloc: deallocating None"), so everything is flushed here and the process ends at once.
+    Nothing is collected or deleted first: destroying Qt objects while the backend thread may still be
+    winding down is itself a source of intermittent exit-time failures.
     """
-    gc.collect()
     logging.shutdown()
     for stream in (sys.stdout, sys.stderr):
         if stream:
