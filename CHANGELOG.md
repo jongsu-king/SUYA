@@ -11,6 +11,11 @@ All notable changes to this project are documented here. The format follows
 - Dependabot keeps Python packages and GitHub Actions versions current with one grouped
   pull request per week.
 
+### Fixed
+- Time-series charts looked empty on the first day: a single sample, or a value isolated between
+  gaps, cannot form a line. Such values are now drawn as dots, a one-time-step axis is centred on
+  the sample, and a note says how many samples exist until the line fills in.
+
 ## [0.1.0] - 2026-11-04
 
 First public release of **SUYA** (Antarctic Ocean Monitor).

@@ -171,10 +171,19 @@ class Chart(QWidget):
             return
         ax = self._begin(title)
         t = self.theme
+        most_points = 0
         for s in usable:
             xs = mdates.date2num(s["times"])
             ys = np.array([np.nan if v is None else v for v in s["values"]], dtype=float)
             ax.plot(xs, ys, color=s["color"], linewidth=1.2, label=s["name"], linestyle=s.get("style", "-"))
+            # 선은 이웃한 값이 있어야 보입니다. 수집을 막 시작해 값이 한두 개뿐이거나 결측 사이에 홀로 있는 값은 점으로 찍습니다.
+            valid = ~np.isnan(ys)
+            most_points = max(most_points, int(valid.sum()))
+            before = np.concatenate(([False], valid[:-1]))
+            after = np.concatenate((valid[1:], [False]))
+            dots = valid & ~before & ~after if valid.sum() > 3 else valid
+            if dots.any():
+                ax.plot(xs[dots], ys[dots], color=s["color"], marker="o", markersize=3, linestyle="none")
             if s.get("low") is not None:
                 low = np.array([np.nan if v is None else v for v in s["low"]], dtype=float)
                 high = np.array([np.nan if v is None else v for v in s["high"]], dtype=float)
@@ -193,6 +202,13 @@ class Chart(QWidget):
         all_times = sorted({moment for s in usable for moment in s["times"]})
         lookups = [(s, dict(zip(s["times"], s["values"]))) for s in usable]
         positions = mdates.date2num(all_times)
+        if len(all_times) == 1:  # 시각이 하나뿐이면 그 점을 가운데 두고 하루 폭으로 봅니다.
+            ax.set_xlim(positions[0] - 0.5, positions[0] + 0.5)
+        if most_points <= 2:
+            ax.text(
+                0.5, 0.06, tr("표본 {n}개 — 수집이 이어지면 선으로 채워집니다", n=most_points),
+                transform=ax.transAxes, ha="center", va="bottom", fontsize=8, color=t.muted,
+            )
         self._crosshair = ax.axvline(positions[0], color=t.muted, linewidth=0.6, visible=False)
         suffix = f" {unit}" if unit else ""
 

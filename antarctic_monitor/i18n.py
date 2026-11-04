@@ -239,6 +239,7 @@ EN: dict[str, str] = {
     "표": "Table",
     "값을 표로 보기": "Show values as a table",
     "자료 없음": "No data",
+    "표본 {n}개 — 수집이 이어지면 선으로 채워집니다": "{n} sample(s) so far — the line fills in as collection continues",
     "시각": "Time",
     "수심 (m)": "Depth (m)",
     "기온 (°C)": "Air temperature (°C)",
