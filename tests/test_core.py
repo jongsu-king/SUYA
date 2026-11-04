@@ -243,8 +243,8 @@ async def test_point_cache_keeps_partial_results_only_briefly():
     await cache.get(("p",), 10800.0, partial)
     await cache.get(("c",), 10800.0, complete)
     now = time.monotonic()
-    assert cache._values[("p",)][0] - now <= pointquery.PARTIAL_TTL
-    assert cache._values[("c",)][0] - now > pointquery.PARTIAL_TTL
+    assert cache._values[("p",)][0] - now <= pointquery.PARTIAL_TTL + 1  # +1: 시계 해상도와 부동소수 오차
+    assert cache._values[("c",)][0] - now > pointquery.PARTIAL_TTL + 1
 
 
 async def test_fetcher_does_not_retry_rate_limit():
