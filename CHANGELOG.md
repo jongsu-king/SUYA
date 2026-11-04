@@ -10,8 +10,13 @@ All notable changes to this project are documented here. The format follows
 - WOA23 climatology profiles are kept in the database per grid point and month, so the
   vertical-profile tab shows the climatology at once for any point looked up before, even while
   the NCEI server is slow or down.
-- *Help ▸ Check for updates…* compares the running version with the latest GitHub release and
-  offers to open the download page. Nothing is checked unless you click it.
+- Automatic updates. The program looks up the latest GitHub release 15 seconds after it starts and
+  once a day; a new version is downloaded (Windows installer, macOS disk image or Linux archive for
+  the running platform), verified against the release's `SHA256SUMS.txt`, installed and the program
+  restarted. *Settings ▸ Updates* chooses between *do not check*, *notify and ask* (default) and
+  *install automatically* (with a 20-second prompt to postpone); *Help ▸ Check for updates…* runs the
+  check on demand. pip installations are only pointed to the download page. The Windows installer
+  accepts `/relaunch=1` to start the program again after a silent update.
 
 ### Changed
 - Chart legends sit above the plot, outside the axes, so they never cover the data; the T-S

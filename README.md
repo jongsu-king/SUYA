@@ -103,7 +103,9 @@ building a personal time series of Southern Ocean salinity, or simply having a l
 | **macOS** | Open the `.dmg`, drag **SUYA** to *Applications*, eject the disk image. Uninstall by moving the app to the Trash. |
 | **Linux** | `tar xzf SUYA-<version>-linux-x86_64.tar.gz && cd SUYA-<version>-linux-x86_64 && ./install.sh`. Installs to `~/.local/opt/suya`, links `~/.local/bin/suya`, adds a menu entry. Uninstall: delete those three things. |
 
-**Updating**: install the new version over the old one. Your database, settings and workbooks live in your user folders (section 7) and are untouched.
+**Updating**: SUYA checks GitHub for a new release 15 seconds after it starts and once a day. By default it asks before downloading;
+*Settings ▸ Updates* can turn the check off or make it fully automatic (download, verify the SHA-256, install, restart). Installing a
+new version by hand over the old one also works. Your database, settings and workbooks live in your user folders (section 7) and are untouched.
 
 ### 2-2. First-run warnings
 
@@ -207,7 +209,7 @@ Per-source status, interval, data time, age, last run, countdown to the next run
 
 | Menu | Action |
 |---|---|
-| File > Settings… (Ctrl+,) | Windy API key and tier, Excel folder, database path (read-only) |
+| File > Settings… (Ctrl+,) | Windy API key and tier, Excel folder, update mode, database path (read-only) |
 | File > Save Excel database now | Rewrite the workbooks without waiting 15 minutes |
 | File > Open Excel folder / Open data folder | In Explorer / Finder / your file manager |
 | File > Export CSV | All measurements / all Argo levels / current map layer |
@@ -322,6 +324,7 @@ Use `File > Settings`, or set these as **environment variables**, in a **`.env`*
 | `MONITOR_EXCEL_DIR` | `Documents/SUYA` | Excel folder |
 | `MONITOR_INTERVAL_<SOURCE_ID>` | see section 5 | Seconds, minimum 30, e.g. `MONITOR_INTERVAL_HYCOM_GRID=7200` |
 | `MONITOR_OPENMETEO_DAILY_BUDGET` | `9000` | Daily Open-Meteo call cap (the free limit is 10,000) |
+| `MONITOR_UPDATE_MODE` | `notify` | `off` (never check), `notify` (check daily, ask before installing), `auto` (download, install and restart; a 20-second prompt lets you postpone) |
 
 `settings.env` is written with owner-only permissions because it may contain the Windy key.
 
@@ -387,8 +390,10 @@ megabytes. With pruning (60 snapshots per layer) the database settles around 100
 month and are kept. Excel workbooks are 2–20 MB per month.
 
 **Privacy.** SUYA contacts only the data hosts listed in section 5, sends only coordinates and dataset names, and sends nothing about you.
-There is no telemetry, no automatic update check, no account. *Help ▸ Check for updates…* asks GitHub for the latest release
-number only when you click it. The Windy key, if you enter one, stays in your local `settings.env`. The log file
+There is no telemetry and no account. The only other connection is the update check: unless you set it to *off* in Settings,
+SUYA asks `api.github.com` once a day for the latest release number (a plain HTTPS request carrying no personal data) and downloads an
+installer from `github.com` only when you accept, or when you chose automatic updates; every download is verified against the
+release's SHA-256 list. The Windy key, if you enter one, stays in your local `settings.env`. The log file
 (`monitor.log`, 2 MB × 3 rotating) records collection results and errors, nothing else.
 
 ## 12. Limitations

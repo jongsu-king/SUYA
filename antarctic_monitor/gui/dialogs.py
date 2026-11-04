@@ -57,9 +57,15 @@ class SettingsDialog(QDialog):
         folder_row = QHBoxLayout()
         folder_row.addWidget(self.excel_dir, 1)
         folder_row.addWidget(browse)
+        self.updates = QComboBox()
+        self.updates.addItem(tr("확인하지 않음"), "off")
+        self.updates.addItem(tr("새 버전이 있으면 알리고 물어본 뒤 설치"), "notify")
+        self.updates.addItem(tr("자동으로 내려받아 설치하고 다시 시작"), "auto")
+        self.updates.setCurrentIndex(max(0, self.updates.findData(settings.update_mode)))
         form.addRow(tr("Windy API 키"), self.key)
         form.addRow(tr("Windy 키 종류"), self.tier)
         form.addRow(tr("엑셀 저장 폴더"), folder_row)
+        form.addRow(tr("업데이트"), self.updates)
         form.addRow(tr("데이터베이스"), QLabel(str(settings.db_path)))
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
@@ -76,6 +82,7 @@ class SettingsDialog(QDialog):
             "WINDY_API_KEY": self.key.text().strip(),
             "WINDY_KEY_TIER": self.tier.currentData(),
             "MONITOR_EXCEL_DIR": str(Path(self.excel_dir.text().strip())),
+            "MONITOR_UPDATE_MODE": self.updates.currentData(),
         }
 
 

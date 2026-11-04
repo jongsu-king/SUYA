@@ -76,6 +76,9 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1
    ```
 3. `release.yml`이 Windows x64, macOS arm64, macOS x86_64, Linux x86_64에서 빌드해 테스트와 `self-test`를 통과한 설치 파일과 `SHA256SUMS.txt`를 Release에 첨부합니다. 20~30분 걸립니다.
 4. Release 노트는 자동 생성된 목록 위에 CHANGELOG 내용을 붙여 넣으세요.
+5. 프로그램 안의 자동 업데이트(`antarctic_monitor/updates.py`)는 릴리스 자산 이름(`SUYA-<버전>-windows-x64-setup.exe`,
+   `-macos-arm64.dmg`, `-macos-x86_64.dmg`, `-linux-x86_64.tar.gz`)과 `SHA256SUMS.txt`에 의존합니다. 이름을 바꾸면 이미 설치된
+   버전들이 새 릴리스를 찾지 못하므로 바꾸지 마세요. Windows 설치 프로그램은 `/relaunch=1` 매개변수로 설치 뒤 프로그램을 다시 띄웁니다.
 
 ## 설치 파일 안에 들어가는 것 / What ships
 
