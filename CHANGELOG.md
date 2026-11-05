@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- A Homebrew tap: `brew install --cask jongsu-king/suya/suya` installs the macOS disk image.
+
 ## [0.1.3] - 2026-11-05
 
 A slim collector install and a container image, missed satellite days filled in, a monthly summary

@@ -28,6 +28,7 @@
 | **macOS 12 이상** Apple Silicon (M1–M4) | [SUYA-0.1.3-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.3-macos-arm64.dmg) | ≈ 60 MB | 응용 프로그램 폴더로 끌어 놓기. Apple 메뉴 → *이 Mac에 관하여*에 "칩 Apple M…"으로 나오는 Mac |
 | **macOS 12 이상** Intel | [SUYA-0.1.3-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.3-macos-x86_64.dmg) | ≈ 65 MB | 응용 프로그램 폴더로 끌어 놓기. *이 Mac에 관하여*에 "프로세서 … Intel"로 나오는 Mac |
 | **Linux** x86_64 (glibc 2.35 이상, Ubuntu 22.04+) | [SUYA-0.1.3-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.3-linux-x86_64.tar.gz) | ≈ 110 MB | 풀고 `./install.sh` |
+| Homebrew를 쓰는 macOS | `brew install --cask jongsu-king/suya/suya` | — | 같은 디스크 이미지이고 처음 실행 경고도 같습니다 |
 | 파이썬 3.11 이상이 있는 모든 OS | `pip install "suya[gui] @ git+https://github.com/jongsu-king/SUYA.git"` | — | 설치 후 `suya` 실행. `[gui]`를 빼면 수집기만 설치됩니다(서버·컨테이너용, [9-1](#9-1-서버와-컨테이너)) |
 
 같은 파일이 [최신 릴리스 페이지](https://github.com/jongsu-king/SUYA/releases/latest) 맨 아래 **Assets**에 `SHA256SUMS.txt`, 릴리스 노트와 함께 있습니다.

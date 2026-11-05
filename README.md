@@ -29,6 +29,7 @@ installation needed: download the installer, open it, and the data starts arrivi
 | **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.3-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.3-macos-arm64.dmg) | ≈ 60 MB | Drag to Applications. Apple menu → *About This Mac* says "Chip Apple M…" |
 | **macOS 12+** Intel | [SUYA-0.1.3-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.3-macos-x86_64.dmg) | ≈ 65 MB | Drag to Applications. *About This Mac* says "Processor … Intel" |
 | **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.3-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.3-linux-x86_64.tar.gz) | ≈ 110 MB | Extract and run `./install.sh` |
+| macOS with Homebrew | `brew install --cask jongsu-king/suya/suya` | — | The same disk image, with the same first-run warning |
 | Any OS with Python 3.11+ | `pip install "suya[gui] @ git+https://github.com/jongsu-king/SUYA.git"` | — | Then run `suya`. Without `[gui]` you get the collector only (servers, containers; see [9-1](#9-1-servers-and-containers)) |
 
 The same files are listed under **Assets** at the bottom of the [latest release page](https://github.com/jongsu-king/SUYA/releases/latest),
