@@ -1,14 +1,16 @@
 """좌표 해석, 해수 물성, 격자 계산, 저장소, 수집 엔진을 검증합니다."""
 
+import argparse
 import asyncio
 import math
+import sys
 import time
 from datetime import datetime, timezone
 
 import httpx
 import pytest
 
-from antarctic_monitor import pointquery, seawater, updates
+from antarctic_monitor import cli, instance, pointquery, seawater, updates
 from antarctic_monitor.collectors import JOBS, hycom, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
@@ -277,6 +279,45 @@ def test_second_instance_is_refused(tmp_path):
     first.release()
     assert second.acquire()
     second.release()
+
+
+def test_file_lock_refuses_a_second_holder(tmp_path):
+    first = instance._FileLock(tmp_path / "suya.lock")
+    assert first.acquire()
+    second = instance._FileLock(tmp_path / "suya.lock")
+    assert not second.acquire()
+    first.release()
+    assert second.acquire()
+    second.release()
+    assert (tmp_path / "suya.lock").exists()
+
+
+def test_instance_lock_works_without_qt(tmp_path, monkeypatch):
+    monkeypatch.setattr(instance, "QLockFile", None)
+    first = instance.InstanceLock(tmp_path)
+    assert isinstance(first._lock, instance._FileLock)
+    assert first.acquire()
+    assert not instance.InstanceLock(tmp_path).acquire()
+    first.release()
+    assert instance.InstanceLock(tmp_path).acquire()
+
+
+def test_cli_explains_missing_window_libraries(monkeypatch, capsys):
+    monkeypatch.setitem(sys.modules, "PySide6", None)
+    monkeypatch.setitem(sys.modules, "antarctic_monitor.gui.app", None)
+    monkeypatch.setattr(cli, "_configure_logging", lambda command: None)
+    assert not cli.gui_available()
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main(["gui"])
+    assert exit_info.value.code == 2
+    assert 'suya[gui]' in capsys.readouterr().err
+
+
+def test_self_test_runs_without_qt(monkeypatch, capsys):
+    monkeypatch.setitem(sys.modules, "PySide6", None)
+    cli._self_test(argparse.Namespace(out=None))
+    out = capsys.readouterr().out
+    assert "gui skipped" in out and "excel ok" in out and "version" in out
 
 
 def test_release_check_compares_versions():

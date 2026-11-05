@@ -348,6 +348,8 @@ EN: dict[str, str] = {
     "GitHub 요청 한도에 걸렸습니다. 잠시 후 다시 확인하세요": "GitHub's request limit was reached. Check again in a little while",
     "{minutes}분 안에 끝나지 않아 중단했습니다": "Stopped after {minutes} min without finishing",
     "시간이 길어져 남은 변수 {n}개는 잠시 뒤 이어받습니다": "Taking long; the remaining {n} variable(s) continue in a moment",
+    "화면 구성 요소가 설치되지 않았습니다. pip install \"suya[gui]\" 로 설치하거나 suya daemon 으로 창 없이 수집하세요":
+        "The window libraries are not installed. Install them with pip install \"suya[gui]\" or collect without a window with suya daemon",
     "이 설치본은 스스로 업데이트할 수 없습니다": "This installation cannot update itself",
     "SUYA가 이미 실행 중입니다. 창이 보이지 않으면 Dock이나 작업 표시줄을 확인하세요.": "SUYA is already running. If you cannot see its window, look in the Dock or the taskbar.",
     "혼합층 깊이 (10 m 기준 수온에서 0.2 °C 차): {items}": "Mixed-layer depth (0.2 °C from the 10 m temperature): {items}",

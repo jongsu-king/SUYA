@@ -14,6 +14,10 @@ python -m antarctic_monitor                             # run from source
 
 `uv`를 쓴다면 `uv venv && uv pip install -e ".[dev,build]"`.
 
+추가 의존성 묶음(extras): `gui` = PySide6 + matplotlib(창), `dev` = gui + pytest·openpyxl, `build` = gui + PyInstaller·cmocean.
+`pip install .`만 하면 수집기(httpx·numpy·XlsxWriter)만 설치되어 `suya daemon`·`collect`·`export`·`excel-sync`가 창 없이 돕니다.
+서버에서는 저장소의 `Dockerfile`로 이미지를 만들어 `/data` 볼륨에 쌓는 것이 가장 간단합니다(README 9-1).
+
 ## 프로젝트 구조 / Layout
 
 ```
@@ -32,6 +36,7 @@ packaging/
 .github/workflows/
   ci.yml                   push·PR마다 테스트: Linux·Windows는 Python 3.11~3.13, macOS는 설치 파일과 같은 3.12 하나
   release.yml              v* 태그마다 설치 파일 빌드 후 Release에 첨부
+Dockerfile              창 없는 수집기 이미지 (python:3.12-slim + 수집기만, suya daemon)
 tests/                  pytest (네트워크 불필요, 실제 응답 형태를 고정값으로 사용)
 docs/                   상세 문서와 화면 캡처
 ```

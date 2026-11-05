@@ -28,7 +28,7 @@
 | **macOS 12 이상** Apple Silicon (M1–M4) | [SUYA-0.1.2-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-arm64.dmg) | ≈ 60 MB | 응용 프로그램 폴더로 끌어 놓기. Apple 메뉴 → *이 Mac에 관하여*에 "칩 Apple M…"으로 나오는 Mac |
 | **macOS 12 이상** Intel | [SUYA-0.1.2-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-x86_64.dmg) | ≈ 65 MB | 응용 프로그램 폴더로 끌어 놓기. *이 Mac에 관하여*에 "프로세서 … Intel"로 나오는 Mac |
 | **Linux** x86_64 (glibc 2.35 이상, Ubuntu 22.04+) | [SUYA-0.1.2-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-linux-x86_64.tar.gz) | ≈ 110 MB | 풀고 `./install.sh` |
-| 파이썬 3.11 이상이 있는 모든 OS | `pip install git+https://github.com/jongsu-king/SUYA.git` | — | 설치 후 `suya` 실행 |
+| 파이썬 3.11 이상이 있는 모든 OS | `pip install "suya[gui] @ git+https://github.com/jongsu-king/SUYA.git"` | — | 설치 후 `suya` 실행. `[gui]`를 빼면 수집기만 설치됩니다(서버·컨테이너용, [9-1](#9-1-서버와-컨테이너)) |
 
 같은 파일이 [최신 릴리스 페이지](https://github.com/jongsu-king/SUYA/releases/latest) 맨 아래 **Assets**에 `SHA256SUMS.txt`, 릴리스 노트와 함께 있습니다.
 이전 버전은 [Releases 페이지](https://github.com/jongsu-king/SUYA/releases)에 있습니다.
@@ -120,11 +120,15 @@ SUYA는 개인 오픈소스 프로젝트라 코드 서명 인증서가 없습니
 파이썬 3.11 이상이 있다면:
 
 ```bash
-pip install git+https://github.com/jongsu-king/SUYA.git
+pip install "suya[gui] @ git+https://github.com/jongsu-king/SUYA.git"
 suya
 ```
 
 Windows에서는 `suya-gui`로 실행하면 콘솔 창 없이 뜹니다.
+
+`gui` 묶음이 Qt(PySide6)와 matplotlib을 가져옵니다. 이것 없이 `pip install git+https://github.com/jongsu-king/SUYA.git`만 하면
+수집기(httpx·numpy·XlsxWriter)만 설치되어 `suya daemon`, `suya collect`, `suya export`, `suya excel-sync`는 돌고, `suya`만 치면
+창 라이브러리가 없다고 알려 줍니다. 서버나 컨테이너에는 이쪽이 맞습니다([9-1](#9-1-서버와-컨테이너)).
 
 ### 2-4. 소스에서 실행
 
@@ -344,6 +348,29 @@ suya --version
 
 `daemon`과 창을 같은 데이터베이스로 동시에 돌리지 마세요(둘 다 수집합니다). 다른 컴퓨터에서 모은 데이터를 보려면 `antarctic.db`를 복사해 `--no-collect`로 엽니다.
 
+### 9-1. 서버와 컨테이너
+
+수집만 하는 컴퓨터에는 Qt가 필요 없습니다. `gui` 묶음 없이 설치하고 데몬을 돌립니다:
+
+```bash
+pip install git+https://github.com/jongsu-king/SUYA.git
+suya daemon                       # 데이터는 ~/.local/share/SUYA (Linux); MONITOR_DB_PATH·MONITOR_EXCEL_DIR로 바꿀 수 있음
+```
+
+같은 용도로 저장소에 `Dockerfile`이 있습니다. 컨테이너가 쓰는 것은 모두 `/data` 볼륨에 들어갑니다
+(`/data/SUYA/antarctic.db`, `/data/SUYA/excel/`, `settings.env`, `suya.lock`):
+
+```bash
+docker build -t suya https://github.com/jongsu-king/SUYA.git
+docker run -d --name suya --restart unless-stopped -v suya-data:/data suya
+docker logs -f suya                                   # 수집 로그
+docker run --rm -v suya-data:/data suya suya collect  # 손으로 한 바퀴
+```
+
+데이터를 보려면 볼륨에서 `antarctic.db`를 꺼내(`docker cp suya:/data/SUYA/antarctic.db .`) 데스크톱에서 `MONITOR_DB_PATH`를
+지정하고 `suya --no-collect`로 열거나, 엑셀 워크북을 바로 읽으면 됩니다. 컨테이너와 데스크톱 복사본이 같은 데이터베이스를
+동시에 쓰면 안 됩니다.
+
 ## 10. 동작 원리
 
 ```
@@ -453,7 +480,8 @@ antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
 packaging/                PyInstaller 명세, 아이콘 생성기, Inno Setup 스크립트, 빌드 스크립트, Linux desktop 파일
 tests/                    pytest (네트워크 불필요)
 docs/                     상세 문서와 화면 캡처
-.github/workflows/        ci.yml(테스트), release.yml(설치 파일)
+.github/workflows/        ci.yml(테스트, Qt 없는 설치, Docker 이미지), release.yml(설치 파일)
+Dockerfile                창 없는 수집기 컨테이너 (suya daemon, 데이터는 /data)
 ```
 
 ## 16. 앞으로 할 일과 기여

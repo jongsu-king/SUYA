@@ -136,32 +136,49 @@ def _excel_sync(args: argparse.Namespace) -> None:
         print(f"{directory}: {', '.join(result['files'])} ({result['rows']} rows)")
 
 
+def gui_available() -> bool:
+    """True when the window's libraries are installed (the ``gui`` extra); a server copy may lack them."""
+    try:
+        import matplotlib  # noqa: F401
+        import PySide6  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def _self_test(args: argparse.Namespace) -> None:
     """Check that an installed copy can load everything it needs. Used by the installer build."""
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     import tempfile
 
-    from PySide6.QtWidgets import QApplication
-
     from . import excel
     from .config import Settings
-    from .gui.app import MainWindow
-    from .gui.backend import Backend
 
     lines = []
     with tempfile.TemporaryDirectory() as temp:
-        app = QApplication.instance() or QApplication(sys.argv[:1])
         settings = Settings(db_path=Path(temp) / "test.db", excel_dir=Path(temp) / "excel")
-        backend = Backend(settings, collect=False)
-        backend.start()
-        window = MainWindow(backend, settings)
-        window.show()
-        app.processEvents()
-        window.grab()
-        lines.append("gui ok")
-        lines.append(f"excel ok {excel.sync(backend.store, settings.excel_dir)['files']}")
-        window.close()
-        app.processEvents()
+        if gui_available():
+            from PySide6.QtWidgets import QApplication
+
+            from .gui.app import MainWindow
+            from .gui.backend import Backend
+
+            app = QApplication.instance() or QApplication(sys.argv[:1])
+            backend = Backend(settings, collect=False)
+            backend.start()
+            window = MainWindow(backend, settings)
+            window.show()
+            app.processEvents()
+            window.grab()
+            lines.append("gui ok")
+            lines.append(f"excel ok {excel.sync(backend.store, settings.excel_dir)['files']}")
+            window.close()
+            app.processEvents()
+        else:
+            store = Store(settings.db_path)
+            lines.append("gui skipped (window libraries not installed; collection and Excel only)")
+            lines.append(f"excel ok {excel.sync(store, settings.excel_dir)['files']}")
+            store.close()
     lines.append(f"version {__version__}")
     text = "\n".join(lines) + "\n"
     if args.out:
@@ -285,7 +302,13 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{source['id']:20s} {tr(source['name'])} | {tr(source['measures'])} | {tr(source['cadence'])}")
         return
 
-    from .gui.app import run_gui
+    try:
+        from .gui.app import run_gui
+    except ImportError:
+        if gui_available():
+            raise
+        print(tr("화면 구성 요소가 설치되지 않았습니다. pip install \"suya[gui]\" 로 설치하거나 suya daemon 으로 창 없이 수집하세요"), file=sys.stderr)
+        sys.exit(2)
 
     code = run_gui(
         collect=not getattr(args, "no_collect", False),

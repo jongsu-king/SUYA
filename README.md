@@ -29,7 +29,7 @@ installation needed: download the installer, open it, and the data starts arrivi
 | **macOS 12+** Apple Silicon (M1–M4) | [SUYA-0.1.2-macos-arm64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-arm64.dmg) | ≈ 60 MB | Drag to Applications. Apple menu → *About This Mac* says "Chip Apple M…" |
 | **macOS 12+** Intel | [SUYA-0.1.2-macos-x86_64.dmg](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-macos-x86_64.dmg) | ≈ 65 MB | Drag to Applications. *About This Mac* says "Processor … Intel" |
 | **Linux** x86_64 (glibc 2.35+, e.g. Ubuntu 22.04+) | [SUYA-0.1.2-linux-x86_64.tar.gz](https://github.com/jongsu-king/SUYA/releases/latest/download/SUYA-0.1.2-linux-x86_64.tar.gz) | ≈ 110 MB | Extract and run `./install.sh` |
-| Any OS with Python 3.11+ | `pip install git+https://github.com/jongsu-king/SUYA.git` | — | Then run `suya` |
+| Any OS with Python 3.11+ | `pip install "suya[gui] @ git+https://github.com/jongsu-king/SUYA.git"` | — | Then run `suya`. Without `[gui]` you get the collector only (servers, containers; see [9-1](#9-1-servers-and-containers)) |
 
 The same files are listed under **Assets** at the bottom of the [latest release page](https://github.com/jongsu-king/SUYA/releases/latest),
 next to `SHA256SUMS.txt` and the release notes; older versions are on the [Releases page](https://github.com/jongsu-king/SUYA/releases).
@@ -123,11 +123,16 @@ You can verify a download against `SHA256SUMS.txt` on the release page (`shasum 
 With Python 3.11 or newer:
 
 ```bash
-pip install git+https://github.com/jongsu-king/SUYA.git
+pip install "suya[gui] @ git+https://github.com/jongsu-king/SUYA.git"
 suya
 ```
 
 On Windows, `suya-gui` starts it without a console window.
+
+The `gui` extra brings in Qt (PySide6) and matplotlib. `pip install git+https://github.com/jongsu-king/SUYA.git` without
+it installs only the collector (httpx, numpy, XlsxWriter): `suya daemon`, `suya collect`, `suya export` and
+`suya excel-sync` work, `suya` alone explains that the window libraries are missing. That is the right install for a
+server or a container, see [9-1](#9-1-servers-and-containers).
 
 ### 2-4. From source
 
@@ -354,6 +359,29 @@ suya --version
 
 Run either `daemon` or the GUI against one database, not both. To view data collected on another computer, copy `antarctic.db` and open it with `--no-collect`.
 
+### 9-1. Servers and containers
+
+A machine that only collects does not need Qt. Install the package without the `gui` extra and run the daemon:
+
+```bash
+pip install git+https://github.com/jongsu-king/SUYA.git
+suya daemon                       # data in ~/.local/share/SUYA (Linux); MONITOR_DB_PATH and MONITOR_EXCEL_DIR override
+```
+
+The repository ships a `Dockerfile` for the same thing. Everything the container writes goes to the `/data` volume
+(`/data/SUYA/antarctic.db`, `/data/SUYA/excel/`, `settings.env`, `suya.lock`):
+
+```bash
+docker build -t suya https://github.com/jongsu-king/SUYA.git
+docker run -d --name suya --restart unless-stopped -v suya-data:/data suya
+docker logs -f suya                                   # the collection log
+docker run --rm -v suya-data:/data suya suya collect  # one pass by hand
+```
+
+To look at the data, copy `antarctic.db` out of the volume (`docker cp suya:/data/SUYA/antarctic.db .`) and open it on a
+desktop with `suya --no-collect` after setting `MONITOR_DB_PATH`, or read the Excel workbooks directly. The container
+and a desktop copy must not share one database at the same time.
+
 ## 10. How it works
 
 ```
@@ -472,7 +500,8 @@ antarctic_monitor/        Python package (CLI name: suya)
 packaging/                PyInstaller spec, icon generator, Inno Setup script, build scripts, Linux desktop file
 tests/                    pytest suite (no network needed)
 docs/                     detailed documentation and screenshots
-.github/workflows/        ci.yml (tests), release.yml (installers)
+.github/workflows/        ci.yml (tests, Qt-free install, Docker image), release.yml (installers)
+Dockerfile                collector container without a window (suya daemon, data under /data)
 ```
 
 ## 16. Roadmap and contributing

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- The collector installs without Qt. `pip install suya` (or the Git URL) now brings only httpx, numpy
+  and XlsxWriter; the window needs the `gui` extra (`pip install "suya[gui]"`). `suya daemon`,
+  `collect`, `export`, `excel-sync` and `self-test` work in the slim install, and `suya` alone says
+  what is missing. A `Dockerfile` runs the daemon in a container with everything under `/data`.
+  The single-instance lock falls back to an OS file lock when Qt is absent. CI checks the slim
+  install and builds the image. The installers are unchanged.
+
 ### Changed
 - HYCOM jobs may run for 60 minutes (other sources keep 30). When the HYCOM server is slow, the
   grid job stops starting new variables after 20 minutes, keeps the layers it has and continues
