@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from datetime import datetime, timedelta, timezone
 
 from ..db import Measurement, iso, utcnow
@@ -25,6 +26,7 @@ VARIABLES = {
 MEASURE_NAME = {"water_temp": "sea_water_temperature", "salinity": "sea_water_salinity"}
 LAYER_PREFIX = {"water_temp": "hycom_temp", "salinity": "hycom_salt"}
 MAP_DEPTHS = (0, 100, 200, 500, 1000, 2000)
+GRID_SOFT_LIMIT = 1200.0
 
 LAT_ORIGIN, LAT_STEP = -80.0, 0.04
 LON_STEP = 0.08
@@ -121,9 +123,15 @@ async def fetch_map_layer(
 
 
 async def collect_grid(ctx: Context) -> CollectResult:
+    """변수마다 깊이별 격자를 받습니다. 레이어마다 저장하고 토큰을 남기므로 중단돼도 받은 것은 남고,
+    서버가 느려 GRID_SOFT_LIMIT를 넘기면 남은 변수는 잠시 뒤의 다음 실행으로 넘깁니다."""
     now = utcnow()
-    total, latest, skipped, messages = 0, None, 0, []
-    for variable, config in VARIABLES.items():
+    started = time.monotonic()
+    total, latest, skipped, messages, deferred = 0, None, 0, [], 0
+    for index, (variable, config) in enumerate(VARIABLES.items()):
+        if index and time.monotonic() - started > GRID_SOFT_LIMIT:
+            deferred = len(VARIABLES) - index
+            break
         hours, origin = await time_axis(ctx.fetcher, variable)
         depths = await depth_axis(ctx.fetcher, variable)
         time_index, valid = nearest_time(hours, origin, now)
@@ -167,15 +175,17 @@ async def collect_grid(ctx: Context) -> CollectResult:
                 skipped += 1
             else:
                 total += result
-    expected = len(VARIABLES) * len(MAP_DEPTHS)
+    expected = (len(VARIABLES) - deferred) * len(MAP_DEPTHS)
     if len(messages) == expected:
         raise FetchError("; ".join(messages[:2]))
-    if skipped == expected:
+    if skipped == expected and not deferred:
         return CollectResult(data_time=latest, unchanged=True, message=msg("같은 시각의 격자를 이미 보유"))
     note = msg("격자 {n}개 갱신", n=expected - skipped - len(messages))
     if messages:
         note = join(note, msg("실패 {n}개", n=len(messages)), messages[0])
-    return CollectResult(rows=total, data_time=latest, message=note)
+    if deferred:
+        note = join(note, msg("시간이 길어져 남은 변수 {n}개는 잠시 뒤 이어받습니다", n=deferred))
+    return CollectResult(rows=total, data_time=latest, message=note, backlog=bool(deferred))
 
 
 async def fetch_profile(fetcher: Fetcher, lat: float, lon: float) -> dict:

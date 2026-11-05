@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- HYCOM jobs may run for 60 minutes (other sources keep 30). When the HYCOM server is slow, the
+  grid job stops starting new variables after 20 minutes, keeps the layers it has and continues
+  30 seconds later, so a slow day no longer ends in a timeout with nothing recorded.
+
 ## [0.1.2] - 2026-11-05
 
 The program now updates itself. Version DOI: https://doi.org/10.5281/zenodo.23967499 (concept DOI for all

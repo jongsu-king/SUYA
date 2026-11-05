@@ -3,17 +3,18 @@
 import asyncio
 import math
 import time
+from datetime import datetime, timezone
 
 import httpx
 import pytest
 
 from antarctic_monitor import pointquery, seawater, updates
-from antarctic_monitor.collectors import JOBS, windy
+from antarctic_monitor.collectors import JOBS, hycom, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
 from antarctic_monitor.config import Settings, load_dotenv
 from antarctic_monitor.db import Measurement, Store
-from antarctic_monitor.engine import Engine, EventBus
+from antarctic_monitor.engine import Engine, EventBus, failure_message, job_timeout
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
 from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited
@@ -419,6 +420,47 @@ async def test_engine_describes_job_timeouts_and_bare_exceptions(store, monkeypa
     await engine.run_once("fake")
     assert store.source_states()["fake"]["last_message"] == "RuntimeError"
     await engine.ctx.fetcher.aclose()
+
+
+def test_job_timeouts_are_longer_for_hycom():
+    assert job_timeout("hycom_grid") == 3600.0
+    assert job_timeout("hycom_profiles") == 3600.0
+    assert job_timeout("metar") == 1800.0
+    assert render(failure_message(TimeoutError(), 3600.0)) == "60분 안에 끝나지 않아 중단했습니다"
+
+
+async def test_hycom_grid_hands_remaining_variables_to_the_next_run(store, monkeypatch):
+    origin = datetime(2026, 11, 5, tzinfo=timezone.utc)
+
+    async def time_axis(fetcher, variable, interactive=False):
+        return [0.0, 3.0], origin
+
+    async def depth_axis(fetcher, variable):
+        return [0.0, 100.0, 200.0, 500.0, 1000.0, 2000.0]
+
+    async def fetch_map_layer(fetcher, variable, time_index, depth_index):
+        return [-70.0, -60.0], [0.0, 10.0], [30.0, 30.0, 30.0, 30.0]
+
+    monkeypatch.setattr(hycom, "time_axis", time_axis)
+    monkeypatch.setattr(hycom, "depth_axis", depth_axis)
+    monkeypatch.setattr(hycom, "fetch_map_layer", fetch_map_layer)
+    ctx = Context(store, Fetcher(), Settings())
+
+    monkeypatch.setattr(hycom, "GRID_SOFT_LIMIT", -1.0)
+    first = await hycom.collect_grid(ctx)
+    assert first.backlog and first.rows == 24
+    assert "이어받습니다" in render(first.message) and "격자 6개 갱신" in render(first.message)
+    assert store.kv_get("token:hycom_temp_0") and not store.kv_get("token:hycom_salt_0")
+
+    monkeypatch.setattr(hycom, "GRID_SOFT_LIMIT", 1200.0)
+    second = await hycom.collect_grid(ctx)
+    assert not second.backlog and second.rows == 24
+    assert render(second.message) == "격자 6개 갱신"
+    assert store.kv_get("token:hycom_salt_2000")
+
+    third = await hycom.collect_grid(ctx)
+    assert third.unchanged and third.rows == 0
+    await ctx.fetcher.aclose()
 
 
 async def test_engine_rate_limit_waits_at_least_an_hour(store, monkeypatch):

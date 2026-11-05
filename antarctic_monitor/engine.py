@@ -22,17 +22,23 @@ from .http import RateLimited
 log = logging.getLogger(__name__)
 
 JOB_TIMEOUT = 1800.0
+JOB_TIMEOUTS = {"hycom_grid": 3600.0, "hycom_profiles": 3600.0}
 BACKLOG_DELAY = 30.0
 RATE_LIMIT_DELAY = 3600.0
 STARTUP_STAGGER = 2.0
 PRUNE_EVERY = 86400.0
 
 
-def failure_message(exc: BaseException) -> str:
+def job_timeout(name: str) -> float:
+    """소스별 작업 시간 제한. HYCOM처럼 한 번에 많이 받는 소스는 더 깁니다."""
+    return JOB_TIMEOUTS.get(name, JOB_TIMEOUT)
+
+
+def failure_message(exc: BaseException, timeout: float = JOB_TIMEOUT) -> str:
     """실패 원인을 저장할 글로 만듭니다. 작업 시간 제한과 설명 없는 예외도 읽을 수 있는 글이 됩니다."""
     text = str(exc)
     if isinstance(exc, TimeoutError) and not text:
-        return msg("{minutes}분 안에 끝나지 않아 중단했습니다", minutes=max(1, int(JOB_TIMEOUT // 60)))
+        return msg("{minutes}분 안에 끝나지 않아 중단했습니다", minutes=max(1, int(timeout // 60)))
     if is_encoded(text):
         return text
     return (f"{type(exc).__name__}: {text}" if text else type(exc).__name__)[:400]
@@ -123,6 +129,7 @@ class Engine:
     async def run_once(self, name: str) -> float:
         """작업을 한 번 실행하고 다음 실행까지의 대기 시간을 돌려줍니다."""
         interval = float(self.ctx.settings.intervals.get(name, 3600))
+        timeout = job_timeout(name)
         started_at = iso()
         result = CollectResult()
         status, delay = "ok", interval
@@ -130,7 +137,7 @@ class Engine:
             self.running.add(name)
             self.bus.publish({"type": "job", "source": name, "state": "running", "at": started_at})
             try:
-                result = await asyncio.wait_for(JOBS[name](self.ctx), timeout=JOB_TIMEOUT)
+                result = await asyncio.wait_for(JOBS[name](self.ctx), timeout=timeout)
                 if result.disabled:
                     status = "disabled"
                 elif result.unchanged:
@@ -146,7 +153,7 @@ class Engine:
                 delay = max(interval, RATE_LIMIT_DELAY)
             except Exception as exc:
                 status = "error"
-                result.message = failure_message(exc)
+                result.message = failure_message(exc, timeout)
                 log.warning("수집 실패 %s: %s", name, render(result.message))
                 errors = (self.ctx.store.source_states().get(name) or {}).get("consecutive_errors") or 0
                 delay = min(interval, 60.0 * 2 ** min(errors, 8))
