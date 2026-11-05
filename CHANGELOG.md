@@ -18,8 +18,15 @@ All notable changes to this project are documented here. The format follows
   Windows (the same switches the in-app updater uses), mount, copy and run on macOS, extract,
   `install.sh` and run on Linux. The release job also refuses to publish if any of the four
   files the in-app updater looks for is missing.
+- OISST, SMOS and SMAP fill in the days they missed. If the program was off or the server was down,
+  the days that appeared in the meantime are fetched oldest first, three per run and up to seven
+  days back, so the daily series keeps no holes after a short outage.
+- A *Monthly summary* sheet opens each monthly workbook: samples, mean, minimum, maximum, standard
+  deviation, first and last time per point, source and item, with last month's mean and the change.
 
 ### Changed
+- Closing the window while an update is being downloaded or installed now asks first. Closing used
+  to cancel the update without a word and stop collection along with it.
 - HYCOM jobs may run for 60 minutes (other sources keep 30). When the HYCOM server is slow, the
   grid job stops starting new variables after 20 minutes, keeps the layers it has and continues
   30 seconds later, so a slow day no longer ends in a timeout with nothing recorded.

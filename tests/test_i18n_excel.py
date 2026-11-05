@@ -113,10 +113,47 @@ def test_sync_english_headers(tmp_path):
     excel.sync(store, tmp_path / "xl", ["2026-10"])
     book = openpyxl.load_workbook(tmp_path / "xl" / "antarctic_db_2026-10.xlsx", read_only=True)
     titles = [ws.title for ws in book.worksheets]
-    assert titles[:3] == ["Info", "Grid means", "Water by area"]
+    assert titles[:4] == ["Info", "Monthly summary", "Grid means", "Water by area"]
     ships = list(book["Ships"].iter_rows(values_only=True))
     assert ships[0][1] == "Call sign" and ships[1][1] == "SHIP1"
     store.close()
+
+
+def test_monthly_summary_sheet_compares_with_the_previous_month(tmp_path):
+    store = Store(tmp_path / "t.db")
+
+    def oisst(when, value):
+        return Measurement("oisst", "ds", "sea_water_temperature", "analysis", -68.0, -40.0, when, value, "°C", location_id="weddell")
+
+    store.upsert_measurements([
+        oisst("2026-10-31T12:00:00Z", -1.0),
+        oisst("2026-11-01T12:00:00Z", -1.0),
+        oisst("2026-11-02T12:00:00Z", -2.0),
+        Measurement("hycom", "ESPC", "sea_water_salinity", "model", -68.0, -40.0, "2026-11-03T00:00:00Z", 34.0, "PSU", level="depth:0", depth_m=0.0, location_id="weddell"),
+        Measurement("hycom", "ESPC", "sea_water_salinity", "model", -68.0, -40.0, "2026-11-03T00:00:00Z", 34.5, "PSU", level="depth:100", depth_m=100.0, location_id="weddell"),
+        Measurement("openmeteo", "ecmwf_ifs025", "air_temperature", "forecast", -62.2, -58.8, "2026-11-05T06:00:00Z", -2.0, "°C", level="2m", location_id="king_sejong"),
+        Measurement("oisst", "point_query", "sea_water_temperature", "analysis", -66.0, -66.0, "2026-11-02T12:00:00Z", -1.6, "°C"),
+    ])
+    excel.sync(store, tmp_path / "xl", ["2026-11"])
+    book = openpyxl.load_workbook(tmp_path / "xl" / "antarctic_db_2026-11.xlsx", read_only=True)
+    assert book.sheetnames[:2] == ["정보", "월간요약"]
+    rows = list(book["월간요약"].iter_rows(values_only=True))
+    assert rows[0][:6] == ("지점", "자료", "항목", "단위", "표본 수", "평균")
+    assert len(rows) == 3
+    salinity = next(row for row in rows[1:] if row[1] == "hycom")
+    assert salinity[2] == "염분" and salinity[5] == 34.0 and salinity[4] == 1
+    assert salinity[11] is None and salinity[12] is None
+    water = next(row for row in rows[1:] if row[1] == "oisst")
+    assert water[0] == "웨델해" and water[2] == "수온" and water[3] == "°C" and water[4] == 2
+    assert water[5:9] == (-1.5, -2.0, -1.0, 0.5)
+    assert water[9] == datetime(2026, 11, 1, 12, 0) and water[10] == datetime(2026, 11, 2, 12, 0)
+    assert water[11] == -1.0 and water[12] == -0.5
+    store.close()
+
+
+def test_previous_month_crosses_the_year():
+    assert excel.previous_month("2027-01") == "2026-12"
+    assert excel.previous_month("2026-11") == "2026-10"
 
 
 def test_months_to_write_skips_finished_months(tmp_path):

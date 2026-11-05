@@ -231,6 +231,27 @@ class Store:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM measurements").fetchone()[0]
 
+    def location_stats(
+        self, since: str, until: str, sources: tuple[str, ...], variables: tuple[str, ...]
+    ) -> list[dict]:
+        """지점·자료·항목별 기간 통계. 표층과 2 m의 실측·분석·모델 값만 세고 앞날 예보는 뺍니다."""
+        source_marks = ",".join("?" * len(sources))
+        variable_marks = ",".join("?" * len(variables))
+        sql = f"""
+        SELECT location_id, source, variable, unit, COUNT(*) AS n, AVG(value) AS mean, MIN(value) AS low,
+               MAX(value) AS high, AVG(value * value) AS mean_square, MIN(obs_time) AS first_time,
+               MAX(obs_time) AS last_time
+        FROM measurements
+        WHERE location_id IS NOT NULL AND obs_time >= ? AND obs_time <= ? AND kind != 'forecast'
+          AND source IN ({source_marks}) AND variable IN ({variable_marks})
+          AND level IN ('surface', 'depth:0', '2m')
+        GROUP BY location_id, source, variable, unit
+        ORDER BY location_id, variable, source
+        """
+        with self._lock:
+            rows = self._conn.execute(sql, (since, until, *sources, *variables)).fetchall()
+        return [dict(row) for row in rows]
+
     def prune(self, forecast_days: int = 30, grid_keep: int = 60) -> None:
         """오래된 예보와 격자 스냅샷을 지웁니다. 관측·위성·분석값은 계속 보관합니다."""
         cutoff = iso(utcnow() - timedelta(days=forecast_days))

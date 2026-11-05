@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 from ..db import Measurement
 from ..gridutil import Grid, grid_from_triples, sample_nearest
-from ..http import FetchError, Fetcher, NoData
+from ..http import FetchError, Fetcher, NoData, RateLimited
 from ..i18n import join, msg
 from ..locations import OCEAN_LOCATIONS
 from .base import CollectResult, Context, finite, to_iso_utc
@@ -16,6 +16,8 @@ from .base import CollectResult, Context, finite, to_iso_utc
 PFEG = "https://coastwatch.pfeg.noaa.gov/erddap"
 COASTWATCH = "https://coastwatch.noaa.gov/erddap"
 GRID_TIMEOUT = 240.0
+BACKFILL_DAYS = 7
+BACKFILL_PER_RUN = 3
 
 
 @dataclass(frozen=True)
@@ -128,6 +130,19 @@ async def latest_time(fetcher: Fetcher, product: GriddedProduct) -> str:
     return rows[0]["time"]
 
 
+async def times_between(fetcher: Fetcher, product: GriddedProduct, start: str, end: str) -> list[str]:
+    """start부터 end까지 원천에 있는 시각 목록. 프로그램이 꺼져 있던 날이나 서버가 멈췄던 날을 찾을 때 씁니다."""
+    query = f"time[({start}):1:({end})]"
+    return [row["time"] for row in await fetch_rows(fetcher, griddap_url(product.base, product.dataset, query))]
+
+
+def missing_times(available: list[str], previous: str, latest: str) -> list[str]:
+    """previous 뒤에 원천에 생긴 시각을 오래된 순으로 돌려줍니다. 최근 BACKFILL_DAYS개까지만 채웁니다."""
+    newest = to_iso_utc(latest)
+    times = {to_iso_utc(value) for value in available} | {newest}
+    return sorted(value for value in times if previous < value <= newest)[-BACKFILL_DAYS:]
+
+
 def build_grid_query(product: GriddedProduct, time_value: str) -> str:
     lat = f"[({MAP_LAT[0]}):{product.stride}:({MAP_LAT[1]})]"
     lon = f"[({product.lon_range[0]}):{product.stride}:({product.lon_range[1]})]"
@@ -150,12 +165,57 @@ def rows_to_grids(product: GriddedProduct, rows: list[dict], time_value: str) ->
 
 
 async def collect_product(ctx: Context, product: GriddedProduct) -> CollectResult:
+    """새 시각을 받습니다. 지난 실행 뒤로 하루 넘게 비었으면 빠진 날을 오래된 순으로 채웁니다.
+
+    한 번에 BACKFILL_PER_RUN개까지 받고 나머지는 backlog로 넘겨 곧 이어받습니다. 토큰은 받은 시각까지만
+    나아가므로 중간에 끊겨도 날이 빠지지 않고, 그 뒤 날을 받으면 고장 난 하루가 수집을 막지도 않습니다.
+    """
     time_value = await latest_time(ctx.fetcher, product)
     data_time = to_iso_utc(time_value)
     token_key = f"token:{product.source}"
-    if ctx.store.kv_get(token_key) == data_time:
+    previous = ctx.store.kv_get(token_key)
+    if previous == data_time:
         return CollectResult(data_time=data_time, unchanged=True, message=msg("원천 갱신 없음"))
 
+    pending = [data_time]
+    if previous and previous < data_time:
+        try:
+            available = await times_between(ctx.fetcher, product, previous, data_time)
+        except RateLimited:
+            raise
+        except FetchError:
+            available = []
+        pending = missing_times(available, previous, data_time)
+    todo, later = pending[:BACKFILL_PER_RUN], pending[BACKFILL_PER_RUN:]
+
+    total, summaries, done, failed = 0, [], 0, {}
+    for when in todo:
+        try:
+            rows, summaries = await _collect_time(ctx, product, when)
+        except RateLimited:
+            raise
+        except FetchError as exc:
+            failed[when] = exc
+            continue
+        total += rows
+        done += 1
+        ctx.store.kv_set(token_key, when)
+    if todo[-1] in failed:
+        raise failed[todo[-1]]
+
+    note = join(*summaries)
+    if done > 1:
+        note = join(msg("빠진 날 {n}일치 보충", n=done - 1), note)
+    if failed:
+        note = join(note, msg("실패 {n}개", n=len(failed)))
+    if later:
+        note = join(note, msg("남은 {n}일치는 잠시 뒤 이어받습니다", n=len(later)))
+    return CollectResult(rows=total, data_time=todo[-1], message=note, backlog=bool(later))
+
+
+async def _collect_time(ctx: Context, product: GriddedProduct, time_value: str) -> tuple[int, list[str]]:
+    """한 시각의 격자를 받아 저장하고 지점 값을 뽑습니다. (행 수, 레이어별 요약)을 돌려줍니다."""
+    data_time = to_iso_utc(time_value)
     url = griddap_url(product.base, product.dataset, build_grid_query(product, time_value))
     rows = await fetch_rows(ctx.fetcher, url, timeout=GRID_TIMEOUT)
     grids = await asyncio.to_thread(rows_to_grids, product, rows, time_value)
@@ -177,12 +237,7 @@ async def collect_product(ctx: Context, product: GriddedProduct) -> CollectResul
                     )
                 )
     saved = ctx.store.upsert_measurements(measurements)
-    ctx.store.kv_set(token_key, data_time)
-    return CollectResult(
-        rows=sum(len(g.values) for g in grids) + saved,
-        data_time=data_time,
-        message=join(*summaries),
-    )
+    return sum(len(g.values) for g in grids) + saved, summaries
 
 
 async def collect_oisst(ctx: Context) -> CollectResult:

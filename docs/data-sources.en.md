@@ -70,6 +70,7 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 
 ### Common
 - The latest time is asked first: `griddap/<dataset>.json?time[(last)]`. If it equals `token:<source>` in `kv`, nothing is downloaded and the run ends as "Unchanged".
+- If it is newer, `time[(token):1:(latest)]` lists what appeared since the last run. Missed days are fetched oldest first, three per run and at most the latest seven; the rest continue 30 seconds later. The token moves only as far as what was stored, so an interrupted run leaves no gap, and a day the server cannot deliver is skipped once a later day has arrived. The first run ever takes only the latest day.
 - Grid request: `var[(time)][(0.0)][(-89.875):2:(-40.125)][(-179.875):2:(179.875)]` — stride 2, i.e. 0.5°, from 90°S to 40°S. About 1 MB of JSON per variable.
 - Grids are stored gzip-compressed in `grids`; `grid_stats()` adds the area-weighted mean, min, max, valid ratio, 2nd/98th percentiles and sector means south of 60°S.
 - Values at the ten sea areas are also sampled into `measurements`.

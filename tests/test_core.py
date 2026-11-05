@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from antarctic_monitor import cli, instance, pointquery, seawater, updates
-from antarctic_monitor.collectors import JOBS, hycom, windy
+from antarctic_monitor.collectors import JOBS, erddap, hycom, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
 from antarctic_monitor.config import Settings, load_dotenv
@@ -508,6 +508,140 @@ async def test_hycom_grid_hands_remaining_variables_to_the_next_run(store, monke
     third = await hycom.collect_grid(ctx)
     assert third.unchanged and third.rows == 0
     await ctx.fetcher.aclose()
+
+
+DAYS = [f"2026-11-{day:02d}T12:00:00Z" for day in range(1, 16)]
+
+
+def _fake_erddap(monkeypatch, days, bad=(), rate_limited=(), list_error=None):
+    fetched = []
+
+    async def latest_time(fetcher, product):
+        return days[-1]
+
+    async def times_between(fetcher, product, start, end):
+        fetched.append("listed")
+        if list_error:
+            raise list_error
+        return days
+
+    async def collect_time(ctx, product, when):
+        if when in rate_limited:
+            raise RateLimited("한도")
+        if when in bad:
+            raise FetchError("HTTP 500")
+        fetched.append(when)
+        return 10, [msg("{layer} 유효 {pct}%", layer="oisst_sst", pct=40)]
+
+    monkeypatch.setattr(erddap, "latest_time", latest_time)
+    monkeypatch.setattr(erddap, "times_between", times_between)
+    monkeypatch.setattr(erddap, "_collect_time", collect_time)
+    return fetched
+
+
+def test_missing_times_are_ordered_and_limited_to_a_week():
+    assert erddap.missing_times(DAYS[:3], DAYS[0], DAYS[2]) == DAYS[1:3]
+    assert erddap.missing_times([], DAYS[0], DAYS[2]) == [DAYS[2]]
+    assert erddap.missing_times(DAYS, DAYS[0], DAYS[14]) == DAYS[8:15]
+    assert erddap.missing_times(["2026-11-02 12:00:00"], DAYS[0], DAYS[2]) == DAYS[1:3]
+
+
+async def test_erddap_fills_missed_days_oldest_first_and_continues(store, monkeypatch):
+    days = DAYS[:6]
+    fetched = _fake_erddap(monkeypatch, days)
+    store.kv_set("token:oisst", days[0])
+    ctx = Context(store, Fetcher(), Settings())
+
+    first = await erddap.collect_product(ctx, erddap.OISST)
+    assert [item for item in fetched if item != "listed"] == days[1:4]
+    assert first.backlog and first.rows == 30 and first.data_time == days[3]
+    assert store.kv_get("token:oisst") == days[3]
+    text = render(first.message)
+    assert "빠진 날 2일치 보충" in text and "남은 2일치는 잠시 뒤 이어받습니다" in text
+
+    second = await erddap.collect_product(ctx, erddap.OISST)
+    assert [item for item in fetched if item != "listed"] == days[1:6]
+    assert not second.backlog and second.data_time == days[5]
+    assert store.kv_get("token:oisst") == days[5]
+
+    third = await erddap.collect_product(ctx, erddap.OISST)
+    assert third.unchanged and third.rows == 0
+    await ctx.fetcher.aclose()
+
+
+async def test_erddap_first_run_fetches_only_the_latest_day(store, monkeypatch):
+    fetched = _fake_erddap(monkeypatch, DAYS[:6])
+    ctx = Context(store, Fetcher(), Settings())
+    result = await erddap.collect_product(ctx, erddap.OISST)
+    assert fetched == [DAYS[5]] and not result.backlog
+    assert "보충" not in render(result.message)
+    await ctx.fetcher.aclose()
+
+
+async def test_erddap_one_bad_day_does_not_block_newer_days(store, monkeypatch):
+    days = DAYS[:3]
+    _fake_erddap(monkeypatch, days, bad={days[1]})
+    store.kv_set("token:oisst", days[0])
+    ctx = Context(store, Fetcher(), Settings())
+    result = await erddap.collect_product(ctx, erddap.OISST)
+    assert store.kv_get("token:oisst") == days[2] and result.data_time == days[2]
+    assert "실패 1개" in render(result.message)
+    await ctx.fetcher.aclose()
+
+
+async def test_erddap_failure_on_the_newest_day_is_retried(store, monkeypatch):
+    days = DAYS[:3]
+    _fake_erddap(monkeypatch, days, bad={days[2]})
+    store.kv_set("token:oisst", days[0])
+    ctx = Context(store, Fetcher(), Settings())
+    with pytest.raises(FetchError, match="HTTP 500"):
+        await erddap.collect_product(ctx, erddap.OISST)
+    assert store.kv_get("token:oisst") == days[1]
+    await ctx.fetcher.aclose()
+
+
+async def test_erddap_rate_limit_stops_the_run(store, monkeypatch):
+    days = DAYS[:3]
+    _fake_erddap(monkeypatch, days, rate_limited={days[1]})
+    store.kv_set("token:oisst", days[0])
+    ctx = Context(store, Fetcher(), Settings())
+    with pytest.raises(RateLimited):
+        await erddap.collect_product(ctx, erddap.OISST)
+    assert store.kv_get("token:oisst") == days[0]
+    await ctx.fetcher.aclose()
+
+
+async def test_erddap_time_list_failure_still_fetches_the_latest_day(store, monkeypatch):
+    days = DAYS[:4]
+    fetched = _fake_erddap(monkeypatch, days, list_error=FetchError("HTTP 500"))
+    store.kv_set("token:oisst", days[0])
+    ctx = Context(store, Fetcher(), Settings())
+    result = await erddap.collect_product(ctx, erddap.OISST)
+    assert fetched == ["listed", days[3]] and store.kv_get("token:oisst") == days[3] and not result.backlog
+    await ctx.fetcher.aclose()
+
+
+def test_closing_the_window_during_an_update_asks_first(monkeypatch):
+    from types import SimpleNamespace
+
+    from PySide6.QtWidgets import QMessageBox
+
+    from antarctic_monitor.gui.app import MainWindow
+
+    answers = []
+
+    def question(parent, title, text):
+        answers.append(text)
+        return answer
+
+    monkeypatch.setattr(QMessageBox, "question", question)
+    answer = QMessageBox.StandardButton.No
+    assert MainWindow._confirm_close(SimpleNamespace(_updating=False))
+    assert answers == []
+    assert not MainWindow._confirm_close(SimpleNamespace(_updating=True))
+    answer = QMessageBox.StandardButton.Yes
+    assert MainWindow._confirm_close(SimpleNamespace(_updating=True))
+    assert len(answers) == 2
 
 
 async def test_engine_rate_limit_waits_at_least_an_hour(store, monkeypatch):

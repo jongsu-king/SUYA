@@ -263,6 +263,7 @@ Real responses contain values that must not be used as they are. Each rule below
 | GOSUD QC flags 1 and 2 only | 26 °C at 59°S with flag 4 was present |
 | Representative value: an **Argo profile within 100 km and 10 days** first; otherwise SST OISST → MUR → HYCOM, salinity HYCOM → SMOS → SMAP | A float 336 km away and 7 days old disagreed with the map |
 | HYCOM grid time remembered; identical times are not downloaded again | Saves server load and calls |
+| Days of OISST, SMOS and SMAP that appeared while the program was off or the server was down are filled in, oldest first, up to 7 days back | The daily series keeps no holes after a short outage |
 | Delayed-mode Argo data re-fetched when `data_mode` changes | Adjusted salinity replaces real-time values months later |
 | Collection messages stored language-neutral | Switching languages translates past records too |
 
@@ -300,6 +301,7 @@ while SUYA is running.
 | Sheet | Contents |
 |---|---|
 | Info | Period, creation time, rows per sheet |
+| Monthly summary | Per point, source and item: samples, mean, min, max, standard deviation, first and last time, last month's mean and the change. Forecasts and deep levels are left out |
 | Grid means | Per layer and time: mean south of 60°S, min, max, valid ratio, five sector means |
 | Water by area | Surface SST, salinity, anomaly and ice at the 10 sea areas (OISST, SMOS, SMAP, HYCOM, Marine) |
 | Water vertical | HYCOM 40-level temperature and salinity at the 10 areas, one row per level |

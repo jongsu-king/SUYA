@@ -128,7 +128,7 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
 <ul>
  <li><code>antarctic.db</code>: 모든 원본 값(SQLite). 다른 프로그램(파이썬, R, DB Browser)에서 바로 열 수 있습니다.</li>
  <li><code>settings.env</code>: 설정. <code>monitor.log</code>: 로그(문제가 생기면 이 파일을 보세요). <code>crash.log</code>: 프로그램이 갑자기 꺼졌을 때만 내용이 생깁니다. <code>suya.lock</code>: 두 번째 복사본이 뜨지 않게 하는 잠금 파일.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회.</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 월간요약, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회.</li>
  <li><code>argo_levels_YYYY-MM.xlsx</code>: Argo 전 층(행이 많아 별도 파일).</li>
 </ul>
 <p><b>주의</b>: 엑셀 파일은 SQLite에서 <b>다시 생성</b>됩니다. 직접 고친 내용은 다음 저장 때 덮어쓰입니다. 분석은 복사본에서 하세요.
@@ -278,7 +278,7 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
 <ul>
  <li><code>antarctic.db</code>: every raw value (SQLite). Open it directly from Python, R or DB Browser.</li>
  <li><code>settings.env</code>: settings. <code>monitor.log</code>: log file (check it when something goes wrong). <code>crash.log</code>: gets content only when the program dies suddenly. <code>suya.lock</code>: keeps a second copy from starting.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Grid means, Water by area, Water vertical, Argo list, Ships, Stations, GFS air, Forecasts, Windy, Point queries.</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Monthly summary, Grid means, Water by area, Water vertical, Argo list, Ships, Stations, GFS air, Forecasts, Windy, Point queries.</li>
  <li><code>argo_levels_YYYY-MM.xlsx</code>: every Argo level (separate because of the row count).</li>
 </ul>
 <p><b>Note</b>: the workbooks are <b>regenerated</b> from SQLite. Manual edits are overwritten on the next save; analyse a copy.

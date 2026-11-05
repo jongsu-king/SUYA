@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import subprocess
 import sys
@@ -49,6 +50,8 @@ AIR_CURRENT = (
 )
 WATER_SOURCES = ("oisst", "smos", "smap", "hycom", "openmeteo_marine")
 POINT_SOURCES = ("oisst", "mur", "smos", "smap", "hycom", "openmeteo", "openmeteo_marine")
+SUMMARY_SOURCES = WATER_SOURCES + ("openmeteo", "metar")
+SUMMARY_VARIABLES = {**WATER_VARIABLES, "air_temperature": "기온"}
 MAIN_FILE = "antarctic_db_{month}.xlsx"
 ARGO_FILE = "argo_levels_{month}.xlsx"
 
@@ -66,6 +69,11 @@ def month_bounds(month: str) -> tuple[str, str]:
 def _before(end: str) -> str:
     """iter_measurements의 until은 경계를 포함하므로 1초 앞으로 당깁니다."""
     return (parse_time(end) - timedelta(seconds=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def previous_month(month: str) -> str:
+    year, number = int(month[:4]), int(month[5:7])
+    return f"{year - 1}-12" if number == 1 else f"{year}-{number - 1:02d}"
 
 
 def location_name(location_id: str | None) -> str:
@@ -142,6 +150,7 @@ def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
     book = Book(path)
     info = book.workbook.add_worksheet(tr("정보"))
     counts = {
+        "월간요약": _sheet_summary(book, store, month),
         "격자평균": _sheet_grids(book, store, start, end),
         "수온염분_해역": _sheet_water(book, store, start, until),
         "수온염분_수직": _sheet_vertical(book, store, start, until),
@@ -171,6 +180,36 @@ def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
         info.write_number(index, 1, count)
     book.close()
     return counts
+
+
+def _sheet_summary(book: Book, store: Store, month: str) -> int:
+    """지점·자료·항목별 월간 통계와 전월 대비. 축적한 값이 그대로 요약이 되게 합니다."""
+    start, end = month_bounds(month)
+    earlier_start, earlier_end = month_bounds(previous_month(month))
+    sheet = Sheet(
+        book, "월간요약",
+        [("지점", 20), ("자료", 18), ("항목", 11), ("단위", 9), ("표본 수", 8), ("평균", 9), ("최소", 8), ("최대", 8),
+         ("표준편차", 9), ("첫 시각 UTC", 17), ("마지막 시각 UTC", 17), ("전월 평균", 9), ("전월 대비", 9)],
+    )
+    variables = tuple(SUMMARY_VARIABLES)
+    earlier = {
+        (row["location_id"], row["source"], row["variable"]): row["mean"]
+        for row in store.location_stats(earlier_start, _before(earlier_end), SUMMARY_SOURCES, variables)
+    }
+    for row in store.location_stats(start, _before(end), SUMMARY_SOURCES, variables):
+        spread = math.sqrt(max(0.0, row["mean_square"] - row["mean"] ** 2))
+        before = earlier.get((row["location_id"], row["source"], row["variable"]))
+        sheet.add(
+            [
+                location_name(row["location_id"]).removeprefix("metar:"), row["source"],
+                tr(SUMMARY_VARIABLES[row["variable"]]), row["unit"],
+                row["n"], round(row["mean"], 3), row["low"], row["high"], round(spread, 3),
+                parse_time(row["first_time"]), parse_time(row["last_time"]),
+                None if before is None else round(before, 3),
+                None if before is None else round(row["mean"] - before, 3),
+            ]
+        )
+    return sheet.finish()
 
 
 def _sheet_grids(book: Book, store: Store, start: str, end: str) -> int:
@@ -362,8 +401,7 @@ def write_argo_workbook(store: Store, path: Path, month: str) -> int:
 def months_to_write(store: Store, directory: Path, now: datetime | None = None) -> list[str]:
     """이번 달과 그 이후, 지난달, 아직 파일이 없는 달을 다시 씁니다. 끝난 달은 건드리지 않습니다."""
     moment = now or utcnow()
-    year, number = moment.year, moment.month
-    previous = f"{year - 1}-12" if number == 1 else f"{year}-{number - 1:02d}"
+    previous = previous_month(moment.strftime("%Y-%m"))
     output = [
         month for month in store.months_with_data()
         if month >= previous or not (directory / MAIN_FILE.format(month=month)).exists()

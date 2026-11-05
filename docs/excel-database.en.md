@@ -37,6 +37,19 @@ Why regenerate rather than append: an xlsx file is zipped XML, so appending one 
 ### Info
 Period, creation time (UTC), time-basis note, warning, rows per sheet.
 
+### Monthly summary — one month's statistics per point, source and item
+Only surface and 2 m values count. Forecasts for days ahead (`kind = forecast`), deep levels and points clicked on the map are left out.
+
+| Column | Meaning |
+|---|---|
+| Point | Sea area or base name; the ICAO code for METAR stations |
+| Data | `oisst`, `smos`, `smap`, `hycom`, `openmeteo_marine`, `openmeteo`, `metar` |
+| Item, Unit | Temperature, salinity, SST anomaly, sea-ice fraction, SST uncertainty, air temperature |
+| Samples | Number of values in the month. Sources differ in cadence, so read it next to the mean |
+| Mean, Min, Max, Std dev | Plain statistics of the samples (population standard deviation), not time-weighted |
+| First UTC, Last UTC | The range with values in that month. The month collection began does not cover the whole month |
+| Prev month mean, Change vs prev | The previous month's mean for the same point, source and item, and the difference. Empty when that month has no values |
+
 ### Grid means — statistics per map layer and time
 | Column | Meaning |
 |---|---|

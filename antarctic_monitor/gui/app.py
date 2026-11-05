@@ -233,6 +233,7 @@ class MainWindow(QMainWindow):
                 self.statusBar().showMessage(tr("업데이트 실패: {error}", error=render(str(error))), 10000)
                 return
             self.relaunch = False
+            self._updating = False
             self.close()
 
         fetcher = self.backend.ctx.fetcher
@@ -863,7 +864,20 @@ class MainWindow(QMainWindow):
         if path:
             self._export(exporter.export_grid, path, grid_id, path)
 
+    def _confirm_close(self) -> bool:
+        """업데이트 중에 창을 닫으면 내려받던 파일과 수집이 함께 멈추므로 먼저 묻습니다."""
+        if not self._updating:
+            return True
+        answer = QMessageBox.question(
+            self, tr("업데이트 확인"),
+            tr("업데이트를 받는 중입니다. 지금 닫으면 업데이트가 취소되고 수집도 멈춥니다. 닫을까요?"),
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
     def closeEvent(self, event) -> None:
+        if not self._confirm_close():
+            event.ignore()
+            return
         self.preferences.setValue("geometry", self.saveGeometry())
         self.clock.stop()
         self.refresh_timer.stop()
