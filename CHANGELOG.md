@@ -8,8 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.2] - 2026-11-05
 
-The program now updates itself. Version DOI: issued by Zenodo when it archives this release and
-added here afterwards (concept DOI for all versions: 10.5281/zenodo.23937852).
+The program now updates itself. Version DOI: https://doi.org/10.5281/zenodo.23967499 (concept DOI for all
+versions: 10.5281/zenodo.23937852).
 
 ### Added
 - WOA23 climatology profiles are kept in the database per grid point and month, so the
