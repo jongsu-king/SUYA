@@ -41,6 +41,17 @@ def test_stored_messages_render_in_both_languages():
     assert render("legacy message") == "legacy message"
 
 
+def test_nested_messages_render_in_both_languages():
+    inner = msg("프로파일 없음: {platform}/{cycle}", platform="5905620", cycle=35)
+    outer = msg("Argo 프로파일을 받지 못했습니다: {error}", error=inner)
+    assert render(outer) == "Argo 프로파일을 받지 못했습니다: 프로파일 없음: 5905620/35"
+    set_language("en")
+    assert render(outer) == "Could not fetch Argo profiles: Profile not found: 5905620/35"
+    assert "\x1f" not in render(outer)
+    plain = msg("Argo 프로파일을 받지 못했습니다: {error}", error="HTTP 500")
+    assert render(plain) == "Could not fetch Argo profiles: HTTP 500"
+
+
 def test_unsupported_language_rejected():
     with pytest.raises(ValueError):
         set_language("fr")

@@ -16,7 +16,7 @@ from typing import AsyncIterator
 from .collectors import JOBS
 from .collectors.base import CollectResult, Context
 from .db import iso, utcnow
-from .i18n import is_encoded
+from .i18n import is_encoded, render
 from .http import RateLimited
 
 log = logging.getLogger(__name__)
@@ -135,9 +135,9 @@ class Engine:
                 result.message = str(exc)
                 delay = max(interval, RATE_LIMIT_DELAY)
             except Exception as exc:
-                log.warning("수집 실패 %s: %s", name, exc)
                 status = "error"
                 result.message = str(exc) if is_encoded(str(exc)) else f"{type(exc).__name__}: {exc}"[:400]
+                log.warning("수집 실패 %s: %s", name, render(result.message))
                 errors = (self.ctx.store.source_states().get(name) or {}).get("consecutive_errors") or 0
                 delay = min(interval, 60.0 * 2 ** min(errors, 8))
             finally:

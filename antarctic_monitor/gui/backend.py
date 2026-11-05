@@ -16,6 +16,7 @@ from ..config import Settings
 from ..db import Store
 from ..engine import Engine, EventBus
 from ..http import Fetcher
+from ..i18n import render
 
 log = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class Backend(QObject):
             try:
                 result = await factory()
             except Exception as exc:
-                log.warning("요청 실패: %s", exc)
+                log.warning("요청 실패: %s", render(str(exc)))
                 self.finished.emit(request_id, None, exc)
             else:
                 self.finished.emit(request_id, result, None)

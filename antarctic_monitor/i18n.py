@@ -455,7 +455,7 @@ def join(*parts: str) -> str:
 
 
 def render(raw: str | None) -> str:
-    """저장된 메시지를 현재 언어 글자로 바꿉니다. 일반 문자열은 그대로 둡니다."""
+    """저장된 메시지를 현재 언어 글자로 바꿉니다. 일반 문자열은 그대로 두고, 인자 안에 든 메시지도 함께 바꿉니다."""
     if not raw:
         return ""
     output = []
@@ -466,6 +466,9 @@ def render(raw: str | None) -> str:
             except ValueError:
                 output.append(part[1:])
                 continue
+            for key, value in kwargs.items():
+                if isinstance(value, str) and is_encoded(value):
+                    kwargs[key] = render(value)
             output.append(tr(text, **kwargs))
         else:
             output.append(part)

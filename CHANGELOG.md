@@ -32,6 +32,12 @@ All notable changes to this project are documented here. The format follows
 - Chart legends sit above the plot, outside the axes, so they never cover the data; the T-S
   diagram and the salinity profile were the worst affected.
 
+### Fixed
+- Error messages that carry another message inside them, such as Argo's "profile not found",
+  are shown as readable text in both languages in the source table, the status bar and
+  `monitor.log`, instead of the raw stored form. Collection failures are logged with the same
+  words the program shows.
+
 ## [0.1.1] - 2026-11-04
 
 Bug-fix release. Version DOI: https://doi.org/10.5281/zenodo.23945830 (concept DOI for all

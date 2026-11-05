@@ -17,7 +17,7 @@ from antarctic_monitor.engine import Engine, EventBus
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
 from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited
-from antarctic_monitor.i18n import render
+from antarctic_monitor.i18n import msg, render
 
 
 def test_parse_nullschool_link_from_request():
@@ -378,6 +378,21 @@ async def test_engine_failure_keeps_old_data_time_and_backs_off(store, monkeypat
     assert state["data_time"] == "2026-11-04T00:00:00Z"
     assert state["last_success"] is not None
     assert delay < 3600
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_logs_failures_as_readable_text(store, monkeypatch, caplog):
+    nested = msg("Argo 프로파일을 받지 못했습니다: {error}", error=msg("프로파일 없음: {platform}/{cycle}", platform="5905620", cycle=35))
+
+    async def job(ctx):
+        raise FetchError(nested)
+
+    engine, _ = _engine(store, monkeypatch, job)
+    with caplog.at_level("WARNING", logger="antarctic_monitor.engine"):
+        await engine.run_once("fake")
+    assert "수집 실패 fake: Argo 프로파일을 받지 못했습니다: 프로파일 없음: 5905620/35" in caplog.text
+    assert "\x1f" not in caplog.text
+    assert render(store.source_states()["fake"]["last_message"]) == "Argo 프로파일을 받지 못했습니다: 프로파일 없음: 5905620/35"
     await engine.ctx.fetcher.aclose()
 
 
