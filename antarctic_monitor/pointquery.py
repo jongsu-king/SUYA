@@ -58,8 +58,9 @@ async def _guard(label: str, coro: Awaitable[Any], errors: list[dict], timeout: 
     """소스 하나가 실패하거나 답이 없어도 나머지는 보여 주고, 그 사실은 화면에 남깁니다."""
     limit = GUARD_TIMEOUT.get(label, DEFAULT_GUARD_TIMEOUT) if timeout is None else timeout
     try:
-        return await asyncio.wait_for(coro, limit)
-    except asyncio.TimeoutError:
+        async with asyncio.timeout(limit):
+            return await coro
+    except TimeoutError:
         errors.append({"source": label, "message": msg("응답 시간 초과 ({seconds}초)", seconds=int(limit))})
         return None
     except Exception as exc:

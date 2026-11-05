@@ -39,6 +39,15 @@ All notable changes to this project are documented here. The format follows
 - HYCOM jobs may run for 60 minutes (other sources keep 30). When the HYCOM server is slow, the
   grid job stops starting new variables after 20 minutes, keeps the layers it has and continues
   30 seconds later, so a slow day no longer ends in a timeout with nothing recorded.
+- The test step in CI and in the release build stops after 15 minutes, so a stuck test fails
+  instead of holding a runner for hours.
+
+### Fixed
+- On Python 3.11, stopping the collector could hang when a manual collection was requested, or a
+  job finished, at the same moment. `asyncio.wait_for` on that version drops a cancellation that
+  arrives just as its inner task ends, so the job went on to its next long wait. The engine and the
+  point queries now use `asyncio.timeout`. The installers and the container run on Python 3.12 and
+  were not affected.
 
 ## [0.1.2] - 2026-11-05
 

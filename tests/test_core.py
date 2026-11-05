@@ -690,6 +690,36 @@ async def test_engine_loop_runs_and_trigger_wakes_it(store, monkeypatch):
     await engine.ctx.fetcher.aclose()
 
 
+async def test_engine_stop_finishes_right_after_a_trigger(store, monkeypatch):
+    async def job(ctx):
+        return CollectResult(rows=1)
+
+    engine, _ = _engine(store, monkeypatch, job, interval=3600)
+    engine.start()
+    assert await _until(lambda: (store.source_states().get("fake") or {}).get("last_status") == "ok")
+    await asyncio.sleep(0.05)
+    engine.trigger(["fake"])
+    await asyncio.wait_for(engine.stop(), timeout=5.0)
+    assert engine.started is False
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_stop_finishes_while_a_job_is_ending(store, monkeypatch):
+    release = asyncio.Event()
+
+    async def job(ctx):
+        await release.wait()
+        return CollectResult(rows=1)
+
+    engine, _ = _engine(store, monkeypatch, job, interval=3600)
+    engine.start()
+    assert await _until(lambda: "fake" in engine.running)
+    release.set()
+    await asyncio.wait_for(engine.stop(), timeout=5.0)
+    assert engine.started is False
+    await engine.ctx.fetcher.aclose()
+
+
 async def test_engine_resumes_from_saved_schedule(store, monkeypatch):
     runs = {"count": 0}
 

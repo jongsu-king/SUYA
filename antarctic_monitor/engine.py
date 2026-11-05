@@ -64,9 +64,12 @@ class EventBus:
         try:
             while True:
                 try:
-                    yield await asyncio.wait_for(queue.get(), timeout=15.0)
-                except asyncio.TimeoutError:
+                    async with asyncio.timeout(15.0):
+                        event = await queue.get()
+                except TimeoutError:
                     yield None
+                else:
+                    yield event
         finally:
             self._subscribers.discard(queue)
 
@@ -122,8 +125,9 @@ class Engine:
         event = self._wake[name]
         event.clear()
         try:
-            await asyncio.wait_for(event.wait(), timeout=max(0.0, delay))
-        except asyncio.TimeoutError:
+            async with asyncio.timeout(max(0.0, delay)):
+                await event.wait()
+        except TimeoutError:
             pass
 
     async def run_once(self, name: str) -> float:
@@ -137,7 +141,8 @@ class Engine:
             self.running.add(name)
             self.bus.publish({"type": "job", "source": name, "state": "running", "at": started_at})
             try:
-                result = await asyncio.wait_for(JOBS[name](self.ctx), timeout=timeout)
+                async with asyncio.timeout(timeout):
+                    result = await JOBS[name](self.ctx)
                 if result.disabled:
                     status = "disabled"
                 elif result.unchanged:
