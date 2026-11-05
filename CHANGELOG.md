@@ -41,6 +41,8 @@ All notable changes to this project are documented here. The format follows
   30 seconds later, so a slow day no longer ends in a timeout with nothing recorded.
 - The test step in CI and in the release build stops after 15 minutes, so a stuck test fails
   instead of holding a runner for hours.
+- The land outline on the map is built once and moved with a single transform, instead of being
+  rebuilt point by point on every redraw. The drawing is unchanged.
 
 ### Fixed
 - On Python 3.11, stopping the collector could hang when a manual collection was requested, or a

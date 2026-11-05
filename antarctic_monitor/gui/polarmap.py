@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap, QPolygonF, QTransform
 from PySide6.QtWidgets import QSizePolicy, QToolTip, QWidget
 
 from ..gridutil import Grid
@@ -104,6 +104,7 @@ class PolarMapWidget(QWidget):
         self._dragging = False
         self._base: QPixmap | None = None
         self._land_rings = self._load_land()
+        self._land_unit: QPainterPath | None = None
         self._land_path: QPainterPath | None = None
 
     def sizeHint(self) -> QSize:
@@ -196,15 +197,20 @@ class PolarMapWidget(QWidget):
         return image.copy()
 
     def _land(self) -> QPainterPath:
-        if self._land_path is None:
-            path = QPainterPath()
+        """해안선은 처음 한 번만 만들고, 확대와 이동은 변환 하나로 처리합니다."""
+        if self._land_unit is None:
+            unit = QPainterPath()
             for ring in self._land_rings:
-                xs, ys = self.project(ring[:, 1], ring[:, 0])
-                path.moveTo(float(xs[0]), float(ys[0]))
-                for x, y in zip(xs[1:], ys[1:]):
-                    path.lineTo(float(x), float(y))
-                path.closeSubpath()
-            self._land_path = path
+                rho = rho_of_lat(ring[:, 1])
+                theta = np.radians(ring[:, 0])
+                xs, ys = (rho * np.sin(theta)).tolist(), (-rho * np.cos(theta)).tolist()
+                unit.addPolygon(QPolygonF([QPointF(x, y) for x, y in zip(xs, ys)]))
+                unit.closeSubpath()
+            self._land_unit = unit
+        if self._land_path is None:
+            cx, cy = self._center()
+            k = self._pixels_per_rho()
+            self._land_path = QTransform(k, 0.0, 0.0, k, cx, cy).map(self._land_unit)
         return self._land_path
 
     def _render_base(self) -> QPixmap:

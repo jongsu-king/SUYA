@@ -126,6 +126,43 @@ os._exit(0)
 '''
 
 
+def test_land_outline_follows_the_projection(app):
+    import numpy as np
+    from PySide6.QtCore import QPointF
+
+    from antarctic_monitor.gui.polarmap import PolarMapWidget
+
+    widget = PolarMapWidget()
+    widget.resize(800, 500)
+    ring = widget._land_rings[0]
+    for zoom, offset in ((1.0, QPointF(0.0, 0.0)), (4.5, QPointF(120.0, -80.0))):
+        widget.zoom = zoom
+        widget.offset = offset
+        widget._invalidate()
+        path = widget._land()
+        xs, ys = widget.project(ring[:, 1], ring[:, 0])
+        elements = [path.elementAt(index) for index in range(len(ring))]
+        assert path.elementCount() >= sum(len(item) for item in widget._land_rings)
+        assert np.allclose([element.x for element in elements], xs)
+        assert np.allclose([element.y for element in elements], ys)
+
+
+def test_redrawing_the_land_keeps_references_to_none(app):
+    """Python 3.11에서는 None의 참조 수가 바닥나면 프로그램이 죽습니다."""
+    import sys
+
+    from antarctic_monitor.gui.polarmap import PolarMapWidget
+
+    widget = PolarMapWidget()
+    widget.resize(500, 400)
+    widget._land()
+    before = sys.getrefcount(None)
+    for _ in range(50):
+        widget._invalidate()
+        widget._land()
+    assert sys.getrefcount(None) > before - 1000
+
+
 def test_map_steps_through_stored_times():
     import subprocess
     import sys
