@@ -47,6 +47,65 @@ jobs:
         run: powershell -ExecutionPolicy Bypass -File packaging\build.ps1
         env:
           QT_QPA_PLATFORM: offscreen
+
+      - name: Install the installer and run the installed copy (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          $setup = (Get-ChildItem dist\*-setup.exe | Select-Object -First 1).FullName
+          $log = Join-Path $PWD 'install.log'
+          $proc = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER','/CLOSEAPPLICATIONS','/NORESTARTAPPLICATIONS',"/LOG=$log" -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { Get-Content $log; throw "installer exit code $($proc.ExitCode)" }
+          $app = Join-Path $env:LOCALAPPDATA 'Programs\SUYA'
+          if (-not (Test-Path "$app\SUYA.exe")) { Get-Content $log; throw "SUYA.exe not found in $app" }
+          $report = Join-Path $PWD 'installed-self-test.txt'
+          Start-Process -FilePath "$app\SUYA.exe" -ArgumentList 'self-test','--out',$report -Wait
+          Get-Content $report
+          if (-not (Select-String -Path $report -Pattern 'gui ok' -Quiet)) { throw 'the installed copy failed its self-test' }
+          $unins = (Get-ChildItem "$app\unins*.exe" | Select-Object -First 1).FullName
+          $proc = Start-Process -FilePath $unins -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "uninstaller exit code $($proc.ExitCode)" }
+          if (Test-Path "$app\SUYA.exe") { throw 'SUYA.exe is still there after the uninstall' }
+
+      - name: Mount the disk image, copy the app and run it (macOS)
+        if: runner.os == 'macOS'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -euo pipefail
+          DMG=$(ls dist/*.dmg | head -n 1)
+          MOUNT=$(mktemp -d)
+          TARGET=$(mktemp -d)
+          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MOUNT" "$DMG"
+          ditto "$MOUNT/SUYA.app" "$TARGET/SUYA.app"
+          hdiutil detach "$MOUNT" -quiet
+          xattr -dr com.apple.quarantine "$TARGET/SUYA.app" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$TARGET/SUYA.app/Contents/Info.plist"
+          "$TARGET/SUYA.app/Contents/MacOS/suya" self-test --out "$TARGET/self-test.txt"
+          cat "$TARGET/self-test.txt"
+          grep -q "gui ok" "$TARGET/self-test.txt"
+
+      - name: Extract the archive, run install.sh and the installed copy (Linux)
+        if: runner.os == 'Linux'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          set -euo pipefail
+          ARCHIVE=$(ls dist/*.tar.gz | head -n 1)
+          WORK=$(mktemp -d)
+          tar -xzf "$ARCHIVE" -C "$WORK"
+          ROOT=$(dirname "$(find "$WORK" -name install.sh | head -n 1)")
+          export HOME="$WORK/home"
+          mkdir -p "$HOME"
+          bash "$ROOT/install.sh"
+          test -x "$HOME/.local/bin/suya"
+          test -f "$HOME/.local/share/applications/suya.desktop"
+          "$HOME/.local/bin/suya" self-test --out "$WORK/self-test.txt"
+          cat "$WORK/self-test.txt"
+          grep -q "gui ok" "$WORK/self-test.txt"
+
       - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}
@@ -65,6 +124,15 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+      - name: Every file the in-app updater looks for must be present
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd artifacts && ls -l
+          for name in "SUYA-$VERSION-windows-x64-setup.exe" "SUYA-$VERSION-macos-arm64.dmg" \
+                      "SUYA-$VERSION-macos-x86_64.dmg" "SUYA-$VERSION-linux-x86_64.tar.gz"; do
+            test -s "$name" || { echo "missing $name"; exit 1; }
+          done
       - name: Checksums
         run: cd artifacts && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - uses: softprops/action-gh-release@v3

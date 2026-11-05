@@ -13,6 +13,11 @@ All notable changes to this project are documented here. The format follows
   what is missing. A `Dockerfile` runs the daemon in a container with everything under `/data`.
   The single-instance lock falls back to an OS file lock when Qt is absent. CI checks the slim
   install and builds the image. The installers are unchanged.
+- Every release build now installs its own installer on the runner and runs the installed copy's
+  self-test before anything is attached: a silent install, self-test and silent uninstall on
+  Windows (the same switches the in-app updater uses), mount, copy and run on macOS, extract,
+  `install.sh` and run on Linux. The release job also refuses to publish if any of the four
+  files the in-app updater looks for is missing.
 
 ### Changed
 - HYCOM jobs may run for 60 minutes (other sources keep 30). When the HYCOM server is slow, the

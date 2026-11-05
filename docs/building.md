@@ -80,6 +80,10 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1
    git push origin main --tags
    ```
 3. `release.yml`이 Windows x64, macOS arm64, macOS x86_64, Linux x86_64에서 빌드해 테스트와 `self-test`를 통과한 설치 파일과 `SHA256SUMS.txt`를 Release에 첨부합니다. 20~30분 걸립니다.
+   첨부 전에 러너마다 자기 설치 파일을 실제로 설치해 봅니다: Windows는 프로그램 안 업데이터와 같은 조용한 설치(`/VERYSILENT /CURRENTUSER …`) → 설치된 `SUYA.exe self-test` → 조용한 제거,
+   macOS는 DMG 마운트 → `ditto`로 복사 → 복사본의 `self-test`, Linux는 tar 풀기 → `install.sh`(임시 HOME) → `~/.local/bin/suya self-test`.
+   마지막 `release` 잡은 업데이터가 찾는 네 파일 이름이 모두 있는지 확인한 뒤에야 체크섬을 만들고 첨부합니다.
+   태그 없이 `workflow_dispatch`로 돌리면 빌드와 설치 검사만 하고 Release는 만들지 않습니다.
 4. Release 노트는 자동 생성된 목록 위에 CHANGELOG 내용을 붙여 넣으세요.
 5. 프로그램 안의 자동 업데이트(`antarctic_monitor/updates.py`)는 릴리스 자산 이름(`SUYA-<버전>-windows-x64-setup.exe`,
    `-macos-arm64.dmg`, `-macos-x86_64.dmg`, `-linux-x86_64.tar.gz`)과 `SHA256SUMS.txt`에 의존합니다. 이름을 바꾸면 이미 설치된
