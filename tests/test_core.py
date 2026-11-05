@@ -396,6 +396,31 @@ async def test_engine_logs_failures_as_readable_text(store, monkeypatch, caplog)
     await engine.ctx.fetcher.aclose()
 
 
+async def test_engine_describes_job_timeouts_and_bare_exceptions(store, monkeypatch, caplog):
+    async def slow_job(ctx):
+        await asyncio.sleep(5)
+        return CollectResult(rows=1)
+
+    monkeypatch.setattr("antarctic_monitor.engine.JOB_TIMEOUT", 0.05)
+    engine, _ = _engine(store, monkeypatch, slow_job)
+    with caplog.at_level("WARNING", logger="antarctic_monitor.engine"):
+        await engine.run_once("fake")
+    state = store.source_states()["fake"]
+    assert state["last_status"] == "error"
+    assert render(state["last_message"]) == "1분 안에 끝나지 않아 중단했습니다"
+    assert "수집 실패 fake: 1분 안에 끝나지 않아 중단했습니다" in caplog.text
+    assert "TimeoutError" not in caplog.text
+    await engine.ctx.fetcher.aclose()
+
+    async def bare_job(ctx):
+        raise RuntimeError()
+
+    engine, _ = _engine(store, monkeypatch, bare_job)
+    await engine.run_once("fake")
+    assert store.source_states()["fake"]["last_message"] == "RuntimeError"
+    await engine.ctx.fetcher.aclose()
+
+
 async def test_engine_rate_limit_waits_at_least_an_hour(store, monkeypatch):
     async def job(ctx):
         raise RateLimited("한도")

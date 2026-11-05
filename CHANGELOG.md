@@ -37,6 +37,9 @@ All notable changes to this project are documented here. The format follows
   are shown as readable text in both languages in the source table, the status bar and
   `monitor.log`, instead of the raw stored form. Collection failures are logged with the same
   words the program shows.
+- A collection job that runs into the 30-minute limit is recorded as "stopped after 30 min
+  without finishing" instead of an empty `TimeoutError:`; errors that carry no text show the
+  error type alone.
 
 ## [0.1.1] - 2026-11-04
 
