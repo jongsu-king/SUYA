@@ -49,7 +49,7 @@ bash packaging/build.sh
 # dist/SUYA.app, dist/SUYA-<version>-macos-<arm64|x86_64>.dmg
 ```
 PyInstaller가 `SUYA.app`을 만들고, `self-test`로 창을 띄워 보고 엑셀을 써 본 뒤, ad-hoc 서명(`codesign --sign -`)을 하고 `hdiutil`로 DMG를 만듭니다.
-Apple 개발자 인증서가 없으므로 공증(notarization)은 하지 않습니다. 처음 열 때 우클릭 → 열기가 필요합니다.
+Apple 개발자 인증서가 없으므로 공증(notarization)은 하지 않습니다. 처음 열 때 macOS 15 이상은 시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기, macOS 12~14는 우클릭 → 열기가 필요합니다.
 인증서가 있다면 `codesign --sign "Developer ID Application: …"`과 `xcrun notarytool submit`을 `build.sh`에 추가하세요.
 
 ### Linux → `.tar.gz`
@@ -85,6 +85,8 @@ powershell -ExecutionPolicy Bypass -File packaging\build.ps1
    마지막 `release` 잡은 업데이터가 찾는 네 파일 이름이 모두 있는지 확인한 뒤에야 체크섬을 만들고 첨부합니다.
    태그 없이 `workflow_dispatch`로 돌리면 빌드와 설치 검사만 하고 Release는 만들지 않습니다.
 4. Release 노트는 자동 생성된 목록 위에 CHANGELOG 내용을 붙여 넣으세요.
+   같은 때에 배포 채널용 파일의 버전과 SHA-256을 올립니다: Homebrew 캐스크 `packaging/homebrew/suya.rb`(탭 저장소의 `Casks/suya.rb`로 쓸 파일),
+   winget 매니페스트 `packaging/winget/JongsuLim.SUYA/<버전>/`(받아 주는 저장소는 [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs)). 둘 다 아직 공개 채널에 올리지 않았습니다.
 5. 프로그램 안의 자동 업데이트(`antarctic_monitor/updates.py`)는 릴리스 자산 이름(`SUYA-<버전>-windows-x64-setup.exe`,
    `-macos-arm64.dmg`, `-macos-x86_64.dmg`, `-linux-x86_64.tar.gz`)과 `SHA256SUMS.txt`에 의존합니다. 이름을 바꾸면 이미 설치된
    버전들이 새 릴리스를 찾지 못하므로 바꾸지 마세요. Windows 설치 프로그램은 `/relaunch=1` 매개변수로 설치 뒤 프로그램을 다시 띄웁니다.

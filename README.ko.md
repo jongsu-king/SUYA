@@ -109,7 +109,8 @@
 SUYA는 개인 오픈소스 프로젝트라 코드 서명 인증서가 없습니다. 그래서 처음 한 번 운영체제가 경고합니다.
 
 - **Windows SmartScreen**: *추가 정보 → 실행*.
-- **macOS Gatekeeper**: 처음 한 번 **앱 우클릭 → 열기 → 열기**. "손상되었기 때문에 열 수 없습니다"라고 나오면 터미널에서
+- **macOS Gatekeeper**: macOS 15 이상은 SUYA를 한 번 열어 경고를 닫은 뒤 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**를 누릅니다.
+  macOS 12~14는 **앱 우클릭 → 열기 → 열기**. "손상되었기 때문에 열 수 없습니다"라고 나오면 터미널에서
   `xattr -dr com.apple.quarantine /Applications/SUYA.app`을 한 번 실행합니다.
 - **Linux**: 경고 없음.
 

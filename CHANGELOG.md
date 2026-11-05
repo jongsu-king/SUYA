@@ -21,10 +21,17 @@ All notable changes to this project are documented here. The format follows
 - OISST, SMOS and SMAP fill in the days they missed. If the program was off or the server was down,
   the days that appeared in the meantime are fetched oldest first, three per run and up to seven
   days back, so the daily series keeps no holes after a short outage.
+- A Homebrew cask (`packaging/homebrew/`) and a winget manifest set (`packaging/winget/`) for
+  publishing on those channels.
 - A *Monthly summary* sheet opens each monthly workbook: samples, mean, minimum, maximum, standard
   deviation, first and last time per point, source and item, with last month's mean and the change.
 
 ### Changed
+- The air-temperature tab lists the current values two per row. Four per row was wider than the
+  panel in a narrow window, which cut off the values and the charts below them.
+- The screenshots in the READMEs show the current window: legends above the charts and the air-temperature tab as it fits now.
+- The first-run instructions describe macOS 15 and later, where right-clicking no longer gets past
+  the warning: *System Settings ▸ Privacy & Security ▸ Open Anyway*.
 - Closing the window while an update is being downloaded or installed now asks first. Closing used
   to cancel the update without a word and stop collection along with it.
 - HYCOM jobs may run for 60 minutes (other sources keep 30). When the HYCOM server is slow, the

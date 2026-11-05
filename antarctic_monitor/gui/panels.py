@@ -288,8 +288,8 @@ class AirPanel(DetailPanel):
         for index, (key, label, _) in enumerate(AIR_FIELDS):
             value = QLabel("–")
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            grid.addWidget(QLabel(tr(label)), index // 4, (index % 4) * 2)
-            grid.addWidget(value, index // 4, (index % 4) * 2 + 1)
+            grid.addWidget(QLabel(tr(label)), index // 2, (index % 2) * 2)
+            grid.addWidget(value, index // 2, (index % 2) * 2 + 1)
             self.values[key] = value
         self.forecast_chart = Chart(height=230)
         self.obs_chart = Chart(height=170)

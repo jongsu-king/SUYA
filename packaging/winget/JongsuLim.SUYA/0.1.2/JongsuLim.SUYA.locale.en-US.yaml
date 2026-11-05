@@ -1,0 +1,26 @@
+PackageIdentifier: JongsuLim.SUYA
+PackageVersion: 0.1.2
+PackageLocale: en-US
+Publisher: Jongsu Lim
+PublisherUrl: https://github.com/jongsu-king
+PublisherSupportUrl: https://github.com/jongsu-king/SUYA/issues
+Author: Jongsu Lim, Suyeon Park
+PackageName: SUYA
+PackageUrl: https://github.com/jongsu-king/SUYA
+License: MIT
+LicenseUrl: https://github.com/jongsu-king/SUYA/blob/main/LICENSE
+Copyright: Copyright (c) 2026 Jongsu Lim and Suyeon Park
+ShortDescription: Collects Antarctic ocean temperature, salinity and air temperature from public APIs.
+Description: SUYA continuously collects Southern Ocean temperature, salinity and air temperature from public APIs into SQLite and monthly Excel workbooks, and shows them on a south-polar map with vertical profiles, T-S diagrams and time series. English and Korean.
+Moniker: suya
+Tags:
+  - antarctica
+  - argo
+  - climate
+  - oceanography
+  - salinity
+  - sea-surface-temperature
+  - southern-ocean
+ReleaseNotesUrl: https://github.com/jongsu-king/SUYA/releases/tag/v0.1.2
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0

@@ -112,7 +112,8 @@ new version by hand over the old one also works. Your database, settings and wor
 SUYA is a personal open-source project without a code-signing certificate, so operating systems warn once:
 
 - **Windows SmartScreen**: *More info → Run anyway*.
-- **macOS Gatekeeper**: the first time, **right-click the app → Open → Open**. If macOS says the app "is damaged", run
+- **macOS Gatekeeper**: on macOS 15 or later, open SUYA once, dismiss the warning, then choose **System Settings → Privacy & Security → Open Anyway**.
+  On macOS 12–14, **right-click the app → Open → Open**. If macOS says the app "is damaged", run
   `xattr -dr com.apple.quarantine /Applications/SUYA.app` in Terminal once.
 - **Linux**: no warning.
 

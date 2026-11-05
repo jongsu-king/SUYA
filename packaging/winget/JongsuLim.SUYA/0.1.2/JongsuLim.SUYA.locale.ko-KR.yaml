@@ -1,0 +1,10 @@
+PackageIdentifier: JongsuLim.SUYA
+PackageVersion: 0.1.2
+PackageLocale: ko-KR
+Publisher: Jongsu Lim
+PackageName: SUYA
+License: MIT
+ShortDescription: 공개 API에서 남극해 수온, 염분, 기온을 모으는 프로그램.
+Description: SUYA는 남극해 수온, 염분, 기온을 공개 API에서 계속 모아 SQLite와 월별 엑셀에 쌓고, 남극 중심 지도와 수직 프로파일, T-S 다이어그램, 시계열로 보여 줍니다. 한국어와 영어를 지원합니다.
+ManifestType: locale
+ManifestVersion: 1.10.0

@@ -55,3 +55,15 @@ def test_profile_panel_scrolls_only_below_its_minimum_height(app):
     _settle(app)
     minimum = panel.widget().minimumSizeHint().height()
     assert panel.widget().height() == minimum > panel.viewport().height()
+
+
+def test_air_values_fit_a_narrow_panel_in_english(app):
+    from antarctic_monitor.gui.panels import AirPanel
+    from antarctic_monitor.i18n import set_language
+
+    set_language("en")
+    try:
+        panel = AirPanel()
+        assert panel.group.minimumSizeHint().width() <= 480
+    finally:
+        set_language("ko")
