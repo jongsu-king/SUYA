@@ -303,14 +303,20 @@ def test_instance_lock_works_without_qt(tmp_path, monkeypatch):
 
 
 def test_cli_explains_missing_window_libraries(monkeypatch, capsys):
+    from antarctic_monitor import i18n
+
+    monkeypatch.setattr(i18n, "_language", i18n.get_language())
     monkeypatch.setitem(sys.modules, "PySide6", None)
     monkeypatch.setitem(sys.modules, "antarctic_monitor.gui.app", None)
     monkeypatch.setattr(cli, "_configure_logging", lambda command: None)
     assert not cli.gui_available()
     with pytest.raises(SystemExit) as exit_info:
-        cli.main(["gui"])
+        cli.main(["--lang", "en", "gui"])
     assert exit_info.value.code == 2
     assert 'suya[gui]' in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        cli.main(["--lang", "ko", "gui"])
+    assert "suya[gui]" in capsys.readouterr().err
 
 
 def test_self_test_runs_without_qt(monkeypatch, capsys):
