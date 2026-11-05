@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-05
+
+A slim collector install and a container image, missed satellite days filled in, a monthly summary
+sheet, map playback, and Argo profiles that no longer go missing. Version DOI: issued by Zenodo when
+it archives this release and added here afterwards (concept DOI for all versions:
+10.5281/zenodo.23937852).
+
 ### Added
 - The collector installs without Qt. `pip install suya` (or the Git URL) now brings only httpx, numpy
   and XlsxWriter; the window needs the `gui` extra (`pip install "suya[gui]"`). `suya daemon`,
@@ -50,6 +57,10 @@ All notable changes to this project are documented here. The format follows
   arrives just as its inner task ends, so the job went on to its next long wait. The engine and the
   point queries now use `asyncio.timeout`. The installers and the container run on Python 3.12 and
   were not affected.
+- On Linux with Python 3.11, playing the map through stored times could abort the program
+  (`Fatal Python error: deallocating None`) while the land outline was being rebuilt. The outline is
+  now built once, and the abort no longer appears in the test runs. The installers and the container
+  run on Python 3.12 and were not affected.
 - Argo profiles that came back empty are asked for again a day later, for as long as they are within
   the 30-day list. A profile the server had not finished indexing used to be stored as empty and
   never fetched again, so its levels stayed missing from the database and the Excel files.
