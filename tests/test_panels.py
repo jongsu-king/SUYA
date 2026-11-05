@@ -132,4 +132,4 @@ def test_map_steps_through_stored_times():
 
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
     done = subprocess.run([sys.executable, "-c", TIME_SLIDER_SCRIPT], capture_output=True, text=True, errors="replace", timeout=120, env=env)
-    assert done.returncode == 0 and "frames ok" in done.stdout, done.stderr[-1500:]
+    assert done.returncode == 0 and "frames ok" in done.stdout, done.stderr
