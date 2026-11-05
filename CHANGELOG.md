@@ -9,9 +9,8 @@ All notable changes to this project are documented here. The format follows
 ## [0.1.3] - 2026-11-05
 
 A slim collector install and a container image, missed satellite days filled in, a monthly summary
-sheet, map playback, and Argo profiles that no longer go missing. Version DOI: issued by Zenodo when
-it archives this release and added here afterwards (concept DOI for all versions:
-10.5281/zenodo.23937852).
+sheet, map playback, and Argo profiles that no longer go missing. Version DOI: https://doi.org/10.5281/zenodo.23981834 (concept DOI for all
+versions: 10.5281/zenodo.23937852).
 
 ### Added
 - The collector installs without Qt. `pip install suya` (or the Git URL) now brings only httpx, numpy
