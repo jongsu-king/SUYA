@@ -129,6 +129,15 @@ def parse_levels(text: str, lat: float, cycle: int | None = None) -> tuple[list[
     return levels, dropped
 
 
+def _no_results(response) -> bool:
+    """ERDDAP은 결과가 없을 때도, 데이터셋을 잠시 찾지 못할 때도 404로 답합니다. 앞의 경우만 빈 응답입니다."""
+    return response.status_code == 404 and "no matching results" in response.text.lower()
+
+
+def _failure(response) -> FetchError:
+    return FetchError(f"Argo HTTP {response.status_code}: {' '.join(response.text.split())[:160]}")
+
+
 async def fetch_listing(fetcher: Fetcher, lat_max: float = LIST_LAT, days: int = LIST_DAYS) -> list[dict]:
     url = _query(
         "platform_number,cycle_number,time,latitude,longitude,data_mode,position_qc,pres,"
@@ -139,10 +148,10 @@ async def fetch_listing(fetcher: Fetcher, lat_max: float = LIST_LAT, days: int =
         'orderByLimit("platform_number,cycle_number,1")',
     )
     response = await fetcher.request("GET", url, timeout=180.0)
-    if response.status_code == 404:
+    if _no_results(response):
         return []
     if response.status_code >= 400:
-        raise FetchError(f"Argo HTTP {response.status_code}: {' '.join(response.text.split())[:160]}")
+        raise _failure(response)
     return parse_listing(response.text)
 
 
@@ -164,19 +173,24 @@ async def fetch_levels(
 ) -> tuple[list[dict], dict]:
     url = _query(LEVEL_COLUMNS, f'platform_number="{platform}"', f"cycle_number={cycle}")
     response = await fetcher.request("GET", url, timeout=120.0, interactive=interactive)
-    if response.status_code == 404:
+    if _no_results(response):
         url = _query(LEVEL_COLUMNS, f'platform_number="{platform}"', f"cycle_number>={max(cycle - 1, 0)}")
         response = await fetcher.request("GET", url, timeout=120.0, interactive=interactive)
-        if response.status_code == 404:
+        if _no_results(response):
             raise NoData(msg("프로파일 없음: {platform}/{cycle}", platform=platform, cycle=cycle))
     if response.status_code >= 400:
-        raise FetchError(f"Argo HTTP {response.status_code}")
+        raise _failure(response)
     return parse_levels(response.text, lat, cycle=cycle)
 
 
 async def collect(ctx: Context) -> CollectResult:
-    """목록을 갱신하고, 층별 값이 없는 프로파일을 최신순으로 조금씩 받습니다."""
+    """목록을 갱신하고, 층별 값이 없는 프로파일을 최신순으로 조금씩 받습니다.
+
+    이 해역의 30일치 목록은 평소 수백 개이므로, 통째로 비면 정상 결과가 아니라 실패로 기록합니다.
+    """
     listing = await fetch_listing(ctx.fetcher)
+    if not listing:
+        raise FetchError(msg("Argo 목록이 비어 있습니다"))
     ctx.store.upsert_argo_listing(listing)
     pending = ctx.store.argo_missing_levels(BATCH)
 

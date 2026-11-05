@@ -35,6 +35,7 @@ EN: dict[str, str] = {
     "최근 {days}일 프로파일 {listed}개, 층별 값 {fetched}개 수신, 대기 {remaining}개":
         "{listed} profiles in {days} days, {fetched} fetched, {remaining} queued",
     "Argo 프로파일을 받지 못했습니다: {error}": "Could not fetch Argo profiles: {error}",
+    "Argo 목록이 비어 있습니다": "The Argo list came back empty",
     "최근 30일 이 해역의 선박 관측 없음": "No ship observations here in the last 30 days",
     "선박 {n}척": "{n} ships",
     "기후값 격자상 육지입니다": "Land in the climatology grid",

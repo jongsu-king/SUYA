@@ -69,6 +69,99 @@ async def test_argo_fetch_levels_falls_back_to_a_cycle_range():
     await fetcher.aclose()
 
 
+ERDDAP_NO_RESULTS = 'Error { code=404; message="Not Found: Your query produced no matching results. (nRows = 0)"; }'
+ERDDAP_UNKNOWN_DATASET = 'Error { code=404; message="Not Found: Currently unknown datasetID=ArgoFloats"; }'
+ARGO_LISTING = (
+    "platform_number,cycle_number,time,latitude,longitude,data_mode,position_qc,pres,temp,temp_qc,psal,psal_qc,"
+    "temp_adjusted,temp_adjusted_qc,psal_adjusted,psal_adjusted_qc\n"
+    ",,UTC,degrees_north,degrees_east,,,decibar,degree_Celsius,,PSU,,degree_Celsius,,PSU,\n"
+    '1902700,78,2026-10-25T01:23:56Z,-62.83514,-62.96182,R,1,1.04,-1.372,1,33.834,1,NaN," ",NaN," "\n'
+)
+
+
+def _argo_fetcher(answer):
+    import httpx
+
+    from antarctic_monitor.http import Fetcher
+
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        return answer(request)
+
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(handler)), backoff=0.0)
+    return fetcher, calls
+
+
+async def test_argo_unknown_dataset_is_a_failure_and_not_an_empty_answer():
+    import httpx
+
+    from antarctic_monitor.http import FetchError, NoData
+
+    fetcher, calls = _argo_fetcher(lambda request: httpx.Response(404, text=ERDDAP_UNKNOWN_DATASET))
+    with pytest.raises(FetchError, match="unknown datasetID"):
+        await argo.fetch_listing(fetcher)
+    calls.clear()
+    with pytest.raises(FetchError, match="unknown datasetID") as caught:
+        await argo.fetch_levels(fetcher, "5905620", 35, -56.7)
+    assert not isinstance(caught.value, NoData)
+    assert len(calls) == 1
+    await fetcher.aclose()
+
+
+async def test_argo_no_matching_results_still_means_no_data():
+    import httpx
+
+    from antarctic_monitor.http import NoData
+
+    fetcher, calls = _argo_fetcher(lambda request: httpx.Response(404, text=ERDDAP_NO_RESULTS))
+    assert await argo.fetch_listing(fetcher) == []
+    calls.clear()
+    with pytest.raises(NoData):
+        await argo.fetch_levels(fetcher, "5905620", 35, -56.7)
+    assert len(calls) == 2
+    await fetcher.aclose()
+
+
+async def test_argo_collect_reports_an_empty_listing_as_a_failure(tmp_path):
+    import httpx
+
+    from antarctic_monitor.collectors.base import Context
+    from antarctic_monitor.config import Settings
+    from antarctic_monitor.db import Store
+    from antarctic_monitor.http import FetchError
+
+    fetcher, _ = _argo_fetcher(lambda request: httpx.Response(404, text=ERDDAP_NO_RESULTS))
+    store = Store(tmp_path / "t.db")
+    with pytest.raises(FetchError):
+        await argo.collect(Context(store, fetcher, Settings()))
+    await fetcher.aclose()
+    store.close()
+
+
+async def test_argo_collect_keeps_profiles_open_while_the_dataset_is_missing(tmp_path):
+    import httpx
+
+    from antarctic_monitor.collectors.base import Context
+    from antarctic_monitor.config import Settings
+    from antarctic_monitor.db import Store
+    from antarctic_monitor.http import FetchError
+
+    def answer(request):
+        if "orderByLimit" in request.url.query.decode():
+            return httpx.Response(200, text=ARGO_LISTING)
+        return httpx.Response(404, text=ERDDAP_UNKNOWN_DATASET)
+
+    fetcher, _ = _argo_fetcher(answer)
+    store = Store(tmp_path / "t.db")
+    with pytest.raises(FetchError):
+        await argo.collect(Context(store, fetcher, Settings()))
+    assert store.argo_count_missing() == 1
+    await fetcher.aclose()
+    store.close()
+
+
 def test_argo_prefers_adjusted_in_delayed_mode():
     text = ARGO_HEADER + "A,D,100.0,1,0.5,1,34.0,1,100.1,1,0.52,1,34.2,1\n"
     levels, _ = argo.parse_levels(text, -65.0)

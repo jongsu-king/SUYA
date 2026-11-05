@@ -398,12 +398,15 @@ class Store:
             )
             self._conn.commit()
 
-    def argo_missing_levels(self, limit: int) -> list[dict]:
+    def argo_missing_levels(self, limit: int, recheck_days: int = 30) -> list[dict]:
+        """층별 값을 받을 프로파일. 막 올라온 프로파일은 서버 색인이 늦어 비어 보일 수 있으므로, 빈 것은 하루 뒤 다시 묻습니다."""
+        now = utcnow()
         with self._lock:
             rows = self._conn.execute(
-                "SELECT platform, cycle, lat, lon FROM argo_profiles WHERE levels_json IS NULL "
+                "SELECT platform, cycle, lat, lon FROM argo_profiles "
+                "WHERE levels_json IS NULL OR (n_levels = 0 AND obs_time >= ? AND fetched_at < ?) "
                 "ORDER BY obs_time DESC LIMIT ?",
-                (limit,),
+                (iso(now - timedelta(days=recheck_days)), iso(now - timedelta(days=1)), limit),
             ).fetchall()
         return [dict(r) for r in rows]
 

@@ -50,6 +50,12 @@ All notable changes to this project are documented here. The format follows
   arrives just as its inner task ends, so the job went on to its next long wait. The engine and the
   point queries now use `asyncio.timeout`. The installers and the container run on Python 3.12 and
   were not affected.
+- Argo profiles that came back empty are asked for again a day later, for as long as they are within
+  the 30-day list. A profile the server had not finished indexing used to be stored as empty and
+  never fetched again, so its levels stayed missing from the database and the Excel files.
+- Argo treated every HTTP 404 as "no data", including the one ERDDAP sends while a dataset is
+  briefly unavailable. Such an answer is now a failure that is retried soon: profiles are no longer
+  marked empty during an outage, and a completely empty list is no longer reported as a success.
 
 ## [0.1.2] - 2026-11-05
 

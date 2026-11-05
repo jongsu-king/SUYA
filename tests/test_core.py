@@ -5,7 +5,7 @@ import asyncio
 import math
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
@@ -15,7 +15,7 @@ from antarctic_monitor.collectors import JOBS, erddap, hycom, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
 from antarctic_monitor.config import Settings, load_dotenv
-from antarctic_monitor.db import Measurement, Store
+from antarctic_monitor.db import Measurement, Store, iso, utcnow
 from antarctic_monitor.engine import Engine, EventBus, failure_message, job_timeout
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
@@ -159,6 +159,23 @@ def test_argo_levels_survive_relisting_but_reset_when_mode_changes(store):
     assert store.argo_count_missing() == 0
     store.upsert_argo_listing([listing | {"data_mode": "D"}])
     assert store.argo_count_missing() == 1
+
+
+def test_argo_profile_stored_empty_is_asked_again_after_a_day(store):
+    now = utcnow()
+
+    def item(cycle, age_days):
+        moment = iso(now - timedelta(days=age_days))
+        return {"platform": "1", "cycle": cycle, "time": moment, "lat": -65.0, "lon": 0.0, "data_mode": "A", "position_qc": "1", "surface_temp": None, "surface_salt": None}
+
+    store.upsert_argo_listing([item(1, 2), item(2, 40), item(3, 2)])
+    store.save_argo_levels("1", 1, [])
+    store.save_argo_levels("1", 2, [])
+    store.save_argo_levels("1", 3, [{"pressure_dbar": 5.0, "depth_m": 5.0, "temp": 0.5, "salt": 34.0}])
+    assert store.argo_missing_levels(10) == []
+    store._conn.execute("UPDATE argo_profiles SET fetched_at = ?", (iso(now - timedelta(hours=25)),))
+    assert [row["cycle"] for row in store.argo_missing_levels(10)] == [1]
+    assert store.argo_count_missing() == 0
 
 
 def test_prune_removes_only_old_forecasts(store):
