@@ -166,6 +166,7 @@ python -m antarctic_monitor
 | **Argo**, **Stations and areas** | Marker toggles. Black dots = Argo profiles from the last 30 days, triangles = stations, squares = sea-area points |
 | Mouse | Move: coordinates and value in the status bar. **Wheel**: zoom (up to 12×), **drag**: pan, **double-click**: reset, **click**: inspect that point (red cross). Clicking a marker inspects that float or station |
 | **Location** box | Type `-65, -60` (lat, lon) or paste a nullschool / Windy URL. Only the coordinates are read; the site is not contacted |
+| Time playback | A layer with two or more stored times shows a slider and a play button below the map, with the colour range fixed to the latest grid. The latest 60 grids are kept per layer: two months of OISST, about a week of HYCOM |
 | Colour bar | cmocean oceanographic colormaps: *thermal* (temperature), *haline* (salinity), *balance* (anomaly, air), *ice* |
 | Caption | Data kind, data time with age, valid-cell ratio south of 60°S, number of out-of-range values removed |
 

@@ -12,7 +12,8 @@ from PySide6.QtCore import QSettings, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton, QSplitter, QTabWidget, QVBoxLayout, QWidget,
+    QListWidget, QListWidgetItem, QMainWindow, QMessageBox, QPushButton, QSlider, QSplitter, QStyle, QTabWidget,
+    QVBoxLayout, QWidget,
 )
 
 from .. import __version__, exporter, pointquery, queries, updates
@@ -81,6 +82,7 @@ class MainWindow(QMainWindow):
         self.detail_tab = "water"
         self.detail_loaded: dict[str, tuple] = {}
         self.layer_request = 0
+        self.layer_frames: list[dict] = []
         self.status_data: dict | None = None
         self.pending_sources: set[str] = set()
         self.overview_data: dict | None = None
@@ -291,6 +293,22 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.map, 1)
         self.colorbar = ColorBar()
         left_layout.addWidget(self.colorbar)
+        self.time_row = QWidget()
+        time_layout = QHBoxLayout(self.time_row)
+        time_layout.setContentsMargins(0, 0, 0, 0)
+        self.play_button = QPushButton()
+        self.play_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+        self.play_button.setToolTip(tr("저장된 시각을 차례로 재생"))
+        self.play_button.clicked.connect(self._toggle_play)
+        self.time_slider = QSlider(Qt.Orientation.Horizontal)
+        self.time_slider.setToolTip(tr("저장된 시각 고르기"))
+        self.time_slider.valueChanged.connect(self._on_time_changed)
+        time_layout.addWidget(self.play_button)
+        time_layout.addWidget(self.time_slider, 1)
+        self.time_row.setVisible(False)
+        left_layout.addWidget(self.time_row)
+        self.play_timer = QTimer(self, interval=900)
+        self.play_timer.timeout.connect(self._next_frame)
         self.layer_meta = QLabel()
         self.layer_meta.setWordWrap(True)
         left_layout.addWidget(self.layer_meta)
@@ -595,10 +613,53 @@ class MainWindow(QMainWindow):
             self.depth = depth
             self.render_layer()
 
-    def render_layer(self) -> None:
+    def _stop_play(self) -> None:
+        self.play_timer.stop()
+        self.play_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+
+    def _toggle_play(self) -> None:
+        if self.play_timer.isActive():
+            self._stop_play()
+            return
+        if self.time_slider.value() >= self.time_slider.maximum():
+            self.time_slider.setValue(0)
+        self.play_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+        self.play_timer.start()
+
+    def _next_frame(self) -> None:
+        if self.time_slider.value() >= self.time_slider.maximum():
+            self._stop_play()
+        else:
+            self.time_slider.setValue(self.time_slider.value() + 1)
+
+    def _on_time_changed(self, index: int) -> None:
+        if 0 <= index < len(self.layer_frames):
+            self.render_layer(self.layer_frames[index])
+
+    def _load_frames(self, grid_id: str) -> None:
+        """이 레이어에 저장된 시각을 슬라이더에 올립니다. 시각이 둘 이상일 때만 보입니다."""
+
+        def done(frames, error):
+            if error or grid_id != self.grid_id():
+                return
+            self.layer_frames = frames or []
+            self.time_slider.blockSignals(True)
+            self.time_slider.setRange(0, max(len(self.layer_frames) - 1, 0))
+            self.time_slider.setValue(self.time_slider.maximum())
+            self.time_slider.blockSignals(False)
+            self.time_row.setVisible(len(self.layer_frames) > 1)
+
+        self.backend.call_sync(self.backend.store.grid_history, grid_id, callback=done)
+
+    def render_layer(self, frame: dict | None = None) -> None:
+        """최신 격자를 그립니다. frame을 주면 그 저장 시각을 같은 색 범위로 그립니다."""
         layer = self._layer_def()
         grid_id = self.grid_id()
         info = self.layer_info.get(grid_id)
+        if frame is None:
+            self._stop_play()
+            self.layer_frames = []
+            self.time_row.setVisible(False)
         label = f"{tr(layer['label'])} {self.depth} m" if layer.get("depths") else tr(layer["label"])
         self.layer_request += 1
         token = self.layer_request
@@ -607,6 +668,9 @@ class MainWindow(QMainWindow):
             self.colorbar.set_scale(None, self.theme)
             self.layer_meta.setText("")
             return
+        if frame is None:
+            self._load_frames(grid_id)
+        shown = frame or info
 
         def done(grid, error):
             if token != self.layer_request:
@@ -620,15 +684,15 @@ class MainWindow(QMainWindow):
             self.colorbar.set_scale(scale, self.theme)
             parts = [
                 tr(KIND_LABEL[layer["kind"]]),
-                f"{short_time(info['valid_time'])} ({age(info['valid_time'])})",
-                tr("유효 {pct}%", pct=round((info["stats"].get("coverage") or 0) * 100)),
+                f"{short_time(shown['valid_time'])} ({age(shown['valid_time'])})",
+                tr("유효 {pct}%", pct=round((shown["stats"].get("coverage") or 0) * 100)),
             ]
             rejected = grid.meta.get("rejected_out_of_range")
             if rejected:
                 parts.append(tr("범위 밖 {n}개 제외", n=rejected))
             self.layer_meta.setText(" · ".join(parts))
 
-        self.backend.call_sync(self.backend.store.load_grid, grid_id, callback=done)
+        self.backend.call_sync(self.backend.store.load_grid, grid_id, shown["valid_time"], callback=done)
 
     def submit_locator(self) -> None:
         text = self.locator.text().strip()

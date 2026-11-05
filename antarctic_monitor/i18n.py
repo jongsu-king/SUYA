@@ -170,6 +170,8 @@ EN: dict[str, str] = {
     "행 수": "Rows",
     "격자평균": "Grid means",
     "월간요약": "Monthly summary",
+    "저장된 시각을 차례로 재생": "Play the stored times in order",
+    "저장된 시각 고르기": "Choose a stored time",
     "표본 수": "Samples",
     "평균": "Mean",
     "표준편차": "Std dev",

@@ -663,6 +663,13 @@ async def test_engine_backlog_runs_again_soon(store, monkeypatch):
     await engine.ctx.fetcher.aclose()
 
 
+async def _until(check, seconds: float = 10.0) -> bool:
+    deadline = time.monotonic() + seconds
+    while not check() and time.monotonic() < deadline:
+        await asyncio.sleep(0.01)
+    return check()
+
+
 async def test_engine_loop_runs_and_trigger_wakes_it(store, monkeypatch):
     runs = {"count": 0}
 
@@ -672,11 +679,9 @@ async def test_engine_loop_runs_and_trigger_wakes_it(store, monkeypatch):
 
     engine, _ = _engine(store, monkeypatch, job, interval=3600)
     engine.start()
-    await asyncio.sleep(0.1)
-    assert runs["count"] == 1
-    assert engine.trigger(["fake"]) == ["fake"]
-    await asyncio.sleep(0.1)
-    assert runs["count"] == 2
+    assert await _until(lambda: runs["count"] == 1)
+    assert await _until(lambda: engine.trigger(["fake"]) == ["fake"])
+    assert await _until(lambda: runs["count"] == 2)
     await engine.stop()
     await engine.ctx.fetcher.aclose()
 

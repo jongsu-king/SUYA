@@ -23,6 +23,8 @@ All notable changes to this project are documented here. The format follows
   days back, so the daily series keeps no holes after a short outage.
 - A Homebrew cask (`packaging/homebrew/`) and a winget manifest set (`packaging/winget/`) for
   publishing on those channels.
+- The map can step through time. A layer with two or more stored times shows a slider and a play
+  button below the map, with the colour range fixed to the latest grid.
 - A *Monthly summary* sheet opens each monthly workbook: samples, mean, minimum, maximum, standard
   deviation, first and last time per point, source and item, with last month's mean and the change.
 

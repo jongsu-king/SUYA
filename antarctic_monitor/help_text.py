@@ -51,6 +51,7 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
  <tr><td>마우스</td><td>움직이면 상태 표시줄에 좌표와 값이 나옵니다. <b>휠</b>: 확대, <b>끌기</b>: 이동, <b>더블클릭</b>: 원래 크기,
   <b>클릭</b>: 그 지점 상세 조회(빨간 십자). 점 위에서 클릭하면 그 Argo/기지를 조회합니다.</td></tr>
  <tr><td>위치 입력</td><td>"-65, -60" 처럼 위도, 경도를 넣거나 nullschool·Windy 주소를 그대로 붙여 넣고 OK. 주소에서 좌표만 읽고 그 사이트에 접속하지는 않습니다.</td></tr>
+ <tr><td>시간 재생</td><td>저장된 시각이 둘 이상인 레이어는 지도 아래 슬라이더로 지난 시각을 고르고 재생 단추로 차례로 봅니다. 색 범위는 최신 격자에 맞춰 고정됩니다. 레이어마다 최근 60개까지 남습니다.</td></tr>
  <tr><td>색 범례</td><td>지도 아래 막대. 수온 thermal, 염분 haline, 편차 balance, 해빙 ice(cmocean 해양 표준 색).</td></tr>
 </table>
 <p>육지나 빙붕을 클릭하면 "최근접 해양 격자 … 값 표시"라고 알려 주고, 가장 가까운 바다 격자의 값을 대신 보여 줍니다. 기온은 클릭한 지점 그대로입니다.</p>
@@ -202,6 +203,7 @@ collection. Windy is used only through its <b>official Point Forecast API</b>, a
  <tr><td>Mouse</td><td>Move to read coordinates and the value in the status bar. <b>Wheel</b>: zoom, <b>drag</b>: pan, <b>double-click</b>: reset,
   <b>click</b>: inspect that point (red cross). Clicking a marker inspects that Argo float or station.</td></tr>
  <tr><td>Location box</td><td>Type "-65, -60" (lat, lon) or paste a nullschool / Windy URL and press OK. Only the coordinates are read; the site is not contacted.</td></tr>
+ <tr><td>Time playback</td><td>A layer with two or more stored times shows a slider below the map: pick an earlier time or press play to step through them. The colour range stays fixed to the latest grid. The latest 60 are kept per layer.</td></tr>
  <tr><td>Colour bar</td><td>Below the map. cmocean oceanographic colormaps: thermal (temperature), haline (salinity), balance (anomaly), ice.</td></tr>
 </table>
 <p>Clicking land or an ice shelf shows "nearest ocean cell …" and uses the closest ocean grid cell for water values. Air temperature is for the clicked point itself.</p>
