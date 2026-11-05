@@ -60,7 +60,8 @@ def test_profile_panel_scrolls_only_below_its_minimum_height(app):
 def test_air_values_are_listed_two_per_row(app):
     from antarctic_monitor.gui.panels import AIR_FIELDS, AirPanel
 
-    grid = AirPanel().group.layout()
+    panel = AirPanel()
+    grid = panel.group.layout()
     assert grid.columnCount() == 4
     assert grid.rowCount() == (len(AIR_FIELDS) + 1) // 2
 

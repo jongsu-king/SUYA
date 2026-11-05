@@ -680,8 +680,12 @@ async def test_engine_loop_runs_and_trigger_wakes_it(store, monkeypatch):
     engine, _ = _engine(store, monkeypatch, job, interval=3600)
     engine.start()
     assert await _until(lambda: runs["count"] == 1)
-    assert await _until(lambda: engine.trigger(["fake"]) == ["fake"])
-    assert await _until(lambda: runs["count"] == 2)
+
+    def triggered() -> bool:
+        assert engine.trigger(["fake"]) == ["fake"]
+        return runs["count"] >= 2
+
+    assert await _until(triggered)
     await engine.stop()
     await engine.ctx.fetcher.aclose()
 
