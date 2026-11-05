@@ -16,7 +16,7 @@ from typing import AsyncIterator
 from .collectors import JOBS
 from .collectors.base import CollectResult, Context
 from .db import iso, utcnow
-from .i18n import is_encoded, render
+from .i18n import is_encoded, msg, render
 from .http import RateLimited
 
 log = logging.getLogger(__name__)
@@ -26,6 +26,16 @@ BACKLOG_DELAY = 30.0
 RATE_LIMIT_DELAY = 3600.0
 STARTUP_STAGGER = 2.0
 PRUNE_EVERY = 86400.0
+
+
+def failure_message(exc: BaseException) -> str:
+    """실패 원인을 저장할 글로 만듭니다. 작업 시간 제한과 설명 없는 예외도 읽을 수 있는 글이 됩니다."""
+    text = str(exc)
+    if isinstance(exc, TimeoutError) and not text:
+        return msg("{minutes}분 안에 끝나지 않아 중단했습니다", minutes=max(1, int(JOB_TIMEOUT // 60)))
+    if is_encoded(text):
+        return text
+    return (f"{type(exc).__name__}: {text}" if text else type(exc).__name__)[:400]
 
 
 class EventBus:
@@ -136,7 +146,7 @@ class Engine:
                 delay = max(interval, RATE_LIMIT_DELAY)
             except Exception as exc:
                 status = "error"
-                result.message = str(exc) if is_encoded(str(exc)) else f"{type(exc).__name__}: {exc}"[:400]
+                result.message = failure_message(exc)
                 log.warning("수집 실패 %s: %s", name, render(result.message))
                 errors = (self.ctx.store.source_states().get(name) or {}).get("consecutive_errors") or 0
                 delay = min(interval, 60.0 * 2 ** min(errors, 8))
