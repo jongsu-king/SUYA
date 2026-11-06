@@ -12,7 +12,7 @@ import asyncio
 from datetime import date
 
 from ..db import Measurement
-from ..http import FetchError, Fetcher, RateLimited
+from ..http import FetchError, Fetcher, RateLimited, Unreachable
 from ..i18n import join, msg
 from ..locations import LOCATIONS
 from .base import CollectResult, Context, epoch_to_iso, finite
@@ -102,6 +102,13 @@ def _consume(ctx: Context, calls: int) -> None:
     ctx.store.kv_set(key, str(used + calls))
 
 
+def _refund(ctx: Context, calls: int) -> None:
+    """서버에 닿지 못한 호출은 한도에 들어가지 않으므로 돌려줍니다."""
+    key = f"windy_budget:{date.today().isoformat()}"
+    used = int(ctx.store.kv_get(key) or 0)
+    ctx.store.kv_set(key, str(max(0, used - calls)))
+
+
 async def collect(ctx: Context) -> CollectResult:
     key = ctx.settings.windy_api_key
     if not key:
@@ -111,6 +118,7 @@ async def collect(ctx: Context) -> CollectResult:
     quality = quality_label(ctx)
     tasks = [(loc, model, fetch_point(ctx.fetcher, key, loc.lat, loc.lon, model)) for loc in LOCATIONS for model in models]
     results = await asyncio.gather(*(t[2] for t in tasks), return_exceptions=True)
+    _refund(ctx, sum(isinstance(result, Unreachable) for result in results))
     rows, failures = [], []
     for (loc, model, _), result in zip(tasks, results):
         if isinstance(result, Exception):

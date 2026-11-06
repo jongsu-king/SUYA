@@ -9,6 +9,11 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - A Homebrew tap: `brew install --cask jongsu-king/suya/suya` installs the macOS disk image.
 
+### Fixed
+- Open-Meteo and Windy calls that never reached the server no longer count against the daily budget.
+  During a long network outage the failed attempts used the budget up, so the GFS map stayed blocked
+  after the connection came back. A failure after the server was reached still counts.
+
 ## [0.1.3] - 2026-11-05
 
 A slim collector install and a container image, missed satellite days filled in, a monthly summary

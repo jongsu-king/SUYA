@@ -31,6 +31,10 @@ class FetchError(Exception):
     """요청이 재시도 후에도 실패했습니다."""
 
 
+class Unreachable(FetchError):
+    """모든 시도가 연결 단계에서 실패했습니다. DNS 실패처럼 요청이 서버에 닿지 못한 경우입니다."""
+
+
 class RateLimited(FetchError):
     """호출 한도에 걸렸습니다. 재시도하지 않고 다음 주기로 넘깁니다."""
 
@@ -74,6 +78,7 @@ class Fetcher:
     ) -> httpx.Response:
         """interactive=True는 사용자가 화면에서 기다리는 요청입니다. 같은 호스트로 가는 수집 작업 뒤에 줄 서지 않습니다."""
         last_error = "알 수 없는 오류"
+        reached = False
         for attempt in range(self._retries):
             if attempt:
                 await asyncio.sleep(self._backoff * 2 ** (attempt - 1))
@@ -81,15 +86,18 @@ class Fetcher:
                 async with self._semaphore(url, interactive):
                     response = await self._client.request(method, url, params=params, json=json, timeout=timeout)
             except (httpx.TimeoutException, httpx.TransportError) as exc:
+                reached = reached or not isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout))
                 last_error = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
                 continue
             if response.status_code == 429:
                 raise RateLimited(_short_body(response) or "HTTP 429")
             if response.status_code in RETRYABLE_STATUS:
+                reached = True
                 last_error = f"HTTP {response.status_code}"
                 continue
             return response
-        raise FetchError(f"{urlparse(url).netloc}: {last_error}")
+        failure = FetchError if reached else Unreachable
+        raise failure(f"{urlparse(url).netloc}: {last_error}")
 
     async def get_text(
         self, url: str, *, params: dict | None = None, timeout: float = 60.0, interactive: bool = False

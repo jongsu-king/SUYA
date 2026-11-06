@@ -11,7 +11,7 @@ import httpx
 import pytest
 
 from antarctic_monitor import cli, instance, pointquery, seawater, updates
-from antarctic_monitor.collectors import JOBS, erddap, hycom, windy
+from antarctic_monitor.collectors import JOBS, erddap, hycom, openmeteo, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
 from antarctic_monitor.config import Settings, load_dotenv
@@ -204,6 +204,92 @@ def test_budget_reserve_protects_priority_jobs(store):
     with pytest.raises(BudgetExceeded):
         consume_budget(ctx, 71, reserve=0.3)
     consume_budget(ctx, 70, reserve=0.3)
+
+
+def _offline(request):
+    raise httpx.ConnectError("[Errno 8] nodename nor servname provided, or not known", request=request)
+
+
+def _answering_ctx(store, answer, **settings):
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(answer)), retries=1, backoff=0.0)
+    return Context(store, fetcher, Settings(**settings))
+
+
+async def test_calls_that_never_reach_open_meteo_cost_no_budget(store):
+    ctx = _answering_ctx(store, _offline)
+    jobs = (
+        openmeteo.collect_current(ctx),
+        openmeteo.collect_forecast(ctx),
+        openmeteo.collect_marine(ctx),
+        openmeteo.collect_gfs_grid(ctx),
+        openmeteo.fetch_air_point(ctx, -65.0, 140.0),
+        openmeteo.fetch_era5_daily(ctx, -65.0, 140.0, "2026-10-01", "2026-10-02"),
+    )
+    for job in jobs:
+        with pytest.raises(FetchError):
+            await job
+    assert openmeteo.budget_usage(ctx)["used"] == 0
+
+
+async def test_gfs_grid_pays_only_for_the_chunks_it_sent(store, monkeypatch):
+    monkeypatch.setattr(openmeteo, "GRID_CHUNK_DELAY", 0.0)
+    answered = []
+
+    def answer(request):
+        if answered:
+            _offline(request)
+        answered.append(request)
+        count = request.url.params["latitude"].count(",") + 1
+        return httpx.Response(200, json=[{"current": {"time": "2026-11-06T00:00", "temperature_2m": -20.0}}] * count)
+
+    ctx = _answering_ctx(store, answer)
+    with pytest.raises(FetchError):
+        await openmeteo.collect_gfs_grid(ctx)
+    assert openmeteo.budget_usage(ctx)["used"] == openmeteo.GRID_CHUNK
+
+
+@pytest.mark.parametrize("status", [400, 503])
+async def test_calls_the_server_answered_still_cost_budget(store, status):
+    ctx = _answering_ctx(store, lambda request: httpx.Response(status, json={"reason": "no"}))
+    with pytest.raises(FetchError):
+        await openmeteo.collect_current(ctx)
+    assert openmeteo.budget_usage(ctx)["used"] == len(openmeteo.LOCATIONS)
+
+
+async def test_windy_calls_that_never_reach_the_server_cost_no_budget(store):
+    ctx = _answering_ctx(store, _offline, windy_api_key="k", windy_key_tier="testing")
+    with pytest.raises(FetchError):
+        await windy.collect(ctx)
+    assert int(store.kv_get(f"windy_budget:{datetime.now().date().isoformat()}") or 0) == 0
+
+
+async def test_fetcher_tells_an_unreachable_server_from_a_failed_answer():
+    from antarctic_monitor.http import Unreachable
+
+    async def outcome(answer, retries=1):
+        fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(answer)), retries=retries, backoff=0.0)
+        try:
+            await fetcher.request("GET", "https://example.org/")
+        except FetchError as exc:
+            return exc
+        finally:
+            await fetcher.aclose()
+
+    def read_timeout(request):
+        raise httpx.ReadTimeout("slow", request=request)
+
+    attempts = []
+
+    def offline_then_503(request):
+        attempts.append(request)
+        if len(attempts) == 1:
+            _offline(request)
+        return httpx.Response(503)
+
+    assert isinstance(await outcome(_offline), Unreachable)
+    assert not isinstance(await outcome(read_timeout), Unreachable)
+    assert not isinstance(await outcome(lambda request: httpx.Response(503)), Unreachable)
+    assert not isinstance(await outcome(offline_then_503, retries=2), Unreachable)
 
 
 async def test_fetcher_retries_then_succeeds():

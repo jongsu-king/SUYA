@@ -7,11 +7,12 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
 from datetime import date
 
 from ..db import Measurement, utcnow
 from ..gridutil import grid_from_triples
-from ..http import FetchError, Fetcher, RateLimited
+from ..http import FetchError, Fetcher, RateLimited, Unreachable
 from ..i18n import join, msg
 from ..locations import LOCATIONS, OCEAN_LOCATIONS, Location
 from .base import CollectResult, Context, finite, to_iso_utc
@@ -56,6 +57,24 @@ def consume_budget(ctx: Context, calls: int, reserve: float = 0.0) -> None:
     if used + calls > limit * (1.0 - reserve):
         raise BudgetExceeded(msg("Open-Meteo 오늘 호출 예산 소진 ({used}/{limit})", used=used, limit=limit))
     ctx.store.kv_set(key, str(used + calls))
+
+
+def refund_budget(ctx: Context, calls: int) -> None:
+    """서버에 닿지 못한 호출은 한도에 들어가지 않으므로 돌려줍니다."""
+    key = f"openmeteo_budget:{date.today().isoformat()}"
+    used = int(ctx.store.kv_get(key) or 0)
+    ctx.store.kv_set(key, str(max(0, used - calls)))
+
+
+@contextmanager
+def spending(ctx: Context, calls: int):
+    """예산을 차감하고 호출합니다. 호출이 서버에 닿지 못하면 돌려줍니다."""
+    consume_budget(ctx, calls)
+    try:
+        yield
+    except Unreachable:
+        refund_budget(ctx, calls)
+        raise
 
 
 def budget_usage(ctx: Context) -> dict:
@@ -107,9 +126,9 @@ def parse_current(payloads: list[dict], locations: tuple[Location, ...]) -> list
 
 
 async def collect_current(ctx: Context) -> CollectResult:
-    consume_budget(ctx, len(LOCATIONS))
     params = _coordinates(LOCATIONS) | {"current": ",".join(CURRENT_VARIABLES), "models": "gfs_global"}
-    payloads = as_list(await _get(ctx.fetcher, FORECAST, params))
+    with spending(ctx, len(LOCATIONS)):
+        payloads = as_list(await _get(ctx.fetcher, FORECAST, params))
     rows = parse_current(payloads, LOCATIONS)
     saved = ctx.store.upsert_measurements(rows)
     latest = max((r.obs_time for r in rows), default=None)
@@ -139,14 +158,14 @@ def parse_hourly_models(payloads: list[dict], locations) -> list[Measurement]:
 
 
 async def collect_forecast(ctx: Context) -> CollectResult:
-    consume_budget(ctx, len(LOCATIONS))
     params = _coordinates(LOCATIONS) | {
         "hourly": "temperature_2m",
         "models": ",".join(MODELS),
         "forecast_days": 7,
         "past_days": 1,
     }
-    payloads = as_list(await _get(ctx.fetcher, FORECAST, params, timeout=180.0))
+    with spending(ctx, len(LOCATIONS)):
+        payloads = as_list(await _get(ctx.fetcher, FORECAST, params, timeout=180.0))
     rows = parse_hourly_models(payloads, LOCATIONS)
     saved = ctx.store.upsert_measurements(rows)
     return CollectResult(rows=saved, data_time=to_iso_utc(utcnow().strftime("%Y-%m-%dT%H:00")), message=msg("모델 {n}종", n=len(MODELS)))
@@ -190,6 +209,7 @@ async def collect_marine(ctx: Context) -> CollectResult:
     results = await asyncio.gather(
         *(fetch_marine_point(ctx.fetcher, loc.lat, loc.lon) for loc in targets), return_exceptions=True
     )
+    refund_budget(ctx, sum(isinstance(result, Unreachable) for result in results))
     rows, land, failures = [], 0, []
     for loc, result in zip(targets, results):
         if isinstance(result, Exception):
@@ -225,6 +245,7 @@ async def collect_gfs_grid(ctx: Context) -> CollectResult:
     triples = []
     valid_time = None
     chunks = [points[i : i + GRID_CHUNK] for i in range(0, len(points), GRID_CHUNK)]
+    sent = 0
     for index, chunk in enumerate(chunks):
         if index:
             await asyncio.sleep(GRID_CHUNK_DELAY)
@@ -235,7 +256,12 @@ async def collect_gfs_grid(ctx: Context) -> CollectResult:
             "models": "gfs_global",
             "timezone": "UTC",
         }
-        payloads = as_list(await _get(ctx.fetcher, FORECAST, params, timeout=120.0))
+        try:
+            payloads = as_list(await _get(ctx.fetcher, FORECAST, params, timeout=120.0))
+        except Unreachable:
+            refund_budget(ctx, len(points) - sent)
+            raise
+        sent += len(chunk)
         for point, payload in zip(chunk, payloads):
             current = payload.get("current") or {}
             if current.get("time"):
@@ -254,17 +280,17 @@ async def collect_gfs_grid(ctx: Context) -> CollectResult:
 
 async def fetch_air_point(ctx: Context, lat: float, lon: float) -> dict:
     """클릭한 지점의 기온 전체: 현재값, 모델별 예보, 고도별 기온."""
-    consume_budget(ctx, 3)
     base = {"latitude": f"{lat:.3f}", "longitude": f"{lon:.3f}", "timezone": "UTC"}
     pressure_vars = [f"temperature_{p}hPa" for p in PRESSURE_LEVELS]
-    current, forecast, levels = await asyncio.gather(
-        _get(ctx.fetcher, FORECAST, base | {"current": ",".join(CURRENT_VARIABLES), "models": "gfs_global"}),
-        _get(
-            ctx.fetcher, FORECAST,
-            base | {"hourly": "temperature_2m", "models": ",".join(MODELS), "forecast_days": 7, "past_days": 1},
-        ),
-        _get(ctx.fetcher, FORECAST, base | {"current": ",".join(pressure_vars), "models": "gfs_global,ecmwf_ifs025"}),
-    )
+    with spending(ctx, 3):
+        current, forecast, levels = await asyncio.gather(
+            _get(ctx.fetcher, FORECAST, base | {"current": ",".join(CURRENT_VARIABLES), "models": "gfs_global"}),
+            _get(
+                ctx.fetcher, FORECAST,
+                base | {"hourly": "temperature_2m", "models": ",".join(MODELS), "forecast_days": 7, "past_days": 1},
+            ),
+            _get(ctx.fetcher, FORECAST, base | {"current": ",".join(pressure_vars), "models": "gfs_global,ecmwf_ifs025"}),
+        )
     hourly = forecast.get("hourly") or {}
     times = [to_iso_utc(t) for t in hourly.get("time", [])]
     series = []
@@ -299,7 +325,6 @@ async def fetch_air_point(ctx: Context, lat: float, lon: float) -> dict:
 
 
 async def fetch_era5_daily(ctx: Context, lat: float, lon: float, start: str, end: str) -> dict:
-    consume_budget(ctx, 1)
     params = {
         "latitude": f"{lat:.3f}",
         "longitude": f"{lon:.3f}",
@@ -308,7 +333,9 @@ async def fetch_era5_daily(ctx: Context, lat: float, lon: float, start: str, end
         "daily": "temperature_2m_mean,temperature_2m_min,temperature_2m_max",
         "timezone": "UTC",
     }
-    daily = (await _get(ctx.fetcher, ARCHIVE, params, timeout=120.0)).get("daily") or {}
+    with spending(ctx, 1):
+        payload = await _get(ctx.fetcher, ARCHIVE, params, timeout=120.0)
+    daily = payload.get("daily") or {}
     return {
         "times": [to_iso_utc(t) for t in daily.get("time", [])],
         "mean": [finite(v) for v in daily.get("temperature_2m_mean", [])],
