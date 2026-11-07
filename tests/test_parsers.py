@@ -320,6 +320,26 @@ def test_metar_keeps_station_without_dewpoint():
     assert rows[0].location_id == "metar:NZSP"
 
 
+def _metar_report(temp, dewp, altim=987):
+    return {"icaoId": "SAWB", "obsTime": 1793934000, "temp": temp, "dewp": dewp, "lat": -64.2383, "lon": -56.6308, "altim": altim, "name": "Gustavo Marambio Arpt, U-A, AQ"}
+
+
+def test_metar_drops_temperature_outside_the_plausible_range():
+    rows = metar.parse_reports([_metar_report(48, -8)])
+    assert {r.variable: r.value for r in rows} == {"dew_point": -8.0, "surface_pressure": 987.0}
+
+
+def test_metar_drops_both_when_dew_point_is_above_temperature():
+    rows = metar.parse_reports([_metar_report(-4, 9, altim=974)])
+    assert {r.variable: r.value for r in rows} == {"surface_pressure": 974.0}
+
+
+def test_metar_keeps_saturated_air_and_real_extremes():
+    rows = metar.parse_reports([_metar_report(-2, -2), _metar_report(-89, None)])
+    assert sorted(r.value for r in rows if r.variable == "air_temperature") == [-89.0, -2.0]
+    assert [r.value for r in rows if r.variable == "dew_point"] == [-2.0]
+
+
 def test_woa_csv_and_deep_fill():
     text = (
         'time,alt[unit="meters"],station,latitude[unit="degrees_north"],longitude[unit="degrees_east"],s_an[unit="1"]\n'

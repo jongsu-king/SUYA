@@ -164,6 +164,31 @@ class Store:
             self._conn.commit()
         return len(params)
 
+    def drop_invalid_metar(self, low: float, high: float) -> int:
+        """수집 필터를 통과하지 못할 METAR 기온·이슬점이 이미 저장돼 있으면 지웁니다."""
+        with self._lock:
+            removed = self._conn.execute(
+                """DELETE FROM measurements WHERE source = 'metar'
+                   AND variable IN ('air_temperature', 'dew_point') AND (value < ? OR value > ?)""",
+                (low, high),
+            ).rowcount
+            crossed = self._conn.execute(
+                """SELECT d.dataset, d.lat, d.lon, d.level, d.obs_time FROM measurements d
+                   JOIN measurements t ON t.source = d.source AND t.dataset = d.dataset AND t.lat = d.lat
+                    AND t.lon = d.lon AND t.level = d.level AND t.obs_time = d.obs_time
+                    AND t.variable = 'air_temperature'
+                   WHERE d.source = 'metar' AND d.variable = 'dew_point' AND d.value > t.value"""
+            ).fetchall()
+            for row in crossed:
+                removed += self._conn.execute(
+                    """DELETE FROM measurements WHERE source = 'metar'
+                       AND variable IN ('air_temperature', 'dew_point')
+                       AND dataset = ? AND lat = ? AND lon = ? AND level = ? AND obs_time = ?""",
+                    tuple(row),
+                ).rowcount
+            self._conn.commit()
+        return removed
+
     def latest_for_location(self, location_id: str) -> dict[str, dict]:
         """지점별 (소스, 데이터셋, 변수, 층) 조합의 현재 시각 이전 최신값."""
         sql = """

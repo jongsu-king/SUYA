@@ -862,3 +862,40 @@ def test_dotenv_parser(tmp_path):
 
 def test_math_sanity():
     assert math.isclose(seawater.sigma_t(34.0, -1.8), 27.3, abs_tol=0.1)
+
+
+def _metar_row(dataset, variable, when, value):
+    return Measurement("metar", dataset, variable, "observation", -64.24, -56.63, when, value, "°C", level="2m", location_id=f"metar:{dataset}")
+
+
+def test_metar_collect_removes_garbled_rows_already_stored(store):
+    from types import SimpleNamespace
+
+    from antarctic_monitor.collectors import metar
+
+    store.upsert_measurements(
+        [
+            _metar_row("SAWB", "air_temperature", "2026-11-06T03:00:00Z", 48.0),
+            _metar_row("SAWB", "dew_point", "2026-11-06T03:00:00Z", -8.0),
+            _metar_row("SAWB", "air_temperature", "2026-11-04T22:00:00Z", -4.0),
+            _metar_row("SAWB", "dew_point", "2026-11-04T22:00:00Z", 9.0),
+            _metar_row("SAWB", "air_temperature", "2026-11-04T23:00:00Z", -4.0),
+            _metar_row("SAWB", "dew_point", "2026-11-04T23:00:00Z", -4.0),
+            Measurement("openmeteo", "SAWB", "air_temperature", "model", -64.24, -56.63, "2026-11-06T03:00:00Z", 48.0, "°C"),
+        ]
+    )
+
+    class Stub:
+        async def get_json(self, url, **kwargs):
+            return []
+
+    asyncio.run(metar.collect(SimpleNamespace(store=store, fetcher=Stub())))
+
+    kept = {(r["source"], r["variable"], r["obs_time"]): r["value"] for r in store.query_measurements()}
+    assert kept == {
+        ("metar", "dew_point", "2026-11-06T03:00:00Z"): -8.0,
+        ("metar", "air_temperature", "2026-11-04T23:00:00Z"): -4.0,
+        ("metar", "dew_point", "2026-11-04T23:00:00Z"): -4.0,
+        ("openmeteo", "air_temperature", "2026-11-06T03:00:00Z"): 48.0,
+    }
+
