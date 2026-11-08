@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-08
+
+Fixes to stored values: garbled METAR reports kept out of the temperature series, METAR pressure
+stored under its own name, and a network outage no longer using up the daily call budget. Also a
+Homebrew tap. Version DOI: issued by Zenodo when it archives this release and added here afterwards
+(concept DOI for all versions: 10.5281/zenodo.23937852).
+
 ### Added
 - A Homebrew tap: `brew install --cask jongsu-king/suya/suya` installs the macOS disk image.
 
