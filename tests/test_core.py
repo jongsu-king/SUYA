@@ -899,3 +899,31 @@ def test_metar_collect_removes_garbled_rows_already_stored(store):
         ("openmeteo", "air_temperature", "2026-11-06T03:00:00Z"): 48.0,
     }
 
+
+
+def test_metar_collect_relabels_pressure_already_stored_as_surface_pressure(store):
+    from types import SimpleNamespace
+
+    from antarctic_monitor.collectors import metar
+
+    store.upsert_measurements(
+        [
+            Measurement("metar", "NZSP", "surface_pressure", "observation", -89.98, 180.0, "2026-11-07T00:00:00Z", 963.0, "hPa", level="2m", location_id="metar:NZSP"),
+            Measurement("metar", "NZSP", "surface_pressure", "observation", -89.98, 180.0, "2026-11-07T01:00:00Z", 962.0, "hPa", level="2m", location_id="metar:NZSP"),
+            Measurement("metar", "NZSP", "sea_level_pressure", "observation", -89.98, 180.0, "2026-11-07T01:00:00Z", 962.5, "hPa", level="2m", location_id="metar:NZSP"),
+            Measurement("openmeteo", "gfs_global", "surface_pressure", "model", -90.0, 0.0, "2026-11-07T00:00:00Z", 676.0, "hPa"),
+        ]
+    )
+
+    class Stub:
+        async def get_json(self, url, **kwargs):
+            return []
+
+    asyncio.run(metar.collect(SimpleNamespace(store=store, fetcher=Stub())))
+
+    kept = {(r["source"], r["variable"], r["obs_time"]): r["value"] for r in store.query_measurements()}
+    assert kept == {
+        ("metar", "sea_level_pressure", "2026-11-07T00:00:00Z"): 963.0,
+        ("metar", "sea_level_pressure", "2026-11-07T01:00:00Z"): 962.5,
+        ("openmeteo", "surface_pressure", "2026-11-07T00:00:00Z"): 676.0,
+    }

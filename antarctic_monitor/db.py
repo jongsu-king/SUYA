@@ -189,6 +189,17 @@ class Store:
             self._conn.commit()
         return removed
 
+    def relabel_metar_pressure(self) -> int:
+        """예전에 ``surface_pressure``로 저장된 METAR 해면 기압을 ``sea_level_pressure``로 옮깁니다."""
+        with self._lock:
+            moved = self._conn.execute(
+                """UPDATE OR IGNORE measurements SET variable = 'sea_level_pressure'
+                   WHERE source = 'metar' AND variable = 'surface_pressure'"""
+            ).rowcount
+            self._conn.execute("DELETE FROM measurements WHERE source = 'metar' AND variable = 'surface_pressure'")
+            self._conn.commit()
+        return moved
+
     def latest_for_location(self, location_id: str) -> dict[str, dict]:
         """지점별 (소스, 데이터셋, 변수, 층) 조합의 현재 시각 이전 최신값."""
         sql = """

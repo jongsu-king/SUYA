@@ -2,6 +2,7 @@
 
 bbox 조회만으로는 일부 기지가 빠져서, ICAO 코드 목록과 합쳐서 받습니다.
 원문이 깨진 보고(``M048/M08``, ``M04/09``)는 부호를 잃은 채 JSON으로 오므로 범위와 이슬점으로 거릅니다.
+기압은 해면 보정값(``slp``, 없으면 QNH ``altim``)이라 ``surface_pressure``가 아닌 ``sea_level_pressure``로 저장합니다.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ def parse_reports(payload: list[dict]) -> list[Measurement]:
         for variable, value, unit in (
             ("air_temperature", temp, "°C"),
             ("dew_point", dewp, "°C"),
-            ("surface_pressure", pressure, "hPa"),
+            ("sea_level_pressure", pressure, "hPa"),
         ):
             if value is not None:
                 rows.append(
@@ -54,6 +55,7 @@ async def collect(ctx: Context) -> CollectResult:
     rows = parse_reports(list(by_ids or []) + list(by_box or []))
     saved = ctx.store.upsert_measurements(rows)
     ctx.store.drop_invalid_metar(*VALID_AIR)
+    ctx.store.relabel_metar_pressure()
     stations = {r.dataset for r in rows}
     latest = max((r.obs_time for r in rows), default=None)
     return CollectResult(rows=saved, data_time=latest, message=msg("기지 {n}곳", n=len(stations)))

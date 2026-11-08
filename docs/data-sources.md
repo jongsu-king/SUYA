@@ -157,4 +157,4 @@ SUYA가 호출하는 모든 원격 서비스, 정확한 요청 형태, 받아 �
 | `runs` / `source_state` | 수집 기록, 다음 실행 시각, 연속 오류 수 | |
 | `kv` | 원천 갱신 토큰, 일일 예산, 엑셀 생성 기준 | |
 
-변수 이름: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `wind_speed`.
+변수 이름: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `sea_level_pressure`, `wind_speed`.

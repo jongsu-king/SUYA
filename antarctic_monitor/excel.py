@@ -297,7 +297,7 @@ def _sheet_ships(book: Book, store: Store, start: str, until: str) -> int:
 def _sheet_metar(book: Book, store: Store, start: str, until: str) -> int:
     sheet = Sheet(
         book, "기지기온",
-        [("시각 UTC", 17), ("ICAO", 7), ("기지", 30), ("위도", 9), ("경도", 9), ("기온 °C", 8), ("이슬점 °C", 9), ("기압 hPa", 9)],
+        [("시각 UTC", 17), ("ICAO", 7), ("기지", 30), ("위도", 9), ("경도", 9), ("기온 °C", 8), ("이슬점 °C", 9), ("해면 기압 hPa", 12)],
     )
     merged: dict[tuple, dict] = defaultdict(dict)
     for row in store.iter_measurements(source="metar", since=start, until=until):
@@ -309,7 +309,7 @@ def _sheet_metar(book: Book, store: Store, start: str, until: str) -> int:
         sheet.add(
             [
                 parse_time(key[0]), key[1], values.get("name"), key[2], key[3], values.get("air_temperature"),
-                values.get("dew_point"), values.get("surface_pressure"),
+                values.get("dew_point"), values.get("sea_level_pressure"),
             ]
         )
     return sheet.finish()

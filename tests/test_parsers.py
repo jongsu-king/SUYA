@@ -316,7 +316,7 @@ def test_hourly_models_skip_missing_values():
 def test_metar_keeps_station_without_dewpoint():
     payload = [{"icaoId": "NZSP", "obsTime": 1793757000, "temp": -46, "dewp": None, "lat": -89.98, "lon": 180, "altim": 690.0, "name": "Amundsen-South Pole, NZ, AQ"}]
     rows = metar.parse_reports(payload)
-    assert {r.variable for r in rows} == {"air_temperature", "surface_pressure"}
+    assert {r.variable for r in rows} == {"air_temperature", "sea_level_pressure"}
     assert rows[0].location_id == "metar:NZSP"
 
 
@@ -326,12 +326,12 @@ def _metar_report(temp, dewp, altim=987):
 
 def test_metar_drops_temperature_outside_the_plausible_range():
     rows = metar.parse_reports([_metar_report(48, -8)])
-    assert {r.variable: r.value for r in rows} == {"dew_point": -8.0, "surface_pressure": 987.0}
+    assert {r.variable: r.value for r in rows} == {"dew_point": -8.0, "sea_level_pressure": 987.0}
 
 
 def test_metar_drops_both_when_dew_point_is_above_temperature():
     rows = metar.parse_reports([_metar_report(-4, 9, altim=974)])
-    assert {r.variable: r.value for r in rows} == {"surface_pressure": 974.0}
+    assert {r.variable: r.value for r in rows} == {"sea_level_pressure": 974.0}
 
 
 def test_metar_keeps_saturated_air_and_real_extremes():

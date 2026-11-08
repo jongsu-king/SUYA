@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format follows
   turned `M048/M08` at Marambio into +48 °C and `M04/09` into a dew point of +9 °C above an air
   temperature of -4 °C. Values outside -95 to 30 °C and pairs with the dew point above the air
   temperature are dropped, and rows of this kind already stored are removed at the next collection.
+- METAR pressure is stored as `sea_level_pressure` instead of `surface_pressure`. The value is the
+  sea-level reduced pressure (SLP, or QNH when SLP is missing), so the South Pole read about 963 hPa
+  under the same name as Open-Meteo's station-level 676 hPa. Rows already stored are relabelled at the
+  next collection, and the station sheet in the monthly Excel file names the column sea-level pressure.
 
 ## [0.1.3] - 2026-11-05
 

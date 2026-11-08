@@ -159,4 +159,4 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 | `runs` / `source_state` | Collection history, next run, consecutive errors | |
 | `kv` | Source tokens, daily budgets, Excel stamp | |
 
-Variable names: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `wind_speed`.
+Variable names: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `sea_level_pressure`, `wind_speed`.

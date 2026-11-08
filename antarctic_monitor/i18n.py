@@ -157,6 +157,7 @@ EN: dict[str, str] = {
     "지표 온도 °C": "Surface temp °C",
     "습도 %": "Humidity %",
     "기압 hPa": "Pressure hPa",
+    "해면 기압 hPa": "Sea-level pressure hPa",
     "풍속 km/h": "Wind km/h",
     "{name} 파일이 열려 있어 저장하지 못했습니다": "Could not save {name} because the file is open",
     "정보": "Info",
