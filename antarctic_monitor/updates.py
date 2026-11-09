@@ -27,7 +27,7 @@ RELEASES_API = "https://api.github.com/repos/jongsu-king/SUYA/releases/latest"
 RELEASES_PAGE = f"{__url__}/releases/latest"
 CHECKSUMS = "SHA256SUMS.txt"
 MODES = ("off", "notify", "auto")
-DEFAULT_MODE = "notify"
+DEFAULT_MODE = "auto"
 
 
 def parse_version(text: str) -> tuple[int, int, int]:

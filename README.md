@@ -104,8 +104,10 @@ building a personal time series of Southern Ocean salinity, or simply having a l
 | **macOS** | Open the `.dmg`, drag **SUYA** to *Applications*, eject the disk image. Uninstall by moving the app to the Trash. |
 | **Linux** | `tar xzf SUYA-<version>-linux-x86_64.tar.gz && cd SUYA-<version>-linux-x86_64 && ./install.sh`. Installs to `~/.local/opt/suya`, links `~/.local/bin/suya`, adds a menu entry. Uninstall: delete those three things. |
 
-**Updating**: SUYA checks GitHub for a new release 15 seconds after it starts and once a day. By default it asks before downloading;
-*Settings ▸ Updates* can turn the check off or make it fully automatic (download, verify the SHA-256, install, restart). Installing a
+**Updating**: SUYA checks GitHub for a new release 15 seconds after it starts and once a day. Since 0.1.5 the default is fully
+automatic: the installer for your system is downloaded, verified against the release's `SHA256SUMS.txt`, installed, and SUYA
+restarts, with a 20-second prompt that lets you postpone. *Settings ▸ Updates* switches to *ask first* or *off* (a choice saved
+there is kept across updates). Installing a
 new version by hand over the old one also works. Your database, settings and workbooks live in your user folders (section 7) and are untouched.
 
 ### 2-2. First-run warnings
@@ -338,7 +340,7 @@ Use `File > Settings`, or set these as **environment variables**, in a **`.env`*
 | `MONITOR_EXCEL_DIR` | `Documents/SUYA` | Excel folder |
 | `MONITOR_INTERVAL_<SOURCE_ID>` | see section 5 | Seconds, minimum 30, e.g. `MONITOR_INTERVAL_HYCOM_GRID=7200` |
 | `MONITOR_OPENMETEO_DAILY_BUDGET` | `9000` | Daily Open-Meteo call cap (the free limit is 10,000) |
-| `MONITOR_UPDATE_MODE` | `notify` | `off` (never check), `notify` (check daily, ask before installing), `auto` (download, install and restart; a 20-second prompt lets you postpone) |
+| `MONITOR_UPDATE_MODE` | `auto` | `auto` (default since 0.1.5: check daily; a newer release is downloaded, verified against `SHA256SUMS.txt`, installed and the program restarts - a 20-second prompt lets you postpone), `notify` (check daily, ask before installing), `off` (never check). A choice saved in Settings is kept |
 
 `settings.env` is written with owner-only permissions because it may contain the Windy key.
 

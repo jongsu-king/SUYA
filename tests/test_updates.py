@@ -134,9 +134,11 @@ def test_cleanup_removes_leftovers(tmp_path):
 
 def test_update_mode_setting(tmp_path, monkeypatch):
     monkeypatch.delenv("MONITOR_UPDATE_MODE", raising=False)
-    assert load_settings(env_file=tmp_path / "none", user_dir=tmp_path).update_mode == "notify"
+    assert load_settings(env_file=tmp_path / "none", user_dir=tmp_path).update_mode == "auto"
     monkeypatch.setenv("MONITOR_UPDATE_MODE", "AUTO")
     assert load_settings(env_file=tmp_path / "none", user_dir=tmp_path).update_mode == "auto"
     monkeypatch.setenv("MONITOR_UPDATE_MODE", "sometimes")
+    assert load_settings(env_file=tmp_path / "none", user_dir=tmp_path).update_mode == "auto"
+    monkeypatch.setenv("MONITOR_UPDATE_MODE", "notify")
     assert load_settings(env_file=tmp_path / "none", user_dir=tmp_path).update_mode == "notify"
     assert json.dumps(updates.MODES)

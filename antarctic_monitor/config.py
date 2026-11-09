@@ -93,7 +93,7 @@ class Settings:
     windy_models: tuple[str, ...] = ("gfs",)
     openmeteo_daily_budget: int = 9000
     intervals: dict[str, int] = field(default_factory=lambda: dict(DEFAULT_INTERVALS))
-    update_mode: str = "notify"
+    update_mode: str = "auto"
 
     @property
     def windy_configured(self) -> bool:
@@ -120,9 +120,9 @@ def load_settings(env_file: Path | None = None, user_dir: Path | None = None) ->
 
     db_path = get("MONITOR_DB_PATH")
     excel_dir = get("MONITOR_EXCEL_DIR")
-    update_mode = get("MONITOR_UPDATE_MODE", "notify").lower()
+    update_mode = get("MONITOR_UPDATE_MODE", "auto").lower()
     if update_mode not in ("off", "notify", "auto"):
-        update_mode = "notify"
+        update_mode = "auto"
     return Settings(
         db_path=Path(db_path) if db_path else app_data_dir() / "antarctic.db",
         excel_dir=Path(excel_dir) if excel_dir else default_excel_dir(),

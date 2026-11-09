@@ -156,7 +156,7 @@ def _self_test(args: argparse.Namespace) -> None:
 
     lines = []
     with tempfile.TemporaryDirectory() as temp:
-        settings = Settings(db_path=Path(temp) / "test.db", excel_dir=Path(temp) / "excel")
+        settings = Settings(db_path=Path(temp) / "test.db", excel_dir=Path(temp) / "excel", update_mode="off")
         if gui_available():
             from PySide6.QtWidgets import QApplication
 
