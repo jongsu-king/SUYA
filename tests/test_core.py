@@ -20,7 +20,7 @@ from antarctic_monitor.engine import Engine, EventBus, failure_message, job_time
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
 from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited
-from antarctic_monitor.i18n import msg, render
+from antarctic_monitor.i18n import msg, render, set_language
 
 
 def test_parse_nullschool_link_from_request():
@@ -204,6 +204,27 @@ def test_budget_reserve_protects_priority_jobs(store):
     with pytest.raises(BudgetExceeded):
         consume_budget(ctx, 71, reserve=0.3)
     consume_budget(ctx, 70, reserve=0.3)
+
+
+def test_budget_message_shows_the_cap_and_the_calls_needed(store):
+    ctx = _ctx(store, openmeteo_daily_budget=9000)
+    consume_budget(ctx, 5998)
+    with pytest.raises(BudgetExceeded) as caught:
+        consume_budget(ctx, 613, reserve=0.3)
+    text = render(str(caught.value))
+    assert "소진" not in text
+    assert "5998/6300" in text and "613" in text and "9000" in text and "30%" in text
+    set_language("en")
+    try:
+        text = render(str(caught.value))
+    finally:
+        set_language("ko")
+    assert "5998/6300" in text and "613 calls" in text and "30%" in text
+    with pytest.raises(BudgetExceeded) as caught:
+        consume_budget(ctx, 3003)
+    text = render(str(caught.value))
+    assert "소진" not in text
+    assert "5998/9000" in text and "3003" in text
 
 
 def _offline(request):

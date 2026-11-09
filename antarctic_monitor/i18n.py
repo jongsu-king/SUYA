@@ -39,7 +39,10 @@ EN: dict[str, str] = {
     "최근 30일 이 해역의 선박 관측 없음": "No ship observations here in the last 30 days",
     "선박 {n}척": "{n} ships",
     "기후값 격자상 육지입니다": "Land in the climatology grid",
-    "Open-Meteo 오늘 호출 예산 소진 ({used}/{limit})": "Open-Meteo daily budget used up ({used}/{limit})",
+    "Open-Meteo 오늘 호출 예산 부족 ({used}/{limit} 사용, {calls}호출 필요)":
+        "Open-Meteo daily budget short ({used}/{limit} used, {calls} calls needed)",
+    "Open-Meteo 오늘 호출 예산 부족 ({used}/{cap} 사용, {calls}호출 필요, 전체 {limit} 중 {percent}%는 다른 수집용 예비)":
+        "Open-Meteo daily budget short ({used}/{cap} used, {calls} calls needed; {percent}% of {limit} is kept for other sources)",
     "지점 {n}곳": "{n} points",
     "모델 {n}종": "{n} models",
     "육지 격자 제외 {n}곳": "{n} land cells skipped",

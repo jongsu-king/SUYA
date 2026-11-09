@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- The Open-Meteo budget message no longer reads "used up (5998/9000)" when the GFS map is held back by
+  its 30 % reserve. It now names the calls needed and the share the map may use, for example
+  "short (5998/6300 used, 613 calls needed; 30% of 9000 is kept for other sources)".
+
 ## [0.1.4] - 2026-11-08
 
 Fixes to stored values: garbled METAR reports kept out of the temperature series, METAR pressure

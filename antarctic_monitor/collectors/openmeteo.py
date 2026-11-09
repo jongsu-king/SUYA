@@ -55,7 +55,14 @@ def consume_budget(ctx: Context, calls: int, reserve: float = 0.0) -> None:
     used = int(ctx.store.kv_get(key) or 0)
     limit = ctx.settings.openmeteo_daily_budget
     if used + calls > limit * (1.0 - reserve):
-        raise BudgetExceeded(msg("Open-Meteo 오늘 호출 예산 소진 ({used}/{limit})", used=used, limit=limit))
+        if reserve:
+            raise BudgetExceeded(
+                msg(
+                    "Open-Meteo 오늘 호출 예산 부족 ({used}/{cap} 사용, {calls}호출 필요, 전체 {limit} 중 {percent}%는 다른 수집용 예비)",
+                    used=used, cap=round(limit * (1.0 - reserve)), calls=calls, limit=limit, percent=round(reserve * 100),
+                )
+            )
+        raise BudgetExceeded(msg("Open-Meteo 오늘 호출 예산 부족 ({used}/{limit} 사용, {calls}호출 필요)", used=used, limit=limit, calls=calls))
     ctx.store.kv_set(key, str(used + calls))
 
 
