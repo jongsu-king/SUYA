@@ -331,7 +331,7 @@ async def profile(ctx: Context, lat: float, lon: float) -> dict:
             )
             if fetched:
                 levels = fetched[0]
-                await asyncio.to_thread(ctx.store.save_argo_levels, near["platform"], near["cycle"], levels)
+                await asyncio.to_thread(argo_collector.store_levels, ctx.store, near, levels)
         if levels:
             argo_series = {
                 "platform": near["platform"], "cycle": near["cycle"], "time": near["obs_time"],

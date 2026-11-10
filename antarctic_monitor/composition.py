@@ -15,10 +15,16 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
+from . import seawater
+
 METHOD = "millero2008-rc/1"
 REFERENCE_SALINITY_AT_35 = 35.16504
 REFERENCE_SALINITY_FACTOR = REFERENCE_SALINITY_AT_35 / 35.0
 CHLORINITY_FACTOR = 1.80655
+VOLUME_TEMPERATURE_C = (-3.0, 40.0)
+VOLUME_SALINITY_MAX = 42.0
+"""부피 기준 환산에 쓰는 1기압 밀도 식(Millero & Poisson 1981)의 범위. 식은 -2…40 °C, 염분 0…42 에서 맞춘 것이고
+과냉각된 물만 조금 더 받습니다."""
 
 
 @dataclass(frozen=True)
@@ -120,12 +126,43 @@ def ionic_strength(salinity: float | None) -> float | None:
     return per_kg_seawater / water_fraction
 
 
-def derive(salinity: float | None) -> dict | None:
-    """화면과 내보내기에 쓰는 환산 결과 한 묶음. 환산할 수 없는 염분이면 None 입니다."""
+def volume_basis(
+    salinity: float | None, temperature_c: float | None, components: tuple[Component, ...] = MAJOR
+) -> dict | None:
+    """부피 기준 환산: 1기압 밀도(kg/m³)와 성분별 mmol/L. 수온이 없거나 밀도 식의 범위 밖이면 None 입니다.
+
+    mmol/L = mmol/kg × 밀도 / 1000 입니다. 밀도는 그 수온과 염분에서 대기압일 때의 값이라 현장 압력은 들어가지
+    않습니다. 깊은 물의 실제 밀도는 이보다 큽니다(1000 m 에서 0.4 % 남짓).
+    """
+    if not usable(salinity) or temperature_c is None or isinstance(temperature_c, bool):
+        return None
+    try:
+        value, temperature = float(salinity), float(temperature_c)
+    except (TypeError, ValueError):
+        return None
+    low, high = VOLUME_TEMPERATURE_C
+    if not math.isfinite(temperature) or not low <= temperature <= high or value > VOLUME_SALINITY_MAX:
+        return None
+    density = seawater.density_surface(value, temperature)
+    return {
+        "temperature_c": temperature,
+        "density_kg_m3": density,
+        "mmol_per_l": {
+            component.key: seawater.molar_per_litre(value * component.mmol_per_salinity, density)
+            for component in components
+        },
+    }
+
+
+def derive(salinity: float | None, temperature_c: float | None = None) -> dict | None:
+    """화면과 내보내기에 쓰는 환산 결과 한 묶음. 환산할 수 없는 염분이면 None 입니다.
+
+    수온을 함께 주고 그 값으로 밀도를 낼 수 있으면 1기압 밀도와 성분별 mmol/L 을 더합니다.
+    """
     if not usable(salinity):
         return None
     value = float(salinity)
-    return {
+    result = {
         "practical_salinity": value,
         "reference_salinity": reference_salinity(value),
         "chlorinity": chlorinity(value),
@@ -144,3 +181,10 @@ def derive(salinity: float | None) -> dict | None:
             for component in COMPONENTS
         ],
     }
+    volume = volume_basis(value, temperature_c, COMPONENTS)
+    if volume is not None:
+        result["temperature_c"] = volume["temperature_c"]
+        result["density_kg_m3"] = volume["density_kg_m3"]
+        for ion in result["ions"]:
+            ion["mmol_per_l"] = volume["mmol_per_l"][ion["key"]]
+    return result

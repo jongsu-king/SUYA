@@ -35,7 +35,7 @@ Why regenerate rather than append: an xlsx file is zipped XML, so appending one 
 ## Sheets in `antarctic_db_YYYY-MM.xlsx`
 
 ### Info
-Period, creation time (UTC), time-basis note, warning, ion-conversion note, rows per sheet.
+Period, creation time (UTC), time-basis note, warning, notes on the ion conversion, the range check and the volume basis, rows per sheet.
 
 ### Monthly summary — one month's statistics per point, source and item
 Only surface and 2 m values count. Forecasts for days ahead (`kind = forecast`), deep levels and points clicked on the map are left out.
@@ -82,7 +82,7 @@ Ten areas × time × depth; temperature and salinity share a row (blank when one
 | Lat, Lon | |
 | Mode | R real-time, A real-time adjusted, D delayed mode |
 | Position QC | 1 good, 8 estimated (under ice), … |
-| SST °C, SSS PSU | Shallowest valid level, QC 1 and 2 only |
+| SST °C, SSS PSU | Shallowest valid level (QC 1 and 2) within 100 dbar of the stored levels; the listed value until the levels arrive |
 | Max depth m, Levels | Filled once the levels have been fetched |
 
 ### Ships — GOSUD
@@ -116,10 +116,25 @@ These are **not direct ion measurements**; each salinity is multiplied by the ra
 | Reference salinity g/kg | S_R = (35.16504 / 35) × S_P |
 | Cl⁻ … Br⁻ g/kg | The eight major ions (Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻) per kg of seawater |
 | Cl⁻ … Br⁻ mmol/kg | The same eight as amounts of substance |
+| Temp °C | Temperature of the same source, position, level and time; blank without one |
+| Density at 1 atm kg/m³ | Density at 1 atm for that temperature and salinity (Millero & Poisson 1981); in-situ pressure not included; blank without a temperature |
+| Cl⁻ … Br⁻ mmol/L | mmol/kg × density / 1000; blank without a temperature |
+| Range check | `low` or `high` where the salinity is outside the Southern Ocean range for its depth; blank inside the range. A label only: the value is kept |
 
 ### Ion factors — the Reference Composition used
 Fifteen components with symbol, charge, molar mass, mass share %, g/kg and mmol/kg per unit of salinity, and g/kg and mmol/kg at salinity 35.
 The eight rows with a `DB column` are the ones stored in the database and in Excel. Multiplying these factors by any salinity reproduces every value.
+
+### Salinity ranges — the salinity range by depth used for the range check
+The Southern Ocean table of Boyer & Levitus (1994, NOAA Technical Report NESDIS 81), one row for each of the 33 standard depths.
+
+| Column | Meaning |
+|---|---|
+| Standard depth m | 0 to 5500 m |
+| Deeper than m, Down to m | The depth window this row's range applies to; the outer side of the first and the last row is blank |
+| Salinity minimum, Salinity maximum | Below the minimum is `low`, above the maximum `high` |
+
+The ranges are broad and catch gross errors only. Rule and limits: [Data sources, section 11](data-sources.en.md#11-ion-composition-derived-from-salinity).
 
 ## `argo_levels_YYYY-MM.xlsx`
 
@@ -131,9 +146,10 @@ The eight rows with a `DB column` are the ones stored in the database and in Exc
 | Depth m | Converted with Saunders & Fofonoff (1976) |
 | Temp °C, Salinity PSU | QC 1 and 2 only; blank otherwise |
 | Reference salinity g/kg, Cl⁻ … Br⁻ g/kg | Reference salinity and the eight major ions derived from that level's salinity; blank where the level has no salinity |
+| Range check | `low` or `high` where that level's salinity is outside the Southern Ocean range for its depth; blank inside the range |
 
 The nine ion columns make this file about 1.9 times larger and about 1.8 times slower to write than before
-(measured 2026-11-10: a month of 433,396 rows went from 17.8 MB in 10.2 s to 33.7 MB in 17.8 s). It is written by the child process, so the window does not block.
+(measured 2026-11-10: a month of 433,396 rows went from 17.8 MB in 10.2 s to 33.7 MB in 17.8 s). The range-check column adds almost nothing (measured 2026-11-11: a month of 434,000 rows went from 33,724,118 to 33,728,674 bytes). It is written by the child process, so the window does not block.
 
 ## Reading the data directly from Python or R
 
@@ -156,7 +172,7 @@ library(DBI); con <- dbConnect(RSQLite::SQLite(), "~/Library/Application Support
 dbGetQuery(con, "SELECT * FROM measurements WHERE variable='sea_water_temperature' LIMIT 10")
 ```
 
-Derived ion amounts are read from one table and two views: `seawater_ions` (g/kg, one row per salinity row), `seawater_ions_mmol` (mmol/kg) and `argo_level_ions` (per Argo level, g/kg).
+Derived ion amounts are read from one table and two views: `seawater_ions` (g/kg, one row per salinity row), `seawater_ions_mmol` (mmol/kg) and `argo_level_ions` (per Argo level, g/kg). The range-check verdict is the column `salinity_check` (`ok`, `low`, `high`) of `seawater_ions` and `argo_level_ions`. Density and mmol/L are not in the database; the workbook and `suya export ions` compute them.
 For CSV use `suya export ions --out ions.csv` and `suya export argo-ions --out argo_ions.csv`.
 
 `grids.payload` is gzip-compressed JSON (`{"lats":[…],"lons":[…],"values":[…]}`); `antarctic_monitor.db.Store.load_grid("oisst_sst")` decodes it.

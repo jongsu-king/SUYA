@@ -64,6 +64,31 @@ def mixed_layer_depth(levels: list[dict], reference_m: float = 10.0, delta_c: fl
     return None
 
 
+SURFACE_MAX_DBAR = 100.0
+
+
+def surface_values(levels: list[dict], max_dbar: float = SURFACE_MAX_DBAR) -> dict:
+    """프로파일의 표층 대표값: 압력 max_dbar 이내에서 그 값이 있는 가장 얕은 층.
+
+    수온과 염분을 따로 고르므로 두 값의 수심이 다를 수 있습니다. 그 범위에 값이 없으면 None.
+    """
+    output = {"temp": None, "temp_depth_m": None, "salt": None, "salt_depth_m": None}
+    rows = [lv for lv in levels if lv.get("pressure_dbar", lv.get("depth_m")) is not None]
+    for level in sorted(rows, key=lambda lv: lv.get("pressure_dbar", lv.get("depth_m"))):
+        if level.get("pressure_dbar", level.get("depth_m")) > max_dbar:
+            break
+        for key in ("temp", "salt"):
+            if output[key] is None and level.get(key) is not None:
+                output[key] = level[key]
+                output[f"{key}_depth_m"] = level.get("depth_m")
+    return output
+
+
+def molar_per_litre(mmol_per_kg: float, density_kg_m3: float) -> float:
+    """질량 기준 농도(mmol/kg)를 부피 기준(mmol/L)으로 바꿉니다. 밀도는 그 수온·염분의 값을 넣습니다."""
+    return mmol_per_kg * density_kg_m3 / 1000.0
+
+
 def derive(temperature_c: float | None, salinity: float | None, pressure_dbar: float = 0.0) -> dict:
     """수온·염분이 모두 있을 때 파생값을 만듭니다. 없으면 None."""
     if salinity is None or salinity <= 0:

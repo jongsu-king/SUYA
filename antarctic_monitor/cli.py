@@ -13,7 +13,7 @@ import signal
 import sys
 from pathlib import Path
 
-from . import __version__, composition, exporter
+from . import __version__, composition, exporter, ranges
 from .catalog import SOURCES
 from .collectors import JOBS
 from .collectors.base import Context
@@ -120,11 +120,36 @@ def _export(args: argparse.Namespace) -> None:
     print(f"{out}: {count} rows")
 
 
+RANGE_VERDICTS = {ranges.OK: "범위 안", ranges.LOW: "낮음", ranges.HIGH: "높음"}
+
+
 def _ions(args: argparse.Namespace) -> None:
-    """Convert one practical salinity to ion amounts with the Reference Composition. Needs no database."""
-    result = composition.derive(args.salinity)
+    """Convert one practical salinity to ion amounts with the Reference Composition. Needs no database.
+
+    A temperature adds the density at 1 atm and mmol/L. A depth adds the salinity range check for that depth.
+    """
+    temperature = getattr(args, "temperature", None)
+    depth = getattr(args, "depth", None)
+    result = composition.derive(args.salinity, temperature)
     if result is None:
         raise SystemExit(tr("염분은 0보다 큰 수여야 합니다"))
+    volume = "density_kg_m3" in result
+    if temperature is not None and not volume:
+        low, high = composition.VOLUME_TEMPERATURE_C
+        raise SystemExit(
+            tr(
+                "밀도는 수온 {low}~{high} °C, 염분 {limit} 이하에서만 계산합니다",
+                low=f"{low:g}", high=f"{high:g}", limit=f"{composition.VOLUME_SALINITY_MAX:g}",
+            )
+        )
+    if depth is not None:
+        if depth < 0:
+            raise SystemExit(tr("수심은 0 이상이어야 합니다"))
+        low, high = ranges.salinity_range(depth)
+        result["salinity_check"] = {
+            "depth_m": depth, "low": low, "high": high,
+            "verdict": ranges.check_salinity(result["practical_salinity"], depth), "source": ranges.SOURCE,
+        }
     if sys.stdout and hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
     if args.json:
@@ -135,18 +160,31 @@ def _ions(args: argparse.Namespace) -> None:
         f"{tr('기준 염분 S_R')}: {result['reference_salinity']:.4f} g/kg",
         f"{tr('염소량')}: {result['chlorinity']:.4f} g/kg",
         f"{tr('이온 세기')}: {result['ionic_strength']:.4f} mol/kg",
-        "",
-        f"{'':<9}{'g/kg':>10}{'mmol/kg':>11}{'%':>9}",
     ]
+    if volume:
+        lines.append(f"{tr('1기압 밀도')} ({result['temperature_c']:g} °C): {result['density_kg_m3']:.3f} kg/m³")
+    if depth is not None:
+        check = result["salinity_check"]
+        verdict = tr(RANGE_VERDICTS[check["verdict"]])
+        span = tr("{low}~{high} PSU", low=f"{check['low']:g}", high=f"{check['high']:g}")
+        lines.append(f"{tr('범위 검사')} ({depth:g} m): {span}, {verdict}")
+    litre = f"{'mmol/L':>11}" if volume else ""
+    lines += ["", f"{'':<9}{'g/kg':>10}{'mmol/kg':>11}{litre}{'%':>9}"]
     for ion in result["ions"]:
+        litre = f"{ion['mmol_per_l']:>11.4f}" if volume else ""
         lines.append(
-            f"{ion['symbol']:<9}{ion['g_per_kg']:>10.5f}{ion['mmol_per_kg']:>11.4f}{ion['mass_percent']:>9.4f}  {tr(ion['name'])}"
+            f"{ion['symbol']:<9}{ion['g_per_kg']:>10.5f}{ion['mmol_per_kg']:>11.4f}{litre}{ion['mass_percent']:>9.4f}"
+            f"  {tr(ion['name'])}"
         )
     total = sum(ion["g_per_kg"] for ion in result["ions"])
     share = sum(ion["mass_percent"] for ion in result["ions"])
-    lines.append(f"{'Σ':<9}{total:>10.5f}{'':>11}{share:>9.4f}  {tr('합계')}")
+    lines.append(f"{'Σ':<9}{total:>10.5f}{'':>{22 if volume else 11}}{share:>9.4f}  {tr('합계')}")
     lines.append("")
     lines.append(tr("염분에 기준 조성(Millero 외 2008)을 곱한 환산값입니다. 이온을 직접 잰 값이 아닙니다."))
+    if volume:
+        lines.append(tr("mmol/L 은 그 수온과 염분의 1기압 밀도로 바꾼 값입니다. 현장 압력은 넣지 않았습니다."))
+    if depth is not None:
+        lines.append(tr("범위는 남극해 수심별 염분 범위(Boyer & Levitus 1994)이고, 넓게 잡혀 있어 큰 오류만 가려냅니다."))
     print("\n".join(lines))
 
 
@@ -308,6 +346,8 @@ def main(argv: list[str] | None = None) -> None:
 
     ions = sub.add_parser("ions", help="convert a practical salinity to seawater ion amounts (derived, not measured)")
     ions.add_argument("salinity", type=float, help="practical salinity, e.g. 34.5")
+    ions.add_argument("--temperature", type=float, help="water temperature in °C: adds density at 1 atm and mmol/L")
+    ions.add_argument("--depth", type=float, help="depth in m: adds the Southern Ocean salinity range check")
     ions.add_argument("--json", action="store_true", help="print the result as JSON")
 
     sync = sub.add_parser("excel-sync", help="write the monthly Excel workbooks now")

@@ -255,6 +255,8 @@ python -m antarctic_monitor
 |---|---|
 | **Argo QC 플래그 1·2만** 사용. 보정 모드(A·D)면 `*_adjusted`, 실시간(R)이면 원시값 | 플로트 1902223이 염분 0.014(플래그 4)를 그대로 보냄 |
 | Argo 상승 관측(direction A)이 있으면 그것만 사용 | 하강 관측은 센서 지연 때문에 품질이 낮음 |
+| Argo 표층 값은 저장된 층별 값 가운데 100 dbar 안에서 가장 얕은 유효 층. 수온과 염분을 따로 고름 | 목록의 첫 행이 가장 얕은 유효 층이 아닐 때가 있음. 플로트 6903128 cycle 178은 27.581로 적혔는데 층별 값은 5.5 m에서 33.995 |
+| 그 수심의 남극해 범위(Boyer & Levitus 1994)를 벗어난 염분은 **지우지 않고 표시만** | 범위가 넓어 큰 오류만 걸림. 플로트 7901081은 345~511 m에서 35.8~40.7을 보냄 |
 | 위성 염분 **28~37 PSU** 밖 제거 | SMAP 응답에 0.00과 42.83이 실제로 있었음 |
 | 수온 −3~40 °C, 모델·Argo 염분 20~42 PSU 밖 제거 | 물리적으로 불가능한 값 |
 | Open-Meteo Marine에서 격자 고도 > 0이면 수온 버림 | 육지 격자에서도 −1.8 °C 같은 값이 내려옴 |
@@ -270,7 +272,9 @@ python -m antarctic_monitor
 이온 조성: 저장되는 모든 염분은 주요 이온 여덟 가지(Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻)로도 환산됩니다. Millero, Feistel, Wright, McDougall(2008)의 기준 조성을 써서
 기준 염분 S_R = (35.16504 / 35) × S_P 에 이온별 질량 분율을 곱합니다. 염분 35라면 염화 이온 19.3527 g/kg, 나트륨 이온 10.7815 g/kg입니다.
 **이온을 직접 잰 값이 아니라 환산값**입니다. 실제 바닷물은 기준 조성과 조금 다르고, 해빙 주변의 브라인이나 강물이 섞이는 곳의 비율 변화는 반영하지 않습니다.
-식·계수·한계: [docs/data-sources.md 11절](docs/data-sources.md#11-염분에서-환산하는-이온-조성).
+염분마다 그 수심의 남극해 범위(Boyer & Levitus 1994, NOAA Technical Report NESDIS 81)와 견주어 `ok`·`low`·`high`로 표시합니다. 값은 지우지 않고, 범위가 넓어 큰 오류만 걸립니다.
+같은 행에 짝이 되는 수온이 있으면 엑셀과 CSV에 1기압 밀도와 mmol/L도 넣습니다(현장 압력은 넣지 않음).
+식·계수·범위·한계: [docs/data-sources.md 11절](docs/data-sources.md#11-염분에서-환산하는-이온-조성).
 
 ## 7. 저장: SQLite와 엑셀 데이터베이스
 
@@ -291,8 +295,8 @@ python -m antarctic_monitor
 | `measurements` | 모든 지점값: `source`, `dataset`, `variable`, `kind`(observation / satellite / analysis / model / forecast / climatology), `lat`, `lon`, `level`, `depth_m`, `pressure_hpa`, `obs_time`, `value`, `unit`, `location_id`, `quality`, `fetched_at` | source, dataset, variable, lat, lon, level, obs_time |
 | `grids` | 지도 레이어 스냅샷(gzip JSON: `lats`, `lons`, `values`)과 미리 계산한 통계(평균·최소·최대·유효 비율·백분위·해역 평균) | layer, valid_time |
 | `argo_profiles` | 프로파일 목록(위치·모드·QC·표층 수온·염분)과 층별 값 JSON | platform, cycle |
-| `seawater_ions` | 염분 행마다 실용 염분, 기준 염분, 기준 조성으로 환산한 주요 이온 여덟 가지 g/kg. 트리거가 `measurements`와 함께 넣고 고치고 지우며, 올리기 전에 쌓인 염분은 한 번 채움 | source, dataset, lat, lon, level, obs_time |
-| `seawater_ions_mmol`, `argo_level_ions` (뷰) | 같은 행의 mmol/kg, 그리고 Argo 모든 층의 환산 이온. 읽을 때 계산하므로 층별 값을 두 번 저장하지 않음 | |
+| `seawater_ions` | 염분 행마다 실용 염분, 기준 염분, 기준 조성으로 환산한 주요 이온 여덟 가지 g/kg, 염분 범위 검사 결과 `salinity_check`(`ok`·`low`·`high`). 트리거가 `measurements`와 함께 넣고 고치고 지우며, 올리기 전에 쌓인 염분은 한 번 채움 | source, dataset, lat, lon, level, obs_time |
+| `seawater_ions_mmol`, `argo_level_ions` (뷰) | 같은 행의 mmol/kg, 그리고 Argo 모든 층의 환산 이온과 범위 검사. 읽을 때 계산하므로 층별 값을 두 번 저장하지 않음 | |
 | `runs`, `source_state` | 모든 수집 기록, 소스별 마지막 상태·자료 시각·다음 실행·연속 오류 수 | |
 | `kv` | 원천 갱신 토큰, 일일 호출 예산, 엑셀 생성 기준 | |
 
@@ -315,9 +319,10 @@ SUYA가 돌아가는 중에도 파이썬, R, [DB Browser for SQLite](https://sql
 | 모델예보 | 24개 지점 × 예보 시각 × 5개 모델 |
 | Windy | Windy API 값(키 있을 때) |
 | 지점조회 | 지도에서 클릭한 임의 지점의 조회 결과 |
-| 이온조성 | 그 달 염분 행마다 기준 염분과 주요 이온 여덟 가지의 g/kg·mmol/kg (환산값, 측정값 아님) |
+| 이온조성 | 그 달 염분 행마다 기준 염분과 주요 이온 여덟 가지의 g/kg·mmol/kg (환산값, 측정값 아님). 짝이 되는 수온이 있으면 1기압 밀도와 mmol/L. 범위를 벗어난 염분은 범위 검사 열에 표시 |
 | 이온환산계수 | 환산에 쓴 기준 조성: 성분 열다섯 가지의 전하, 몰질량, 질량 비율, 염분 1당 계수 |
-| *(두 번째 파일)* Argo층별 | Argo 전 층: 압력, 수심, 수온, 염분, 기준 염분, 환산한 주요 이온 여덟 가지 g/kg |
+| 염분범위 | 범위 검사에 쓴 남극해 수심별 염분 범위(Boyer & Levitus 1994): 표준 수심 33개와 각 범위를 적용하는 수심 구간 |
+| *(두 번째 파일)* Argo층별 | Argo 전 층: 압력, 수심, 수온, 염분, 기준 염분, 환산한 주요 이온 여덟 가지 g/kg, 범위 검사 |
 
 엑셀 파일은 **SQLite에서 다시 생성**되며, 임시 파일에 다 쓴 뒤 교체하므로 깨진 파일이 남지 않습니다. 이번 달·지난달과 아직 파일이 없는 달만 다시 쓰고
 그 전 달은 고정됩니다. 1,048,576행을 넘으면 `_2`, `_3` 시트로 이어 씁니다. 열 단위 설명: [docs/excel-database.md](docs/excel-database.md).
@@ -357,9 +362,10 @@ suya excel-sync                   # 엑셀 파일 지금 쓰기. --all: 모든 �
 suya export measurements --out all.csv [--source argo] [--variable sea_water_salinity] [--since 2026-11-01T00:00:00Z]
 suya export argo --out argo.csv
 suya export grid --layer hycom_salt_500 --out salt500.csv
-suya export ions --out ions.csv [--source hycom] [--since 2026-11-01T00:00:00Z]   # 환산 이온, g/kg와 mmol/kg
+suya export ions --out ions.csv [--source hycom] [--since 2026-11-01T00:00:00Z]   # 환산 이온: g/kg, mmol/kg, mmol/L, 범위 검사
 suya export argo-ions --out argo_ions.csv [--since 2026-11-01T00:00:00Z]          # Argo 모든 층의 환산 이온
 suya ions 34.5                    # 염분 하나를 이온 조성으로 환산. --json: 기계가 읽는 출력
+suya ions 34.5 --temperature -1.2 --depth 100   # 1기압 밀도, mmol/L, 염분 범위 검사까지
 suya sources                      # 소스 목록
 suya self-test                    # 설치 점검: 창을 화면 밖에 띄워 보고 엑셀을 써 봄
 suya --version
@@ -489,6 +495,7 @@ antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
 ├── gridutil.py           격자 표본 추출, 면적 가중 통계, 해역 집계
 ├── seawater.py           EOS-80 어는점·밀도·압력→수심
 ├── composition.py        염분에서 환산하는 이온 조성 (기준 조성, Millero 외 2008)
+├── ranges.py             범위 검사에 쓰는 남극해 수심별 염분 범위 (Boyer & Levitus 1994)
 ├── geo.py                좌표 해석(nullschool·Windy 주소), 거리 계산
 ├── i18n.py               한국어·영어 문자열, 언어 중립 저장 메시지
 ├── help_text.py          내장 사용 설명서(두 언어)

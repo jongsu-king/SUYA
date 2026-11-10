@@ -390,6 +390,7 @@ EN: dict[str, str] = {
     "HYCOM 응답 대기 중 (최대 약 2분)…": "Waiting for HYCOM (up to about 2 min)…",
     "응답 시간 초과 ({seconds}초)": "no answer within {seconds} s",
     "층별 값 없음 {n}개": "{n} without level data",
+    "표층 값 {n}개를 층별 값으로 바로잡음": "{n} surface values corrected from level data",
     "지도": "Map",
     "해역 통계": "Area statistics",
     "기지 관측": "Station observations",
@@ -482,6 +483,34 @@ EN: dict[str, str] = {
     "플루오린화 이온": "Fluoride",
     "수산화 이온": "Hydroxide",
     "이산화 탄소": "Carbon dioxide",
+    "1기압 밀도": "Density at 1 atm",
+    "1기압 밀도 kg/m³": "Density at 1 atm kg/m³",
+    "범위 검사": "Range check",
+    "범위 안": "within range",
+    "낮음": "low",
+    "높음": "high",
+    "{low}~{high} PSU": "{low} to {high} PSU",
+    "부피 기준": "Volume basis",
+    "염분범위": "Salinity ranges",
+    "표준 수심 m": "Standard depth m",
+    "적용 수심 초과 m": "Deeper than m",
+    "적용 수심 이하 m": "Down to m",
+    "염분 하한": "Salinity minimum",
+    "염분 상한": "Salinity maximum",
+    "범위 검사 열은 염분이 남극해 수심별 범위(Boyer & Levitus 1994, NOAA NESDIS 81)를 벗어난 행에만 낮음·높음을 적음. "
+    "범위가 넓어 큰 오류만 걸리며 값은 지우거나 고치지 않음": "The range check column says low or high only on rows whose salinity "
+    "is outside the Southern Ocean range for that depth (Boyer & Levitus 1994, NOAA NESDIS 81). The ranges are broad, "
+    "so only gross errors are caught, and no value is removed or changed",
+    "mmol/L 과 밀도는 같은 자료·위치·층·시각의 수온이 있는 행만 계산. 밀도는 그 수온과 염분의 1기압 값이고 현장 압력은 넣지 않음": "mmol/L "
+    "and density are filled only on rows that have a temperature for the same source, place, level and time. The density "
+    "is the 1 atm value for that temperature and salinity; in-situ pressure is not included",
+    "밀도는 수온 {low}~{high} °C, 염분 {limit} 이하에서만 계산합니다": "Density is computed only for temperatures of {low} to {high} °C "
+    "and salinity up to {limit}",
+    "수심은 0 이상이어야 합니다": "Depth must be 0 or more",
+    "mmol/L 은 그 수온과 염분의 1기압 밀도로 바꾼 값입니다. 현장 압력은 넣지 않았습니다.": "mmol/L uses the density at 1 atm for that "
+    "temperature and salinity. In-situ pressure is not included.",
+    "범위는 남극해 수심별 염분 범위(Boyer & Levitus 1994)이고, 넓게 잡혀 있어 큰 오류만 가려냅니다.": "The range is the Southern Ocean "
+    "salinity range by depth (Boyer & Levitus 1994). It is broad and catches gross errors only.",
 }
 
 

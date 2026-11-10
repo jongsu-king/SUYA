@@ -36,7 +36,7 @@ SQLite가 원본이고 엑셀은 그것을 보기 좋게 펼친 사본이라고 
 ## `antarctic_db_YYYY-MM.xlsx` 시트
 
 ### 정보
-기간, 생성 시각(UTC), 시각 기준 안내, 주의 문구, 이온 환산 안내, 시트별 행 수.
+기간, 생성 시각(UTC), 시각 기준 안내, 주의 문구, 이온 환산·범위 검사·부피 기준 안내, 시트별 행 수.
 
 ### 월간요약 — 지점·자료·항목별 한 달 통계
 표층과 2 m 값만 셉니다. 앞날 예보(`kind = forecast`), 깊은 층, 지도에서 클릭한 임의 지점은 뺍니다.
@@ -83,7 +83,7 @@ SQLite가 원본이고 엑셀은 그것을 보기 좋게 펼친 사본이라고 
 | 위도, 경도 | |
 | 모드 | R 실시간, A 실시간 보정, D 지연 보정 |
 | 위치 QC | 1 양호, 8 추정(해빙 아래) 등 |
-| 표층 수온 °C, 표층 염분 PSU | 가장 얕은 유효 층. QC 1·2만 |
+| 표층 수온 °C, 표층 염분 PSU | 받아 둔 층별 값 가운데 100 dbar 안에서 가장 얕은 유효 층(QC 1·2). 층별 값을 받기 전에는 목록의 임시값 |
 | 최대 수심 m, 층 수 | 층별 값을 받은 뒤 채워짐 |
 
 ### 선박관측 — GOSUD
@@ -117,10 +117,25 @@ SQLite `seawater_ions` 표의 그 달 행을 그대로 옮깁니다. 해역 표�
 | 기준 염분 g/kg | S_R = (35.16504 / 35) × S_P |
 | Cl⁻ … Br⁻ g/kg | 주요 이온 여덟 가지(Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻). 바닷물 1 kg 기준 |
 | Cl⁻ … Br⁻ mmol/kg | 같은 여덟 가지의 물질량 |
+| 수온 °C | 같은 자료·위치·층·시각의 수온. 짝이 없으면 빈 칸 |
+| 1기압 밀도 kg/m³ | 그 수온과 염분의 1기압 밀도(Millero & Poisson 1981). 현장 압력은 넣지 않음. 수온이 없으면 빈 칸 |
+| Cl⁻ … Br⁻ mmol/L | mmol/kg × 밀도 / 1000. 수온이 없으면 빈 칸 |
+| 범위 검사 | 염분이 그 수심의 남극해 범위를 벗어나면 `낮음`·`높음`. 범위 안이면 빈 칸. 표시일 뿐이고 값은 그대로 둠 |
 
 ### 이온환산계수 — 환산에 쓴 기준 조성
 성분 열다섯 가지의 기호, 전하, 몰질량, 질량 비율 %, 염분 1당 g/kg·mmol/kg, 염분 35에서의 g/kg·mmol/kg.
 `DB 열`이 채워진 여덟 행이 DB와 엑셀에 쌓이는 성분입니다. 이 시트의 계수에 염분을 곱하면 어느 값이든 다시 계산할 수 있습니다.
+
+### 염분범위 — 범위 검사에 쓴 수심별 염분 범위
+Boyer & Levitus(1994, NOAA Technical Report NESDIS 81)의 남극해 표입니다. 표준 수심 33개마다 한 행입니다.
+
+| 열 | 설명 |
+|---|---|
+| 표준 수심 m | 0~5500 m |
+| 적용 수심 초과 m, 적용 수심 이하 m | 이 행의 범위를 적용하는 수심 구간. 맨 위 행과 맨 아래 행은 바깥쪽이 빈 칸 |
+| 염분 하한, 염분 상한 | 하한보다 낮으면 `낮음`, 상한보다 높으면 `높음` |
+
+범위가 넓어 큰 오류만 걸립니다. 규칙과 한계는 [데이터 출처 11절](data-sources.md#11-염분에서-환산하는-이온-조성)에 있습니다.
 
 ## `argo_levels_YYYY-MM.xlsx`
 
@@ -132,9 +147,10 @@ SQLite `seawater_ions` 표의 그 달 행을 그대로 옮깁니다. 해역 표�
 | 수심 m | Saunders & Fofonoff(1976)로 환산 |
 | 수온 °C, 염분 PSU | QC 1·2만. 없으면 빈 칸 |
 | 기준 염분 g/kg, Cl⁻ … Br⁻ g/kg | 그 층의 염분에서 환산한 기준 염분과 주요 이온 여덟 가지. 염분이 없는 층은 빈 칸 |
+| 범위 검사 | 그 층의 염분이 수심별 남극해 범위를 벗어나면 `낮음`·`높음`. 범위 안이면 빈 칸 |
 
 이온 열 아홉 개가 붙어 이 파일은 전보다 약 1.9배 크고 쓰는 데 약 1.8배 걸립니다
-(2026-11-10 실측: 433,396행인 달이 17.8 MB·10.2초에서 33.7 MB·17.8초). 별도 프로세스가 쓰므로 화면은 멈추지 않습니다.
+(2026-11-10 실측: 433,396행인 달이 17.8 MB·10.2초에서 33.7 MB·17.8초). 범위 검사 열은 크기를 거의 늘리지 않습니다(2026-11-11 실측: 434,000행인 달이 33,724,118바이트에서 33,728,674바이트). 별도 프로세스가 쓰므로 화면은 멈추지 않습니다.
 
 ## 파이썬·R에서 바로 읽기
 
@@ -157,7 +173,7 @@ library(DBI); con <- dbConnect(RSQLite::SQLite(), "~/Documents/../Library/Applic
 dbGetQuery(con, "SELECT * FROM measurements WHERE variable='sea_water_temperature' LIMIT 10")
 ```
 
-이온 환산값은 표 하나와 뷰 둘로 읽습니다: `seawater_ions`(g/kg, 염분 행마다 한 행), `seawater_ions_mmol`(mmol/kg), `argo_level_ions`(Argo 층별, g/kg).
+이온 환산값은 표 하나와 뷰 둘로 읽습니다: `seawater_ions`(g/kg, 염분 행마다 한 행), `seawater_ions_mmol`(mmol/kg), `argo_level_ions`(Argo 층별, g/kg). 범위 검사 결과는 `seawater_ions`와 `argo_level_ions`의 `salinity_check` 열(`ok`·`low`·`high`)입니다. 밀도와 mmol/L은 DB에 없고 엑셀과 `suya export ions`가 계산합니다.
 CSV가 필요하면 `suya export ions --out ions.csv`, `suya export argo-ions --out argo_ions.csv`를 씁니다.
 
 `grids` 표의 `payload`는 gzip으로 압축한 JSON(`{"lats":[…],"lons":[…],"values":[…]}`)이며 `antarctic_monitor.db.Store.load_grid("oisst_sst")`로 풀 수 있습니다.

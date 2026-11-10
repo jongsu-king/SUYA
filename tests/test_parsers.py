@@ -71,11 +71,15 @@ async def test_argo_fetch_levels_falls_back_to_a_cycle_range():
 
 ERDDAP_NO_RESULTS = 'Error { code=404; message="Not Found: Your query produced no matching results. (nRows = 0)"; }'
 ERDDAP_UNKNOWN_DATASET = 'Error { code=404; message="Not Found: Currently unknown datasetID=ArgoFloats"; }'
-ARGO_LISTING = (
-    "platform_number,cycle_number,time,latitude,longitude,data_mode,position_qc,pres,temp,temp_qc,psal,psal_qc,"
+ARGO_LISTING_HEADER = (
+    "platform_number,cycle_number,direction,time,latitude,longitude,data_mode,position_qc,"
+    "pres,pres_qc,pres_adjusted,pres_adjusted_qc,temp,temp_qc,psal,psal_qc,"
     "temp_adjusted,temp_adjusted_qc,psal_adjusted,psal_adjusted_qc\n"
-    ",,UTC,degrees_north,degrees_east,,,decibar,degree_Celsius,,PSU,,degree_Celsius,,PSU,\n"
-    '1902700,78,2026-10-25T01:23:56Z,-62.83514,-62.96182,R,1,1.04,-1.372,1,33.834,1,NaN," ",NaN," "\n'
+    ",,,UTC,degrees_north,degrees_east,,,decibar,,decibar,,degree_Celsius,,PSU,,degree_Celsius,,PSU,\n"
+)
+ARGO_LISTING = (
+    ARGO_LISTING_HEADER
+    + '1902700,78,A,2026-10-25T01:23:56Z,-62.83514,-62.96182,R,1,1.04,1,NaN," ",-1.372,1,33.834,1,NaN," ",NaN," "\n'
 )
 
 
@@ -149,7 +153,7 @@ async def test_argo_collect_keeps_profiles_open_while_the_dataset_is_missing(tmp
     from antarctic_monitor.http import FetchError
 
     def answer(request):
-        if "orderByLimit" in request.url.query.decode():
+        if "orderByMin" in request.url.query.decode():
             return httpx.Response(200, text=ARGO_LISTING)
         return httpx.Response(404, text=ERDDAP_UNKNOWN_DATASET)
 
@@ -159,6 +163,148 @@ async def test_argo_collect_keeps_profiles_open_while_the_dataset_is_missing(tmp
         await argo.collect(Context(store, fetcher, Settings()))
     assert store.argo_count_missing() == 1
     await fetcher.aclose()
+    store.close()
+
+
+ARGO_LEVELS_78 = (
+    ARGO_RANGE_HEADER
+    + "78,A,R,5.5,1,-1.2,1,33.9,1,NaN,,NaN,,NaN,\n"
+    + "78,A,R,20.0,1,-1.1,1,34.0,1,NaN,,NaN,,NaN,\n"
+)
+
+
+def _argo_answers(listing, levels):
+    import httpx
+
+    def answer(request):
+        if "orderByMin" in request.url.query.decode():
+            return httpx.Response(200, text=listing)
+        if levels is None:
+            return httpx.Response(404, text=ERDDAP_NO_RESULTS)
+        return httpx.Response(200, text=levels)
+
+    return answer
+
+
+def _argo_points(store):
+    return {
+        row["variable"]: (row["value"], row["depth_m"], row["obs_time"])
+        for row in store.iter_measurements(source="argo", dataset="1902700/78")
+    }
+
+
+async def test_argo_collect_writes_surface_rows_from_the_levels(tmp_path):
+    from antarctic_monitor.collectors.base import Context
+    from antarctic_monitor.config import Settings
+    from antarctic_monitor.db import Store
+
+    fetcher, _ = _argo_fetcher(_argo_answers(ARGO_LISTING, ARGO_LEVELS_78))
+    store = Store(tmp_path / "t.db")
+    result = await argo.collect(Context(store, fetcher, Settings()))
+    assert result.rows == 1
+    points = _argo_points(store)
+    assert points["sea_water_salinity"][0] == 33.9
+    assert points["sea_water_temperature"][0] == -1.2
+    assert points["sea_water_salinity"][1] == pytest.approx(5.4, abs=0.1)
+    [ion] = list(store.iter_ions(source="argo"))
+    assert ion["practical_salinity"] == 33.9 and ion["depth_m"] == points["sea_water_salinity"][1]
+    await fetcher.aclose()
+    store.close()
+
+
+async def test_argo_collect_keeps_the_listed_value_until_levels_arrive(tmp_path):
+    from antarctic_monitor.collectors.base import Context
+    from antarctic_monitor.config import Settings
+    from antarctic_monitor.db import Store
+
+    fetcher, _ = _argo_fetcher(_argo_answers(ARGO_LISTING, None))
+    store = Store(tmp_path / "t.db")
+    await argo.collect(Context(store, fetcher, Settings()))
+    points = _argo_points(store)
+    assert points["sea_water_salinity"][0] == 33.834
+    assert points["sea_water_salinity"][1] == pytest.approx(1.0, abs=0.1)
+    await fetcher.aclose()
+    store.close()
+
+
+def test_argo_listing_prefers_the_ascending_row_of_a_cycle():
+    text = (
+        ARGO_LISTING_HEADER
+        + '6903128,178,D,2026-10-28T12:08:00Z,-56.4625,68.5581,R,1,0.3,1,NaN," ",0.911,1,27.581,1,NaN," ",NaN," "\n'
+        + '6903128,178,A,2026-11-07T11:03:00Z,-56.5047,68.5086,R,1,5.6,1,NaN," ",1.071,1,33.995,1,NaN," ",NaN," "\n'
+        + '6903128,179,D,2026-11-08T12:00:00Z,-56.6,68.4,R,1,2.0,1,NaN," ",1.0,1,33.9,1,NaN," ",NaN," "\n'
+    )
+    rows = {row["cycle"]: row for row in argo.parse_listing(text)}
+    assert set(rows) == {178, 179}
+    assert rows[178]["direction"] == "A"
+    assert rows[178]["time"] == "2026-11-07T11:03:00Z"
+    assert rows[178]["surface_salt"] == 33.995
+    assert rows[178]["surface_depth_m"] == pytest.approx(5.5, abs=0.1)
+    assert rows[179]["direction"] == "D" and rows[179]["surface_salt"] == 33.9
+
+
+def test_argo_listing_drops_values_at_a_bad_pressure():
+    text = (
+        ARGO_LISTING_HEADER
+        + '1902700,78,A,2026-10-25T01:23:56Z,-62.83514,-62.96182,R,1,1.04,4,NaN," ",-1.372,1,33.834,1,NaN," ",NaN," "\n'
+    )
+    [row] = argo.parse_listing(text)
+    assert row["surface_temp"] is None and row["surface_salt"] is None and row["surface_depth_m"] is None
+    assert (row["platform"], row["cycle"], row["lat"]) == ("1902700", 78, -62.83514)
+
+
+def test_argo_repair_rewrites_stored_surface_rows_from_the_levels(tmp_path):
+    from antarctic_monitor.db import Measurement, Store
+
+    store = Store(tmp_path / "t.db")
+    base = {"time": "2026-10-28T12:08:00Z", "lat": -56.46, "lon": 68.56, "data_mode": "R", "position_qc": "1"}
+    store.upsert_argo_listing([
+        base | {"platform": "6903128", "cycle": 178, "surface_temp": 0.911, "surface_salt": 27.581},
+        base | {"platform": "7901081", "cycle": 43, "surface_temp": 9.0, "surface_salt": 39.063},
+        base | {"platform": "5900000", "cycle": 1, "surface_temp": 0.2, "surface_salt": 34.2},
+    ])
+    store.save_argo_levels("6903128", 178, [{"pressure_dbar": 5.6, "depth_m": 5.5, "temp": 1.071, "salt": 33.995}])
+    store.save_argo_levels("7901081", 43, [{"pressure_dbar": 212.8, "depth_m": 210.7, "temp": 9.0, "salt": 39.063}])
+    store.upsert_measurements(
+        Measurement(
+            source="argo", dataset=dataset, variable="sea_water_salinity", kind="observation",
+            lat=-56.46, lon=68.56, obs_time="2026-10-28T12:08:00Z", value=value, unit="PSU", quality="R",
+        )
+        for dataset, value in (("6903128/178", 27.581), ("7901081/43", 39.063), ("5900000/1", 34.2))
+    )
+    assert argo.repair_surface(store) == 2
+    rows = {
+        r["dataset"]: (r["value"], r["depth_m"])
+        for r in store.iter_measurements(source="argo", variable="sea_water_salinity")
+    }
+    assert rows == {"6903128/178": (33.995, 5.5), "5900000/1": (34.2, None)}
+    assert store.argo_profile("7901081", 43)["surface_salt"] is None
+    assert {r["dataset"]: r["practical_salinity"] for r in store.iter_ions(source="argo")} == {
+        "6903128/178": 33.995, "5900000/1": 34.2,
+    }
+    assert store.kv_get(argo.SURFACE_KEY) == argo.SURFACE_RULE
+    assert argo.repair_surface(store) == 0
+    store.close()
+
+
+def test_argo_repair_does_not_count_a_rounding_difference(tmp_path):
+    from antarctic_monitor.db import Measurement, Store
+
+    store = Store(tmp_path / "t.db")
+    store.upsert_argo_listing([{
+        "platform": "5906915", "cycle": 149, "time": "2026-10-20T03:11:51Z", "lat": -57.1, "lon": 30.2,
+        "data_mode": "A", "position_qc": "1", "surface_temp": None, "surface_salt": 34.0617,
+    }])
+    store.save_argo_levels("5906915", 149, [{"pressure_dbar": 0.6, "depth_m": 0.6, "temp": None, "salt": 34.062}])
+    store.upsert_measurements([
+        Measurement(
+            source="argo", dataset="5906915/149", variable="sea_water_salinity", kind="observation",
+            lat=-57.1, lon=30.2, obs_time="2026-10-20T03:11:51Z", value=34.0617, unit="PSU", quality="A",
+        )
+    ])
+    assert argo.repair_surface(store) == 0
+    [row] = store.iter_measurements(source="argo", variable="sea_water_salinity")
+    assert (row["value"], row["depth_m"]) == (34.062, 0.6)
     store.close()
 
 
@@ -183,10 +329,8 @@ def test_argo_rejects_physically_impossible_values_even_with_good_flag():
 
 def test_argo_listing_parses_coordinates_and_mode():
     text = (
-        "platform_number,cycle_number,time,latitude,longitude,data_mode,position_qc,pres,temp,temp_qc,psal,psal_qc,"
-        "temp_adjusted,temp_adjusted_qc,psal_adjusted,psal_adjusted_qc\n"
-        ",,UTC,degrees_north,degrees_east,,,decibar,degree_Celsius,,PSU,,degree_Celsius,,PSU,\n"
-        '1902700,78,2026-10-25T01:23:56Z,-62.83514,-62.96182,R,8,1.04,-1.372,1,33.834,1,NaN," ",NaN," "\n'
+        ARGO_LISTING_HEADER
+        + '1902700,78,A,2026-10-25T01:23:56Z,-62.83514,-62.96182,R,8,1.04,1,NaN," ",-1.372,1,33.834,1,NaN," ",NaN," "\n'
     )
     [row] = argo.parse_listing(text)
     assert row["platform"] == "1902700"

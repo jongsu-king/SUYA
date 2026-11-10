@@ -5,8 +5,19 @@ import sqlite3
 
 import pytest
 
-from antarctic_monitor import composition
-from antarctic_monitor.db import ION_GRAM_COLUMNS, ION_METHOD_KEY, ION_OBJECTS, Measurement, Store
+from antarctic_monitor import composition, ranges, seawater
+from antarctic_monitor.db import (
+    ION_CHECK,
+    ION_CHECK_KEY,
+    ION_DENSITY,
+    ION_GRAM_COLUMNS,
+    ION_LITRE_COLUMNS,
+    ION_METHOD_KEY,
+    ION_OBJECTS,
+    ION_VOLUME_COLUMNS,
+    Measurement,
+    Store,
+)
 
 
 @pytest.fixture
@@ -261,3 +272,132 @@ def test_argo_level_view_converts_every_level_with_salinity(store):
     for name, component in zip(ION_GRAM_COLUMNS, composition.MAJOR):
         assert rows[1][name] == pytest.approx(composition.grams_per_kg(34.2)[component.key], rel=1e-12)
     assert store.count_ions() == 0
+
+
+def test_volume_basis_is_the_one_atmosphere_density():
+    basis = composition.volume_basis(35.0, 5.0)
+    assert basis["temperature_c"] == 5.0
+    assert basis["density_kg_m3"] == seawater.density_surface(35.0, 5.0)
+    assert basis["density_kg_m3"] == pytest.approx(1027.67547, abs=1e-4)
+    assert list(basis["mmol_per_l"]) == [component.key for component in composition.MAJOR]
+    per_kg = composition.mmol_per_kg(35.0)["chloride"]
+    assert basis["mmol_per_l"]["chloride"] == pytest.approx(per_kg * basis["density_kg_m3"] / 1000.0, rel=1e-12)
+
+
+@pytest.mark.parametrize(
+    ("salinity", "temperature"),
+    [
+        (35.0, None), (35.0, 60.0), (35.0, -3.5), (43.0, 10.0), (0.0, 10.0), (None, 10.0), (35.0, True),
+        (35.0, float("nan")), (35.0, "warm"),
+    ],
+)
+def test_volume_basis_refuses_what_the_density_fit_does_not_cover(salinity, temperature):
+    assert composition.volume_basis(salinity, temperature) is None
+
+
+def test_derive_adds_the_volume_basis_only_with_a_usable_temperature():
+    plain = composition.derive(35.0)
+    assert "density_kg_m3" not in plain and "temperature_c" not in plain
+    assert all("mmol_per_l" not in ion for ion in plain["ions"])
+    assert composition.derive(35.0, 60.0) == plain
+    cold = composition.derive(35.0, -1.2)
+    assert cold["temperature_c"] == -1.2 and len(cold["ions"]) == len(composition.COMPONENTS)
+    assert cold["density_kg_m3"] == seawater.density_surface(35.0, -1.2)
+    for ion in cold["ions"]:
+        assert ion["mmol_per_l"] == pytest.approx(ion["mmol_per_kg"] * cold["density_kg_m3"] / 1000.0, rel=1e-12)
+    for key in plain:
+        assert cold[key] == plain[key] or key == "ions"
+
+
+def test_volume_columns_follow_the_paired_temperature(store):
+    store.upsert_measurements([_salt(34.5), _temp(-1.2), _salt(34.9, when="2026-11-05T00:00:00Z")])
+    paired, alone = store.iter_ions(temperature=True)
+    density = seawater.density_surface(34.5, -1.2)
+    assert paired["temperature_c"] == -1.2 and paired[ION_DENSITY] == pytest.approx(density, rel=1e-12)
+    for name, component in zip(ION_LITRE_COLUMNS, composition.MAJOR):
+        assert paired[name] == pytest.approx(34.5 * component.mmol_per_salinity * density / 1000.0, rel=1e-12)
+    assert all(alone[name] is None for name in ION_VOLUME_COLUMNS)
+    assert ION_DENSITY not in next(store.iter_ions())
+
+
+def test_volume_columns_stay_empty_outside_the_density_fit(store):
+    store.upsert_measurements([_salt(34.5), _temp(55.0)])
+    row = next(store.iter_ions(temperature=True))
+    assert row["temperature_c"] == 55.0
+    assert row[ION_DENSITY] is None and all(row[name] is None for name in ION_LITRE_COLUMNS)
+
+
+def test_salinity_check_is_stored_with_each_row(store):
+    store.upsert_measurements([
+        _salt(34.5),
+        _salt(39.063, when="2026-11-05T00:00:00Z", level="depth:200", depth=211.0),
+        _salt(33.2, when="2026-11-06T00:00:00Z", level="depth:1200", depth=1200.0),
+    ])
+    assert [row[ION_CHECK] for row in _ions(store)] == [ranges.OK, ranges.HIGH, ranges.LOW]
+    store.upsert_measurements([_salt(34.7, when="2026-11-06T00:00:00Z", level="depth:1200", depth=1200.0)])
+    assert [row[ION_CHECK] for row in _ions(store)] == [ranges.OK, ranges.HIGH, ranges.OK]
+    assert store.kv_get(ION_CHECK_KEY) == ranges.SOURCE
+
+
+def test_stored_check_agrees_with_the_module_at_every_window(store):
+    rows = []
+    for depth, _top, _bottom, low, high in ranges.WINDOWS:
+        for offset, value in enumerate((low - 0.01, low, high, high + 0.01)):
+            if value > 0:
+                when = f"2026-11-04T{offset:02d}:00:00Z"
+                rows.append(_salt(value, when=when, level=f"depth:{depth:g}", depth=depth))
+    store.upsert_measurements(rows)
+    stored = _ions(store)
+    assert len(stored) == len(rows)
+    for row in stored:
+        assert row[ION_CHECK] == ranges.check_salinity(row["practical_salinity"], row["depth_m"])
+    assert {row[ION_CHECK] for row in stored} == {ranges.OK, ranges.LOW, ranges.HIGH}
+
+
+def test_database_without_the_check_column_gains_it(tmp_path):
+    path = tmp_path / "before-check.db"
+    store = Store(path)
+    store.upsert_measurements([
+        _salt(34.5), _salt(39.063, when="2026-11-05T00:00:00Z", level="depth:200", depth=211.0),
+    ])
+    for name in ION_OBJECTS[:3]:
+        store._conn.execute(f"DROP TRIGGER {name}")
+    for name in ION_OBJECTS[3:]:
+        store._conn.execute(f"DROP VIEW {name}")
+    store._conn.execute(f"ALTER TABLE seawater_ions DROP COLUMN {ION_CHECK}")
+    for name in ION_OBJECTS[:3]:
+        store._conn.execute(f"CREATE TRIGGER {name} AFTER INSERT ON measurements BEGIN SELECT 1; END")
+    store._conn.execute("DELETE FROM kv WHERE key = ?", (ION_CHECK_KEY,))
+    store._conn.commit()
+    store.close()
+
+    reopened = Store(path)
+    try:
+        assert [row[ION_CHECK] for row in _ions(reopened)] == [ranges.OK, ranges.HIGH]
+        assert reopened.kv_get(ION_CHECK_KEY) == ranges.SOURCE
+        assert reopened.kv_get(ION_METHOD_KEY) == composition.METHOD
+        reopened.upsert_measurements([_salt(33.2, when="2026-11-06T00:00:00Z", level="depth:1200", depth=1200.0)])
+        assert [row[ION_CHECK] for row in _ions(reopened)] == [ranges.OK, ranges.HIGH, ranges.LOW]
+    finally:
+        reopened.close()
+
+    watcher = sqlite3.connect(path)
+    first = watcher.execute("PRAGMA data_version").fetchone()[0]
+    again = Store(path)
+    again.close()
+    assert watcher.execute("PRAGMA data_version").fetchone()[0] == first
+    watcher.close()
+
+
+def test_argo_level_view_labels_levels_outside_the_range(store):
+    store.upsert_argo_listing([{
+        "platform": "7", "cycle": 43, "time": "2026-11-02T00:00:00Z", "lat": -60.0, "lon": 10.0, "data_mode": "R",
+        "position_qc": "1", "surface_temp": 1.0, "surface_salt": 34.0,
+    }])
+    store.save_argo_levels("7", 43, [
+        {"pressure_dbar": 5.0, "depth_m": 5.0, "temp": 1.0, "salt": 34.0},
+        {"pressure_dbar": 213.0, "depth_m": 211.0, "temp": 1.0, "salt": 39.063},
+        {"pressure_dbar": 1213.0, "depth_m": 1200.0, "temp": 0.4, "salt": 33.2},
+    ])
+    rows = sorted(store.iter_argo_level_ions(), key=lambda row: row["pressure_dbar"])
+    assert [row[ION_CHECK] for row in rows] == [ranges.OK, ranges.HIGH, ranges.LOW]

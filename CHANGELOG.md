@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+The ion composition now carries a salinity range check and a volume basis, and the surface values
+of Argo profiles come from the quality-controlled levels.
+
+### Added
+
+- **Salinity range check.** Every stored salinity is compared with the Southern Ocean range for its
+  depth from Boyer and Levitus (1994), *Quality Control and Processing of Historical Oceanographic
+  Temperature, Salinity, and Oxygen Data*, NOAA Technical Report NESDIS 81 (Appendix A, Table 3f;
+  33 standard depths, each applied over the depth window the report defines). The verdict is kept
+  in the new column `salinity_check` of `seawater_ions` (`ok`, `low`, `high`) and in the view
+  `argo_level_ions`, and shown as a *Range check* column in the *Ion composition* sheet, the Argo
+  levels workbook and both ion CSV exports. It is a label only: no value is dropped or changed.
+  The ranges are broad on purpose, so only gross errors are caught. A new sheet, *Salinity
+  ranges*, lists the table that was used.
+- **Volume basis.** Where a salinity row has a temperature from the same source, place, level and
+  time, the *Ion composition* sheet and `suya export ions` add that temperature, the density at
+  1 atm (Millero and Poisson 1981) and the eight major ions in mmol/L. In-situ pressure is not
+  included, and the cells stay blank without a paired temperature.
+- `suya ions` takes `--temperature` (adds the density at 1 atm and mmol/L) and `--depth` (adds the
+  range check); `--json` carries both.
+
+### Fixed
+
+- **Argo surface values.** The surface temperature and salinity of a profile were taken from the
+  first row the listing request returned for it. That request did not sort by pressure, did not
+  read the pressure flag and did not separate ascending from descending casts, so the row was not
+  always the shallowest good level. The surface values are now the shallowest quality-controlled
+  level within 100 dbar of the stored profile, chosen separately for temperature and salinity,
+  and the measurement row records that depth. The listed value is used only until the levels
+  arrive. Rows written by earlier versions are corrected once, on the first collection after the
+  upgrade. On a copy of a real database this changed 10 of 781 profiles: one surface salinity
+  went from 27.581 to 33.995, and a salinity of 39.063 was removed because that profile has no
+  usable value within 100 dbar.
+
 ## [0.1.6] - 2026-11-10
 
 The eight major ions are now derived from every stored salinity and kept in the database, the

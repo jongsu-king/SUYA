@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, Iterator
 
-from . import composition
+from . import composition, ranges, seawater
 from .gridutil import Grid, grid_stats
 
 log = logging.getLogger(__name__)
@@ -101,15 +101,21 @@ MEASUREMENT_COLUMNS = (
 )
 
 SALINITY = "sea_water_salinity"
+TEMPERATURE = "sea_water_temperature"
 ION_KEY = ("source", "dataset", "lat", "lon", "level", "obs_time")
 ION_GRAM_COLUMNS = tuple(f"{component.key}_g_kg" for component in composition.MAJOR)
 ION_MMOL_COLUMNS = tuple(f"{component.key}_mmol_kg" for component in composition.MAJOR)
 ION_COLUMNS = (*ION_KEY, "kind", "depth_m", "location_id", "practical_salinity", "reference_salinity", *ION_GRAM_COLUMNS)
+ION_CHECK = "salinity_check"
+ION_DENSITY = "density_kg_m3"
+ION_LITRE_COLUMNS = tuple(f"{component.key}_mmol_l" for component in composition.MAJOR)
+ION_VOLUME_COLUMNS = ("temperature_c", ION_DENSITY, *ION_LITRE_COLUMNS)
 ARGO_ION_COLUMNS = (
     "platform", "cycle", "obs_time", "lat", "lon", "data_mode", "pressure_dbar", "depth_m", "temperature_c",
-    "practical_salinity", "reference_salinity", *ION_GRAM_COLUMNS,
+    "practical_salinity", "reference_salinity", *ION_GRAM_COLUMNS, ION_CHECK,
 )
 ION_METHOD_KEY = "ions:method"
+ION_CHECK_KEY = "ions:check"
 ION_OBJECTS = (
     "seawater_ions_insert", "seawater_ions_update", "seawater_ions_delete", "seawater_ions_mmol", "argo_level_ions",
 )
@@ -127,7 +133,8 @@ CREATE TABLE IF NOT EXISTS seawater_ions (
     location_id TEXT,
     practical_salinity REAL NOT NULL,
     reference_salinity REAL NOT NULL,
-{"".join(f"    {name} REAL NOT NULL,{chr(10)}" for name in ION_GRAM_COLUMNS)}    PRIMARY KEY (source, dataset, lat, lon, level, obs_time)
+{"".join(f"    {name} REAL NOT NULL,{chr(10)}" for name in ION_GRAM_COLUMNS)}    {ION_CHECK} TEXT,
+    PRIMARY KEY (source, dataset, lat, lon, level, obs_time)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS idx_ions_time ON seawater_ions (obs_time);
 """
@@ -144,20 +151,23 @@ def _ion_select(row: str) -> str:
     """측정 행 하나(NEW 또는 표 이름)에서 seawater_ions 한 행을 만드는 SELECT 목록."""
     head = ", ".join(f"{row}.{name}" for name in (*ION_KEY, "kind", "depth_m", "location_id"))
     reference = f"{row}.value * {composition.REFERENCE_SALINITY_FACTOR!r} AS reference_salinity"
-    return f"{head}, {row}.value AS practical_salinity, {reference}, {_ion_factors(f'{row}.value')}"
+    check = f"{ranges.sql_check(f'{row}.value', f'{row}.depth_m')} AS {ION_CHECK}"
+    return f"{head}, {row}.value AS practical_salinity, {reference}, {_ion_factors(f'{row}.value')}, {check}"
 
 
 def _ion_match(row: str) -> str:
     return " AND ".join(f"{name} = {row}.{name}" for name in ION_KEY)
 
 
-ION_INSERT = f"INSERT INTO seawater_ions ({', '.join(ION_COLUMNS)})"
+ION_INSERT = f"INSERT INTO seawater_ions ({', '.join(ION_COLUMNS)}, {ION_CHECK})"
 ION_BACKFILL = (
     f"{ION_INSERT} SELECT {_ion_select('m')} FROM measurements AS m WHERE m.variable = '{SALINITY}' AND m.value > 0"
 )
-ION_STATEMENTS = (
+ION_DROPS = (
     *(f"DROP TRIGGER IF EXISTS {name}" for name in ION_OBJECTS[:3]),
     *(f"DROP VIEW IF EXISTS {name}" for name in ION_OBJECTS[3:]),
+)
+ION_CREATES = (
     f"""CREATE TRIGGER seawater_ions_insert AFTER INSERT ON measurements
         WHEN NEW.variable = '{SALINITY}'
         BEGIN
@@ -177,12 +187,13 @@ ION_STATEMENTS = (
             DELETE FROM seawater_ions WHERE {_ion_match("OLD")};
         END""",
     f"""CREATE VIEW seawater_ions_mmol AS
-        SELECT {", ".join(ION_COLUMNS[:-len(ION_GRAM_COLUMNS)])}, {_ion_factors("practical_salinity", mmol=True)}
+        SELECT {", ".join(ION_COLUMNS[:-len(ION_GRAM_COLUMNS)])}, {_ion_factors("practical_salinity", mmol=True)},
+               {ION_CHECK}
         FROM seawater_ions""",
     f"""CREATE VIEW argo_level_ions AS
         SELECT platform, cycle, obs_time, lat, lon, data_mode, pressure_dbar, depth_m, temperature_c,
                salt AS practical_salinity, salt * {composition.REFERENCE_SALINITY_FACTOR!r} AS reference_salinity,
-               {_ion_factors("salt")}
+               {_ion_factors("salt")}, {ranges.sql_check("salt", "depth_m")} AS {ION_CHECK}
         FROM (
             SELECT p.platform, p.cycle, p.obs_time, p.lat, p.lon, p.data_mode,
                    json_extract(l.value, '$.pressure_dbar') AS pressure_dbar,
@@ -193,6 +204,32 @@ ION_STATEMENTS = (
         )
         WHERE salt > 0""",
 )
+ION_MARKS = {ION_METHOD_KEY: composition.METHOD, ION_CHECK_KEY: ranges.SOURCE}
+
+
+def ion_volume(salinity: float | None, temperature_c: float | None) -> dict:
+    """ION_VOLUME_COLUMNS 의 값. 수온이 없거나 그 수온으로 밀도를 낼 수 없으면 밀도와 mmol/L 은 None 입니다."""
+    output = dict.fromkeys(ION_VOLUME_COLUMNS)
+    output["temperature_c"] = temperature_c
+    basis = composition.volume_basis(salinity, temperature_c)
+    if basis is not None:
+        output[ION_DENSITY] = basis["density_kg_m3"]
+        output.update({f"{key}_mmol_l": value for key, value in basis["mmol_per_l"].items()})
+    return output
+
+
+SET_KV = "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+UPSERT_MEASUREMENT = (
+    f"INSERT INTO measurements ({','.join(MEASUREMENT_COLUMNS)}) VALUES ({','.join('?' * len(MEASUREMENT_COLUMNS))}) "
+    "ON CONFLICT (source, dataset, variable, lat, lon, level, obs_time) DO UPDATE SET "
+    "value=excluded.value, unit=excluded.unit, kind=excluded.kind, quality=excluded.quality, "
+    "location_id=COALESCE(excluded.location_id, location_id), fetched_at=excluded.fetched_at"
+)
+ARGO_MOVED = (
+    "(argo_profiles.data_mode IS NOT excluded.data_mode OR argo_profiles.obs_time IS NOT excluded.obs_time"
+    " OR argo_profiles.lat IS NOT excluded.lat OR argo_profiles.lon IS NOT excluded.lon)"
+)
+ARGO_UNFILLED = f"(argo_profiles.levels_json IS NULL OR argo_profiles.n_levels = 0 OR {ARGO_MOVED})"
 
 
 def utcnow() -> datetime:
@@ -241,8 +278,9 @@ class Store:
             self._conn.close()
 
     def _ions_current(self) -> bool:
-        row = self._conn.execute("SELECT value FROM kv WHERE key = ?", (ION_METHOD_KEY,)).fetchone()
-        if not row or row[0] != composition.METHOD:
+        keys = ",".join("?" * len(ION_MARKS))
+        stored = self._conn.execute(f"SELECT key, value FROM kv WHERE key IN ({keys})", tuple(ION_MARKS)).fetchall()
+        if {r[0]: r[1] for r in stored} != ION_MARKS:
             return False
         marks = ",".join("?" * len(ION_OBJECTS))
         found = self._conn.execute(f"SELECT name FROM sqlite_master WHERE name IN ({marks})", ION_OBJECTS).fetchall()
@@ -251,7 +289,8 @@ class Store:
     def _ensure_ions(self) -> None:
         """염분 행마다 이온 환산값이 seawater_ions 에 쌓이게 트리거와 뷰를 두고, 이미 있던 염분 행을 채웁니다.
 
-        환산 방식(composition.METHOD)이 바뀌었거나 트리거가 없을 때만 한 번 다시 계산합니다.
+        환산 방식(composition.METHOD)이나 범위 검사 기준(ranges.SOURCE)이 바뀌었거나 트리거가 없을 때만 한 번
+        다시 계산합니다. 이전 버전이 만든 표에는 범위 검사 열을 덧붙입니다.
         다른 프로세스가 DB 를 쓰는 중이라 잠금을 얻지 못하면 다음에 열 때 다시 시도합니다.
         """
         with self._lock:
@@ -260,41 +299,55 @@ class Store:
             try:
                 self._conn.execute("BEGIN IMMEDIATE")
                 if not self._ions_current():
-                    for statement in ION_STATEMENTS:
+                    for statement in ION_DROPS:
+                        self._conn.execute(statement)
+                    columns = {r[1] for r in self._conn.execute("PRAGMA table_info(seawater_ions)")}
+                    if ION_CHECK not in columns:
+                        self._conn.execute(f"ALTER TABLE seawater_ions ADD COLUMN {ION_CHECK} TEXT")
+                    for statement in ION_CREATES:
                         self._conn.execute(statement)
                     self._conn.execute("DELETE FROM seawater_ions")
                     self._conn.execute(ION_BACKFILL)
-                    self._conn.execute(
-                        "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-                        (ION_METHOD_KEY, composition.METHOD),
-                    )
+                    self._conn.executemany(SET_KV, list(ION_MARKS.items()))
                 self._conn.commit()
             except sqlite3.OperationalError as exc:
                 self._conn.rollback()
                 log.warning("ion table not prepared: %s", exc)
 
-    def upsert_measurements(self, rows: Iterable[Measurement]) -> int:
-        now = iso()
-        params = [
+    @staticmethod
+    def _measurement_params(rows: Iterable[Measurement], now: str) -> list[tuple]:
+        return [
             (
                 r.source, r.dataset, r.variable, r.kind, r.lat, r.lon, r.level, r.depth_m, r.pressure_hpa,
                 r.obs_time, r.value, r.unit, r.location_id, r.quality, now,
             )
             for r in rows
         ]
+
+    def upsert_measurements(self, rows: Iterable[Measurement]) -> int:
+        params = self._measurement_params(rows, iso())
         if not params:
             return 0
-        placeholders = ",".join("?" * len(MEASUREMENT_COLUMNS))
-        sql = (
-            f"INSERT INTO measurements ({','.join(MEASUREMENT_COLUMNS)}) VALUES ({placeholders}) "
-            "ON CONFLICT (source, dataset, variable, lat, lon, level, obs_time) DO UPDATE SET "
-            "value=excluded.value, unit=excluded.unit, kind=excluded.kind, quality=excluded.quality, "
-            "location_id=COALESCE(excluded.location_id, location_id), fetched_at=excluded.fetched_at"
-        )
         with self._lock:
-            self._conn.executemany(sql, params)
+            self._conn.executemany(UPSERT_MEASUREMENT, params)
             self._conn.commit()
         return len(params)
+
+    def replace_datasets(self, source: str, groups: dict[str, list[Measurement]]) -> int:
+        """자료원의 데이터셋마다 측정 행을 통째로 바꿉니다. 새 목록에 없는 옛 행은 지워집니다.
+
+        염분 행이 바뀌면 이온 행도 트리거가 따라 바꿉니다. 모두 한 트랜잭션에서 처리합니다.
+        """
+        now = iso()
+        count = 0
+        with self._lock:
+            for dataset, rows in groups.items():
+                self._conn.execute("DELETE FROM measurements WHERE source = ? AND dataset = ?", (source, dataset))
+                params = self._measurement_params(rows, now)
+                self._conn.executemany(UPSERT_MEASUREMENT, params)
+                count += len(params)
+            self._conn.commit()
+        return count
 
     def drop_invalid_metar(self, low: float, high: float) -> int:
         """수집 필터를 통과하지 못할 METAR 기온·이슬점이 이미 저장돼 있으면 지웁니다."""
@@ -408,23 +461,36 @@ class Store:
         until: str | None = None,
         limit: int | None = None,
         mmol: bool = False,
+        temperature: bool = False,
     ) -> Iterator[dict]:
-        """염분에서 환산한 이온 조성 행을 시각 순으로 돌려줍니다. mmol=True 면 mmol/kg 열을 함께 붙입니다."""
+        """염분에서 환산한 이온 조성 행을 시각 순으로 돌려줍니다. mmol=True 면 mmol/kg 열을 함께 붙입니다.
+
+        temperature=True 면 같은 자료·위치·층·시각의 수온을 temperature_c 로 붙이고, 그 수온에서의 1기압 밀도와
+        mmol/L 열(ION_VOLUME_COLUMNS)도 붙입니다. 짝이 되는 수온이 없으면 모두 None 입니다.
+        """
         clauses, params = [], []
         for column, value, op in (
             ("source", source, "="), ("location_id", location_id, "="), ("obs_time", since, ">="), ("obs_time", until, "<="),
         ):
             if value is not None:
-                clauses.append(f"{column} {op} ?")
+                clauses.append(f"i.{column} {op} ?")
                 params.append(value)
         where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         tail = f" LIMIT {int(limit)}" if limit else ""
-        extra = f", {_ion_factors('practical_salinity', mmol=True)}" if mmol else ""
-        sql = f"SELECT *{extra} FROM seawater_ions {where} ORDER BY obs_time, source, level{tail}"
+        extra = f", {_ion_factors('i.practical_salinity', mmol=True)}" if mmol else ""
+        paired = ""
+        if temperature:
+            extra += ", t.value AS temperature_c"
+            match = " AND ".join(f"t.{name} = i.{name}" for name in ION_KEY)
+            paired = f" LEFT JOIN measurements AS t ON t.variable = '{TEMPERATURE}' AND {match}"
+        sql = f"SELECT i.*{extra} FROM seawater_ions AS i{paired} {where} ORDER BY i.obs_time, i.source, i.level{tail}"
         with self._lock:
             rows = self._conn.execute(sql, params).fetchall()
         for row in rows:
-            yield dict(row)
+            item = dict(row)
+            if temperature:
+                item.update(ion_volume(item["practical_salinity"], item["temperature_c"]))
+            yield item
 
     def count_ions(self) -> int:
         with self._lock:
@@ -583,21 +649,26 @@ class Store:
         return [{"valid_time": r["valid_time"], "stats": json.loads(r["stats_json"])} for r in reversed(rows)]
 
     def upsert_argo_listing(self, rows: Iterable[dict]) -> int:
+        """목록 행을 넣습니다. 층별 값이 있는 프로파일의 표층 값은 그 층에서 고른 것이므로 건드리지 않습니다.
+
+        자료 모드나 시각·위치가 바뀐 프로파일은 다른 관측으로 보고, 층별 값을 비워 다시 받게 합니다.
+        """
         now = iso()
         count = 0
         with self._lock:
             for r in rows:
                 self._conn.execute(
-                    """INSERT INTO argo_profiles
+                    f"""INSERT INTO argo_profiles
                        (platform, cycle, obs_time, lat, lon, data_mode, position_qc, surface_temp, surface_salt, fetched_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                        ON CONFLICT (platform, cycle) DO UPDATE SET
                          obs_time = excluded.obs_time, lat = excluded.lat, lon = excluded.lon,
                          data_mode = excluded.data_mode, position_qc = excluded.position_qc,
-                         surface_temp = COALESCE(argo_profiles.surface_temp, excluded.surface_temp),
-                         surface_salt = COALESCE(argo_profiles.surface_salt, excluded.surface_salt),
-                         levels_json = CASE WHEN argo_profiles.data_mode IS NOT excluded.data_mode
-                                            THEN NULL ELSE argo_profiles.levels_json END""",
+                         surface_temp = CASE WHEN {ARGO_UNFILLED}
+                                             THEN excluded.surface_temp ELSE argo_profiles.surface_temp END,
+                         surface_salt = CASE WHEN {ARGO_UNFILLED}
+                                             THEN excluded.surface_salt ELSE argo_profiles.surface_salt END,
+                         levels_json = CASE WHEN {ARGO_MOVED} THEN NULL ELSE argo_profiles.levels_json END""",
                     (
                         r["platform"], r["cycle"], r["time"], r["lat"], r["lon"], r.get("data_mode"),
                         r.get("position_qc"), r.get("surface_temp"), r.get("surface_salt"), now,
@@ -608,17 +679,31 @@ class Store:
         return count
 
     def save_argo_levels(self, platform: str, cycle: int, levels: list[dict]) -> None:
-        temps = [lv["temp"] for lv in levels if lv.get("temp") is not None]
-        salts = [lv["salt"] for lv in levels if lv.get("salt") is not None]
+        """층별 값을 저장합니다. 표층 값은 seawater.surface_values 가 고른 얕은 층의 값이고, 없으면 비워 둡니다.
+
+        받은 층이 하나도 없으면 목록에서 온 임시 표층 값을 그대로 둡니다.
+        """
+        surface = seawater.surface_values(levels)
         depths = [lv["depth_m"] for lv in levels if lv.get("depth_m") is not None]
+        keep = not levels
         with self._lock:
             self._conn.execute(
                 """UPDATE argo_profiles SET levels_json = ?, n_levels = ?, max_depth_m = ?,
-                   surface_temp = ?, surface_salt = ?, fetched_at = ? WHERE platform = ? AND cycle = ?""",
+                   surface_temp = CASE WHEN ? THEN surface_temp ELSE ? END,
+                   surface_salt = CASE WHEN ? THEN surface_salt ELSE ? END,
+                   fetched_at = ? WHERE platform = ? AND cycle = ?""",
                 (
                     json.dumps(levels, separators=(",", ":")), len(levels), max(depths) if depths else None,
-                    temps[0] if temps else None, salts[0] if salts else None, iso(), platform, cycle,
+                    keep, surface["temp"], keep, surface["salt"], iso(), platform, cycle,
                 ),
+            )
+            self._conn.commit()
+
+    def set_argo_surface(self, rows: Iterable[tuple[float | None, float | None, str, int]]) -> None:
+        """(표층 수온, 표층 염분, 플랫폼, 사이클) 묶음으로 프로파일의 표층 값만 고칩니다. 층별 값은 그대로 둡니다."""
+        with self._lock:
+            self._conn.executemany(
+                "UPDATE argo_profiles SET surface_temp = ?, surface_salt = ? WHERE platform = ? AND cycle = ?", list(rows)
             )
             self._conn.commit()
 
@@ -627,7 +712,7 @@ class Store:
         now = utcnow()
         with self._lock:
             rows = self._conn.execute(
-                "SELECT platform, cycle, lat, lon FROM argo_profiles "
+                "SELECT platform, cycle, lat, lon, obs_time, data_mode FROM argo_profiles "
                 "WHERE levels_json IS NULL OR (n_levels = 0 AND obs_time >= ? AND fetched_at < ?) "
                 "ORDER BY obs_time DESC LIMIT ?",
                 (iso(now - timedelta(days=recheck_days)), iso(now - timedelta(days=1)), limit),
@@ -637,6 +722,14 @@ class Store:
     def argo_count_missing(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM argo_profiles WHERE levels_json IS NULL").fetchone()[0]
+
+    def argo_without_levels(self) -> set[tuple[str, int]]:
+        """층별 값이 아직 없거나 받아 보니 비어 있던 프로파일의 (플랫폼, 사이클)."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT platform, cycle FROM argo_profiles WHERE levels_json IS NULL OR n_levels = 0"
+            ).fetchall()
+        return {(r["platform"], r["cycle"]) for r in rows}
 
     def argo_list(self, since: str | None = None, lat_max: float | None = None) -> list[dict]:
         clauses, params = [], []
@@ -741,8 +834,5 @@ class Store:
 
     def kv_set(self, key: str, value: str) -> None:
         with self._lock:
-            self._conn.execute(
-                "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-                (key, value),
-            )
+            self._conn.execute(SET_KV, (key, value))
             self._conn.commit()

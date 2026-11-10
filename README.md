@@ -263,6 +263,8 @@ Real responses contain values that must not be used as they are. Each rule below
 |---|---|
 | **Argo QC flags 1 and 2 only**; `*_adjusted` values in modes A/D, raw values in mode R | Float 1902223 delivered salinity 0.014 with flag 4 |
 | Prefer ascending Argo profiles (direction A) | Descending casts suffer from sensor lag |
+| Argo surface value = the shallowest QC'd level within 100 dbar of the stored profile, temperature and salinity chosen separately | The first listed row is not always the shallowest good level: float 6903128 cycle 178 showed 27.581 where the levels give 33.995 at 5.5 m |
+| Salinity outside the Southern Ocean range for its depth (Boyer & Levitus 1994) is **labelled, not dropped** | The ranges are broad and catch gross errors only; float 7901081 reported 35.8–40.7 at 345–511 m |
 | Satellite salinity outside **28–37 PSU** dropped | SMAP really returned 0.00 and 42.83 |
 | Temperature outside −3…40 °C, model/Argo salinity outside 20–42 PSU dropped | Physically impossible |
 | Open-Meteo Marine SST discarded when the cell elevation is > 0 | Land cells still return values like −1.8 °C |
@@ -279,7 +281,10 @@ all tested against the UNESCO 1983 check values.
 Ion composition: every stored salinity is also converted to the eight major ions (Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻) with the
 Reference Composition of Millero, Feistel, Wright and McDougall (2008): reference salinity S_R = (35.16504 / 35) × S_P, times each ion's mass
 fraction. At salinity 35 that is 19.3527 g/kg of chloride and 10.7815 g/kg of sodium. These are **derived values, not ion measurements**: real
-seawater differs slightly, and the changed ratios in sea-ice brine or where river water mixes in are not modelled. Formula, factors and limits:
+seawater differs slightly, and the changed ratios in sea-ice brine or where river water mixes in are not modelled. Each salinity is
+also compared with the Southern Ocean range for its depth (Boyer & Levitus 1994, NOAA Technical Report NESDIS 81) and labelled `ok`, `low` or `high`;
+nothing is dropped, and the ranges are broad, so only gross errors are caught. Where a row has a paired temperature, the workbook and the CSV export
+add the density at 1 atm and the ions in mmol/L (in-situ pressure not included). Formula, factors, ranges and limits:
 [docs/data-sources.en.md, section 11](docs/data-sources.en.md#11-ion-composition-derived-from-salinity).
 
 ## 7. Storage: SQLite and the Excel database
@@ -301,8 +306,8 @@ ignored), `matplotlib/` (font cache, installer builds only) and, while an update
 | `measurements` | Every point value: `source`, `dataset`, `variable`, `kind` (observation / satellite / analysis / model / forecast / climatology), `lat`, `lon`, `level`, `depth_m`, `pressure_hpa`, `obs_time`, `value`, `unit`, `location_id`, `quality`, `fetched_at` | source, dataset, variable, lat, lon, level, obs_time |
 | `grids` | Map-layer snapshots as gzip JSON (`lats`, `lons`, `values`) plus precomputed statistics (mean, min, max, coverage, percentiles, sector means) | layer, valid_time |
 | `argo_profiles` | Profile listing (position, mode, QC, surface T/S) and the level data as JSON | platform, cycle |
-| `seawater_ions` | For every salinity row: practical and reference salinity and the eight major ions in g/kg, derived with the Reference Composition. Triggers add, change and remove rows together with `measurements`; salinity stored before the upgrade is filled in once | source, dataset, lat, lon, level, obs_time |
-| `seawater_ions_mmol`, `argo_level_ions` (views) | The same rows in mmol/kg; and the derived ions of every Argo level, computed when read so the levels are not stored twice | |
+| `seawater_ions` | For every salinity row: practical and reference salinity and the eight major ions in g/kg, derived with the Reference Composition, plus `salinity_check` (`ok`, `low`, `high`) from the salinity range check. Triggers add, change and remove rows together with `measurements`; salinity stored before the upgrade is filled in once | source, dataset, lat, lon, level, obs_time |
+| `seawater_ions_mmol`, `argo_level_ions` (views) | The same rows in mmol/kg; and the derived ions and the range check of every Argo level, computed when read so the levels are not stored twice | |
 | `runs`, `source_state` | Every collection run; per-source last status, data time, next run, consecutive errors | |
 | `kv` | Source update tokens, daily call budgets, Excel stamp | |
 
@@ -326,9 +331,10 @@ while SUYA is running.
 | Forecasts | 24 points × forecast time × five models |
 | Windy | Windy API values (with a key) |
 | Point queries | Results for arbitrary points clicked on the map |
-| Ion composition | Every salinity row of the month with reference salinity and the eight major ions in g/kg and mmol/kg (derived, not measured) |
+| Ion composition | Every salinity row of the month with reference salinity and the eight major ions in g/kg and mmol/kg (derived, not measured); with a paired temperature also the density at 1 atm and mmol/L; a range-check column marks salinity outside the range |
 | Ion factors | The Reference Composition used: fifteen components with charge, molar mass, mass share and the factors per unit of salinity |
-| *(second file)* Argo levels | Every Argo level: pressure, depth, temperature, salinity, reference salinity and the eight derived ions in g/kg |
+| Salinity ranges | The Southern Ocean salinity range by depth used for the range check (Boyer & Levitus 1994): 33 standard depths with the depth window each range applies to |
+| *(second file)* Argo levels | Every Argo level: pressure, depth, temperature, salinity, reference salinity, the eight derived ions in g/kg and the range check |
 
 Workbooks are **regenerated from SQLite**, written to a temporary file and swapped in, so a crash never leaves a broken file. Only the current
 month, the previous month and months without a file are rewritten; older months are frozen. Sheets beyond 1,048,576 rows continue as `_2`, `_3`.
@@ -370,9 +376,10 @@ suya excel-sync                   # write the workbooks now. --all: every month,
 suya export measurements --out all.csv [--source argo] [--variable sea_water_salinity] [--since 2026-11-01T00:00:00Z]
 suya export argo --out argo.csv
 suya export grid --layer hycom_salt_500 --out salt500.csv
-suya export ions --out ions.csv [--source hycom] [--since 2026-11-01T00:00:00Z]   # derived ions, g/kg and mmol/kg
+suya export ions --out ions.csv [--source hycom] [--since 2026-11-01T00:00:00Z]   # derived ions: g/kg, mmol/kg, mmol/L, range check
 suya export argo-ions --out argo_ions.csv [--since 2026-11-01T00:00:00Z]          # derived ions of every Argo level
 suya ions 34.5                    # convert one salinity to its ion composition. --json for machine-readable output
+suya ions 34.5 --temperature -1.2 --depth 100   # also density at 1 atm, mmol/L and the salinity range check
 suya sources                      # list the sources
 suya self-test                    # installation check: opens a window off-screen and writes a workbook
 suya --version
@@ -511,6 +518,7 @@ antarctic_monitor/        Python package (CLI name: suya)
 ├── gridutil.py           grid sampling, area-weighted statistics, sector aggregation
 ├── seawater.py           EOS-80 freezing point, density, pressure→depth
 ├── composition.py        ion composition derived from salinity (Reference Composition, Millero et al. 2008)
+├── ranges.py             Southern Ocean salinity ranges by depth for the range check (Boyer & Levitus 1994)
 ├── geo.py                coordinate parsing (nullschool / Windy URLs), haversine
 ├── i18n.py               English/Korean strings; language-neutral stored messages
 ├── help_text.py          built-in user guide (both languages)

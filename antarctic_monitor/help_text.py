@@ -114,10 +114,11 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
  <tr><td>Windy</td><td>Windy.com 공식 API</td><td>3시간</td><td>키가 있을 때만. 기온·이슬점·습도·기압. 수온·염분 항목은 이 API에 없음</td></tr>
 </table>
 <ul>
- <li><b>Argo 품질</b>: 플래그 1(양호)·2(대체로 양호)만 받습니다. 보정 모드(A·D)면 보정값을, 실시간(R)이면 원시값을 씁니다. 상승 관측이 있으면 그것만 씁니다.</li>
+ <li><b>Argo 품질</b>: 플래그 1(양호)·2(대체로 양호)만 받습니다. 보정 모드(A·D)면 보정값을, 실시간(R)이면 원시값을 씁니다. 상승 관측이 있으면 그것만 씁니다. 표층 값은 받아 둔 층별 값 가운데 100 dbar 안에서 가장 얕은 유효 층이고, 층별 값을 받기 전까지만 목록의 값을 임시로 씁니다.</li>
  <li><b>범위 밖 값 제거</b>: 수온 −3~40 °C, 위성 염분 28~37 PSU, 모델·Argo 염분 20~42 PSU 밖은 버립니다(위성 염분에서 실제로 0.0이나 42.8이 내려옵니다).</li>
+ <li><b>염분 범위 표시</b>: 저장된 염분이 그 수심의 남극해 범위(Boyer &amp; Levitus 1994, NOAA Technical Report NESDIS 81)를 벗어나면 낮음·높음으로 표시만 합니다. 값은 지우지 않으며, 범위가 넓어 큰 오류만 걸립니다.</li>
  <li><b>대표값</b>: 100 km·10일 안의 Argo 실측이 있으면 그것, 없으면 수온은 OISST → MUR → HYCOM, 염분은 HYCOM → SMOS → SMAP 순.</li>
- <li><b>파생값</b>: 어는점 Millero(1978), 밀도 σt EOS-80(Millero &amp; Poisson 1981), 압력→수심 Saunders &amp; Fofonoff(1976).</li>
+ <li><b>파생값</b>: 어는점 Millero(1978), 밀도 σt EOS-80(Millero &amp; Poisson 1981), 압력→수심 Saunders &amp; Fofonoff(1976). 이온의 mmol/L은 mmol/kg에 그 수온과 염분의 1기압 밀도를 곱한 값이고 현장 압력은 넣지 않습니다.</li>
  <li><b>시각</b>: 저장은 모두 UTC, 화면은 이 컴퓨터의 현지 시각으로 보여 줍니다.</li>
 </ul>
 
@@ -131,9 +132,9 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
 <ul>
  <li><code>antarctic.db</code>: 모든 원본 값(SQLite). 다른 프로그램(파이썬, R, DB Browser)에서 바로 열 수 있습니다.</li>
  <li><code>settings.env</code>: 설정. <code>monitor.log</code>: 로그(문제가 생기면 이 파일을 보세요). <code>crash.log</code>: 프로그램이 갑자기 꺼졌을 때만 내용이 생깁니다. <code>suya.lock</code>: 두 번째 복사본이 뜨지 않게 하는 잠금 파일.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 월간요약, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회, 이온조성, 이온환산계수.</li>
- <li><code>argo_levels_YYYY-MM.xlsx</code>: Argo 전 층과 층별 이온 환산값(행이 많아 별도 파일).</li>
- <li>이온 값은 염분이 저장될 때마다 SQLite의 <code>seawater_ions</code> 표에 함께 쌓입니다(주요 이온 여덟 가지, g/kg). mmol/kg는 <code>seawater_ions_mmol</code>, Argo 층별 값은 <code>argo_level_ions</code> 뷰에서 읽습니다. 모두 환산값입니다.</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 월간요약, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회, 이온조성, 이온환산계수, 염분범위.</li>
+ <li><code>argo_levels_YYYY-MM.xlsx</code>: Argo 전 층과 층별 이온 환산값, 범위 검사 표시(행이 많아 별도 파일).</li>
+ <li>이온 값은 염분이 저장될 때마다 SQLite의 <code>seawater_ions</code> 표에 함께 쌓입니다(주요 이온 여덟 가지, g/kg). mmol/kg는 <code>seawater_ions_mmol</code>, Argo 층별 값은 <code>argo_level_ions</code> 뷰에서 읽습니다. 모두 환산값입니다. 범위 검사 결과는 <code>salinity_check</code> 열(<code>ok</code>·<code>low</code>·<code>high</code>)에 있고, 1기압 밀도와 mmol/L은 엑셀 이온조성 시트와 <code>suya export ions</code>에 들어갑니다.</li>
 </ul>
 <p><b>주의</b>: 엑셀 파일은 SQLite에서 <b>다시 생성</b>됩니다. 직접 고친 내용은 다음 저장 때 덮어쓰입니다. 분석은 복사본에서 하세요.
 Windows에서 엑셀로 파일을 열어 둔 채로는 저장이 실패하고 다음 주기에 다시 시도합니다. 지난달까지의 파일은 더 이상 건드리지 않습니다.</p>
@@ -156,6 +157,7 @@ suya export measurements --out a.csv
 suya export ions --out ions.csv            염분에서 환산한 이온 조성
 suya export argo-ions --out argo_ions.csv  Argo 층별 이온 조성
 suya ions 34.5       염분 하나를 이온 양으로 환산 (--json)
+suya ions 34.5 --temperature -1.2 --depth 100   mmol/L과 염분 범위 검사 추가
 suya sources         소스 목록
 suya --lang en       영어로 실행</pre>
 
@@ -271,10 +273,11 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
  <tr><td>Windy</td><td>Windy.com official API</td><td>3 h</td><td>Only with a key. Air temperature, dew point, humidity, pressure. The API has no water temperature or salinity</td></tr>
 </table>
 <ul>
- <li><b>Argo quality</b>: only QC flags 1 (good) and 2 (probably good). Adjusted values in modes A/D, raw values in mode R. Ascending profiles are preferred.</li>
+ <li><b>Argo quality</b>: only QC flags 1 (good) and 2 (probably good). Adjusted values in modes A/D, raw values in mode R. Ascending profiles are preferred. The surface value is the shallowest valid level within 100 dbar of the stored profile; the listed value is used only until the levels arrive.</li>
  <li><b>Range checks</b>: temperature −3…40 °C, satellite salinity 28…37 PSU, model and Argo salinity 20…42 PSU. Values outside are dropped (satellite salinity really does return 0.0 and 42.8).</li>
+ <li><b>Salinity range label</b>: a stored salinity outside the Southern Ocean range for its depth (Boyer &amp; Levitus 1994, NOAA Technical Report NESDIS 81) is labelled low or high. Nothing is dropped, and the ranges are broad, so only gross errors are caught.</li>
  <li><b>Representative value</b>: an Argo profile within 100 km and 10 days if there is one; otherwise temperature OISST → MUR → HYCOM, salinity HYCOM → SMOS → SMAP.</li>
- <li><b>Derived values</b>: freezing point Millero (1978), density σt from EOS-80 (Millero &amp; Poisson 1981), pressure to depth Saunders &amp; Fofonoff (1976).</li>
+ <li><b>Derived values</b>: freezing point Millero (1978), density σt from EOS-80 (Millero &amp; Poisson 1981), pressure to depth Saunders &amp; Fofonoff (1976). Ion amounts in mmol/L are mmol/kg times the density at 1 atm for that temperature and salinity; in-situ pressure is not included.</li>
  <li><b>Times</b>: stored in UTC, displayed in this computer's local time.</li>
 </ul>
 
@@ -288,9 +291,9 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
 <ul>
  <li><code>antarctic.db</code>: every raw value (SQLite). Open it directly from Python, R or DB Browser.</li>
  <li><code>settings.env</code>: settings. <code>monitor.log</code>: log file (check it when something goes wrong). <code>crash.log</code>: gets content only when the program dies suddenly. <code>suya.lock</code>: keeps a second copy from starting.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Monthly summary, Grid means, Water by area, Water vertical, Argo list, Ships, Stations, GFS air, Forecasts, Windy, Point queries, Ion composition, Ion factors.</li>
- <li><code>argo_levels_YYYY-MM.xlsx</code>: every Argo level with its derived ion amounts (separate because of the row count).</li>
- <li>Ion amounts are added to the SQLite table <code>seawater_ions</code> whenever a salinity is stored (eight major ions, g/kg). Read mmol/kg from the view <code>seawater_ions_mmol</code> and Argo levels from the view <code>argo_level_ions</code>. All of them are derived values.</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Monthly summary, Grid means, Water by area, Water vertical, Argo list, Ships, Stations, GFS air, Forecasts, Windy, Point queries, Ion composition, Ion factors, Salinity ranges.</li>
+ <li><code>argo_levels_YYYY-MM.xlsx</code>: every Argo level with its derived ion amounts and the range check (separate because of the row count).</li>
+ <li>Ion amounts are added to the SQLite table <code>seawater_ions</code> whenever a salinity is stored (eight major ions, g/kg). Read mmol/kg from the view <code>seawater_ions_mmol</code> and Argo levels from the view <code>argo_level_ions</code>. All of them are derived values. The range check is in the column <code>salinity_check</code> (<code>ok</code>, <code>low</code>, <code>high</code>); density at 1 atm and mmol/L are added in the Ion composition sheet and by <code>suya export ions</code>.</li>
 </ul>
 <p><b>Note</b>: the workbooks are <b>regenerated</b> from SQLite. Manual edits are overwritten on the next save; analyse a copy.
 On Windows a workbook that is open in Excel cannot be replaced; the program retries on the next cycle. Months before the previous one are never touched again.</p>
@@ -313,6 +316,7 @@ suya export measurements --out a.csv
 suya export ions --out ions.csv            ion composition derived from salinity
 suya export argo-ions --out argo_ions.csv  ion composition for every Argo level
 suya ions 34.5       convert one salinity to ion amounts (--json)
+suya ions 34.5 --temperature -1.2 --depth 100   adds mmol/L and the salinity range check
 suya sources         list the sources
 suya --lang ko       run in Korean</pre>
 

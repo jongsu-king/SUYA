@@ -104,14 +104,16 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 ## 5. Argo — float profiles
 
 - Dataset `ArgoFloats` at erddap.ifremer.fr (tabledap, CSV).
-- Listing: `platform_number,cycle_number,time,latitude,longitude,data_mode,position_qc,pres,temp,temp_qc,psal,psal_qc,temp_adjusted,…&latitude<=-55&time>=now-30days&pres<=100&orderByLimit("platform_number,cycle_number,1")` — the shallowest level of every profile; about 600 profiles per 30 days at the time of writing.
-- Levels: `…&platform_number="<id>"&cycle_number=<n>` per profile, 60 profiles per run newest first; if more remain the job reruns after 30 s (`backlog`).
+- Listing: `platform_number,cycle_number,direction,time,latitude,longitude,data_mode,position_qc,pres,pres_qc,pres_adjusted,pres_adjusted_qc,temp,temp_qc,psal,psal_qc,temp_adjusted,…&latitude<=-55&time>=now-30days&pres<=100&orderByMin("platform_number,cycle_number,direction,pres")` — for every cycle and direction the row with the lowest pressure within 100 dbar; when a cycle has both an ascending and a descending cast the ascending one is used; about 600 profiles per 30 days at the time of writing.
+- Levels: `…&platform_number="<id>"&cycle_number=<n>` per profile, 120 profiles per run newest first; if more remain the job reruns after 30 s (`backlog`).
 - **Quality rules** (`argo.select_value`):
   - In `data_mode` A (real-time adjusted) or D (delayed) the `*_adjusted` value and `*_adjusted_qc` are used; in R the raw value and `*_qc`.
   - Only QC flags `1` (good) and `2` (probably good) are accepted; `3`, `4`, `8`, `9` are dropped.
   - When an ascending profile (`direction=A`) exists, descending data is ignored.
   - Temperature −3…40 °C, salinity 20…42 PSU, pressure 0…12000 dbar.
   - Real case: float 1902223 cycle 282 reported `psal=0.014, psal_qc=4`. Without the flag check a salinity of zero ends up on the chart.
+- **Surface value** (`seawater.surface_values`): the surface temperature and salinity of a profile are the shallowest stored level within 100 dbar that has the value, chosen separately for temperature and salinity; the measurement row records that level's depth in `depth_m`. A profile with nothing usable within 100 dbar gets no surface row. The listed value is only a stand-in until the levels arrive, and it is not used when the pressure flag of the listed row is bad.
+  - Earlier versions stored the first listed row as the surface value. On the first collection after the upgrade the surface rows of every profile that has levels are chosen again, once (guarded by `argo:surface` in `kv`). Case seen on a copy of a real database (2026-11-11): float 6903128 cycle 178, surface salinity 27.581 → 33.995 (at 5.5 m).
 - Pressure (dbar) is converted to depth (m) with Saunders & Fofonoff (1976).
 - `position_qc=8` marks profiles whose position was estimated under sea ice; the UI says "estimated position".
 - When delayed-mode data appears later, the changed `data_mode` triggers a re-download of the levels.
@@ -156,9 +158,9 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 | `measurements` | Point values: source, dataset, variable, kind (observation/satellite/analysis/model/forecast/climatology), lat, lon, level, depth_m, pressure_hpa, obs_time, value, unit, location_id, quality | (source, dataset, variable, lat, lon, level, obs_time) |
 | `grids` | Map-layer snapshots (gzip JSON) with statistics | (layer, valid_time) |
 | `argo_profiles` | Profile listing and level JSON | (platform, cycle) |
-| `seawater_ions` | Reference salinity and the eight major ions in g/kg, derived for every salinity row (section 11); triggers keep it in step with `measurements` | (source, dataset, lat, lon, level, obs_time) |
+| `seawater_ions` | Reference salinity and the eight major ions in g/kg, derived for every salinity row, and the range-check verdict `salinity_check` (section 11); triggers keep it in step with `measurements` | (source, dataset, lat, lon, level, obs_time) |
 | `seawater_ions_mmol` (view) | The same rows in mmol/kg | |
-| `argo_level_ions` (view) | Temperature, salinity and derived ions in g/kg per Argo level; uses no storage | |
+| `argo_level_ions` (view) | Temperature, salinity, derived ions in g/kg and the range-check verdict per Argo level; uses no storage | |
 | `runs` / `source_state` | Collection history, next run, consecutive errors | |
 | `kv` | Source tokens, daily budgets, Excel stamp | |
 
@@ -196,3 +198,23 @@ Eight components are stored in the database and in Excel; together they are 99.8
 
 Storage: whenever a salinity row is inserted into, changed in or deleted from `measurements`, triggers bring the row with the same key in `seawater_ions` in line. The first start after the upgrade fills in every salinity row already stored, once (guarded by `ions:method` in `kv`).
 Argo level salinities are stored once, in `argo_profiles`; the view `argo_level_ions` computes the ion amounts when it is read, so the same hundreds of thousands of rows are not kept a second time.
+
+### Salinity range check
+
+Every stored salinity is compared with the range that can occur at its depth and labelled (`ranges.py`). **No value is dropped or changed.**
+
+- Ranges: Boyer, T. and S. Levitus (1994), *Quality Control and Processing of Historical Oceanographic Temperature, Salinity, and Oxygen Data*, NOAA Technical Report NESDIS 81, Appendix A, Table 3f (Southern Ocean): a minimum and a maximum for each of 33 standard depths from 0 to 5500 m. <https://repository.library.noaa.gov/view/noaa/13443/noaa_13443_DS1.pdf>
+- Depth windows: following the same report, the range of a standard depth applies upward for 3/4 of the distance to the previous standard depth and downward for 1/4 of the distance to the next. Example: the 100 m range (30.5–36.5) applies deeper than 81.25 m and down to 106.25 m. A row with no depth uses the surface (0 m) range.
+- Result: `ok`, `low` or `high` in `seawater_ions.salinity_check` and `argo_level_ions.salinity_check`. In Excel the *Range check* column is filled only where the value is outside (`low` / `high`), and the *Salinity ranges* sheet lists the table. `ions:check` in `kv` holds the edition of the table (`boyer1994-so/1`); if the table changes, every row is judged again once.
+- Limits: the report makes the ranges broad on purpose, so only gross errors are caught. The window down to 2.5 m is 0–40, so surface values are practically never labelled, and a value inside the range is not thereby confirmed. The Southern Ocean table is applied to every stored salinity whatever its latitude (the basin boundary was not found in the report).
+- Seen on a copy of a real database (2026-11-11): all 4,007 point rows were `ok`; of the 525,907 rows of `argo_level_ions`, 1,647 were `high` (1,597 levels of float 7900928 at 325–1,246 m and 50 levels of float 7901081 at 345–511 m) and none `low`.
+
+### Volume basis (mmol/L)
+
+mmol/kg times the density of the seawater gives mmol/L: mmol/L = mmol/kg × ρ / 1000.
+
+- Density ρ: the density at 1 atm for the row's salinity and temperature (Millero & Poisson 1981, `seawater.density_surface`); 1027.675 kg/m³ at salinity 35 and 5 °C.
+- Temperature: the temperature row with the same source, dataset, position, level and time. A salinity row without such a partner leaves density and mmol/L blank. Computed only for −3…40 °C and salinity up to 42.
+- In-situ pressure is not included; the real density of deep water is higher (about 0.4 % at 1000 m).
+- Not stored in the database: the *Ion composition* sheet, `suya export ions` and `suya ions --temperature` compute it when they read. The Argo levels workbook and `argo_level_ions` do not carry it.
+- Seen on a copy of a real database (2026-11-11): 4,000 of the 4,007 point rows had a paired temperature.
