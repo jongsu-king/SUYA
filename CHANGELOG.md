@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-10
+
+Updates now install themselves by default, and a clearer Open-Meteo budget message. Concept DOI for
+all versions: 10.5281/zenodo.23937852.
+
+### Changed
+- **Automatic updates are on by default** (`MONITOR_UPDATE_MODE=auto`): when the daily check finds a
+  newer release, SUYA downloads the installer for this system, verifies it against the release's
+  `SHA256SUMS.txt`, installs it and restarts; a 20-second prompt lets you postpone. *Settings ▸
+  Updates* still offers *ask first* and *off*, and a choice saved there is kept. An unknown value of
+  `MONITOR_UPDATE_MODE` now falls back to `auto`. `suya self-test` never checks for updates.
+
 ### Fixed
 - The Open-Meteo budget message no longer reads "used up (5998/9000)" when the GFS map is held back by
   its 30 % reserve. It now names the calls needed and the share the map may use, for example
