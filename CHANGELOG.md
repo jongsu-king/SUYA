@@ -8,8 +8,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [0.1.5] - 2026-11-10
 
-Updates now install themselves by default, and a clearer Open-Meteo budget message. Concept DOI for
-all versions: 10.5281/zenodo.23937852.
+Updates now install themselves by default, and a clearer Open-Meteo budget message. Version DOI:
+https://doi.org/10.5281/zenodo.24096560 (concept DOI for all versions: 10.5281/zenodo.23937852).
 
 ### Changed
 - **Automatic updates are on by default** (`MONITOR_UPDATE_MODE=auto`): when the daily check finds a
