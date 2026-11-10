@@ -8,7 +8,7 @@ import time
 from datetime import timedelta
 from typing import Any, Awaitable, Callable
 
-from . import seawater
+from . import composition, seawater
 from .collectors import argo as argo_collector
 from .collectors import erddap, hycom, openmeteo, windy, woa
 from .collectors.base import Context
@@ -213,12 +213,13 @@ async def water(ctx: Context, lat: float, lon: float) -> dict:
     best_temp = _first_value(rows, "temperature", (*lead, "oisst", "mur", "hycom"))
     best_salt = _first_value(rows, "salinity", (*lead, "hycom", "smos", "smap"))
     derived = seawater.derive(best_temp["value"] if best_temp else None, best_salt["value"] if best_salt else None)
+    ions = composition.derive(best_salt["value"] if best_salt else None)
     await asyncio.to_thread(_store_water_rows, ctx, rows, query_lat, query_lon)
     return {
         "query": {"lat": lat, "lon": lon},
         "ocean": ocean,
         "rows": rows,
-        "headline": {"temperature": best_temp, "salinity": best_salt, "derived": derived},
+        "headline": {"temperature": best_temp, "salinity": best_salt, "derived": derived, "ions": ions},
         "errors": errors,
     }
 

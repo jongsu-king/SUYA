@@ -1,4 +1,4 @@
-"""공용 표와 지점 상세 탭 네 개: 표층, 수직 프로파일, 기온, 시계열."""
+"""공용 표와 지점 상세 탭 다섯 개: 표층, 수직 프로파일, 기온, 시계열, 이온 조성."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
+from .. import composition
 from ..catalog import KIND_LABEL
 from ..i18n import render, tr
 from ..seawater import mixed_layer_depth
@@ -18,6 +19,11 @@ from .format import age, coord_text, num, parse_time, percent, short_time
 from .theme import LIGHT, Theme, series_color
 
 VARIABLE_GROUPS = (("temperature", "수온"), ("salinity", "염분"), ("anomaly", "수온 편차"), ("ice", "해빙"))
+ION_NOTE = (
+    "염분에 기준 조성(Millero 외 2008)의 비율을 곱한 환산값입니다. 이온을 직접 잰 값이 아니며, "
+    "해빙 주변의 브라인이나 강물이 섞이는 곳에서는 실제 비율이 다를 수 있습니다. "
+    "주요 이온 여덟 가지는 염분이 저장될 때마다 DB와 엑셀에 함께 쌓입니다."
+)
 
 
 class DataTable(QTableWidget):
@@ -181,6 +187,111 @@ class WaterPanel(DetailPanel):
                 table.put(row, 3, short_time(item["time"]))
                 table.put(row, 4, age(item["time"]))
                 table.put(row, 5, render(item.get("note")))
+
+
+def _fit_rows(table: DataTable, extra: int = 0) -> None:
+    """표 높이를 행 수에 맞춥니다. 표마다 따로 스크롤하지 않고 탭 전체가 한 번에 스크롤됩니다."""
+    rows = max(table.rowCount(), 1)
+    height = table.horizontalHeader().sizeHint().height() + rows * table.verticalHeader().defaultSectionSize()
+    table.setFixedHeight(height + 2 * table.frameWidth() + 2 + extra)
+
+
+class IonPanel(DetailPanel):
+    """염분에서 환산한 이온 조성. 표층 탭과 같은 조회 결과를 쓰므로 통신을 더 하지 않습니다."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.note = QLabel(tr(ION_NOTE))
+        self.note.setWordWrap(True)
+        self.note.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.body.addWidget(self.note)
+        self.headline = DataTable([tr("항목"), tr("값"), tr("비고")], numeric={1})
+        self.body.addWidget(self.headline)
+        self.table = DataTable(
+            [tr("성분"), tr("기호"), "g/kg", "mmol/kg", tr("질량 비율 %"), tr("비고")], numeric={2, 3, 4}
+        )
+        self.body.addWidget(self.table)
+        self.sources_title = QLabel(tr("자료별 염분에서 환산한 주요 이온 (g/kg)"))
+        self.body.addWidget(self.sources_title)
+        self.sources = DataTable(
+            [tr("자료"), tr("염분 PSU"), *(component.symbol for component in composition.MAJOR), tr("자료 시각")],
+            numeric=set(range(1, 2 + len(composition.MAJOR))),
+        )
+        self.body.addWidget(self.sources)
+        self.body.addWidget(self.errors)
+        self.body.addStretch(1)
+        for table in (self.headline, self.table, self.sources):
+            _fit_rows(table)
+
+    def render(self, data: dict) -> None:
+        headline = data["headline"]
+        salt = headline.get("salinity")
+        ions = headline.get("ions") or composition.derive(salt["value"] if salt else None)
+        self.note.setStyleSheet(f"color: {self.theme.muted}")
+
+        table = self.headline
+        table.setRowCount(0)
+
+        def fact(label: str, value: str, note: str = "") -> None:
+            row = table.rowCount()
+            table.insertRow(row)
+            table.put(row, 0, label)
+            table.put(row, 1, value)
+            table.put(row, 2, note)
+
+        if salt:
+            origin = (render(salt["label"]), tr(KIND_LABEL.get(salt["kind"], salt["kind"])), short_time(salt["time"]))
+            fact(tr("표층 염분"), f"{num(salt['value'], 3)} PSU", " · ".join(part for part in origin if part))
+        if ions:
+            fact(tr("기준 염분 S_R"), f"{num(ions['reference_salinity'], 4)} g/kg", "S_R = (35.16504 / 35) × S_P")
+            fact(tr("염소량"), f"{num(ions['chlorinity'], 4)} g/kg", "S_P / 1.80655")
+            fact(tr("이온 세기"), f"{num(ions['ionic_strength'], 4)} mol/kg", tr("물 1 kg 기준"))
+        else:
+            fact(tr("이온 조성"), "–", tr("이 지점에서 쓸 수 있는 염분 값이 없어 환산하지 못했습니다"))
+        _fit_rows(table)
+
+        table = self.table
+        table.setRowCount(0)
+        stored = {component.key for component in composition.MAJOR}
+        components = ions["ions"] if ions else []
+        for ion in components:
+            row = table.rowCount()
+            table.insertRow(row)
+            table.put(row, 0, tr(ion["name"]))
+            table.put(row, 1, ion["symbol"])
+            table.put(row, 2, num(ion["g_per_kg"], 5))
+            table.put(row, 3, num(ion["mmol_per_kg"], 4))
+            table.put(row, 4, num(ion["mass_percent"], 4))
+            table.put(row, 5, tr("DB·엑셀에 저장") if ion["key"] in stored else "")
+        if components:
+            row = table.rowCount()
+            table.insertRow(row)
+            table.put(row, 0, tr("합계"), bold=True)
+            table.put(row, 2, num(sum(ion["g_per_kg"] for ion in components), 5), bold=True)
+            table.put(row, 4, num(sum(ion["mass_percent"] for ion in components), 4), bold=True)
+            table.put(row, 5, tr("기준 염분 S_R 과 같음"))
+        table.setVisible(bool(components))
+        _fit_rows(table)
+
+        table = self.sources
+        table.setRowCount(0)
+        for item in data["rows"]:
+            if item["variable"] != "salinity":
+                continue
+            row = table.rowCount()
+            table.insertRow(row)
+            value = item["value"]
+            grams = composition.grams_per_kg(value, composition.MAJOR)
+            table.put(row, 0, render(item["label"]))
+            table.put(
+                row, 1, tr("결측") if value is None else num(value, 3), color=self.theme.muted if value is None else None
+            )
+            for column, component in enumerate(composition.MAJOR, start=2):
+                table.put(row, column, num(grams.get(component.key), 4))
+            table.put(row, 2 + len(composition.MAJOR), short_time(item["time"]))
+        self.sources_title.setVisible(table.rowCount() > 0)
+        table.setVisible(table.rowCount() > 0)
+        _fit_rows(table, extra=table.horizontalScrollBar().sizeHint().height())
 
 
 def _levels(levels: list[dict] | None, key: str) -> tuple[list[float], list[float]]:

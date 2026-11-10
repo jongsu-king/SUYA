@@ -30,12 +30,13 @@ from .charts import Chart
 from .dialogs import AboutDialog, LanguageDialog, SettingsDialog, SourcesDialog
 from .help import HelpDialog
 from .format import age, clock_time, coord_text, countdown, interval_text, num, percent, short_time, status_text
-from .panels import AirPanel, DataTable, ProfilePanel, SeriesPanel, WaterPanel
+from .panels import AirPanel, DataTable, IonPanel, ProfilePanel, SeriesPanel, WaterPanel
 from .polarmap import ColorBar, PolarMapWidget
 from .scales import build_scale
 from .theme import Theme, current_theme, series_color
 
-DETAIL_TABS = ("water", "profile", "air", "series")
+DETAIL_TABS = ("water", "profile", "air", "series", "ions")
+DETAIL_QUERY = {"ions": "water"}
 GRID_SOURCES = {
     "oisst": {"oisst_sst", "oisst_anom", "oisst_ice"},
     "smos": {"smos_sss"},
@@ -335,11 +336,18 @@ class MainWindow(QMainWindow):
         self.ocean_note.setWordWrap(True)
         self.ocean_note.setVisible(False)
         right_layout.addWidget(self.ocean_note)
-        self.panels = {"water": WaterPanel(), "profile": ProfilePanel(), "air": AirPanel(), "series": SeriesPanel()}
+        self.panels = {
+            "water": WaterPanel(),
+            "profile": ProfilePanel(),
+            "air": AirPanel(),
+            "series": SeriesPanel(),
+            "ions": IonPanel(),
+        }
         for panel in self.panels.values():
             panel.set_theme(self.theme)
         self.detail_tabs = QTabWidget()
-        for key, label in zip(DETAIL_TABS, (tr("표층"), tr("수직 프로파일"), tr("기온"), tr("시계열"))):
+        labels = (tr("표층"), tr("수직 프로파일"), tr("기온"), tr("시계열"), tr("이온 조성"))
+        for key, label in zip(DETAIL_TABS, labels):
             self.detail_tabs.addTab(self.panels[key], label)
         self.detail_tabs.currentChanged.connect(self._on_detail_tab)
         right_layout.addWidget(self.detail_tabs, 1)
@@ -740,7 +748,7 @@ class MainWindow(QMainWindow):
             panel.show_data(data)
             self._update_ocean_note(data.get("ocean"))
 
-        self.backend.point(tab, lat, lon, done)
+        self.backend.point(DETAIL_QUERY.get(tab, tab), lat, lon, done)
 
     def _update_ocean_note(self, ocean: dict | None) -> None:
         if not ocean:

@@ -5,9 +5,10 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .db import MEASUREMENT_COLUMNS, Store
+from .db import ARGO_ION_COLUMNS, ION_COLUMNS, ION_MMOL_COLUMNS, MEASUREMENT_COLUMNS, Store
 
 ARGO_FIELDS = ("platform", "cycle", "obs_time", "lat", "lon", "data_mode", "pressure_dbar", "depth_m", "temp", "salt")
+ION_FIELDS = (*ION_COLUMNS, *ION_MMOL_COLUMNS)
 
 
 def _open(path: Path):
@@ -38,6 +39,30 @@ def export_argo(store: Store, path: Path, since: str | None = None) -> int:
             for level in profile["levels"]:
                 writer.writerow(base | level)
                 count += 1
+    return count
+
+
+def export_ions(store: Store, path: Path, source: str | None = None, since: str | None = None) -> int:
+    """염분에서 환산한 이온 조성 (g/kg 와 mmol/kg). 측정값이 아니라 기준 조성으로 환산한 값입니다."""
+    count = 0
+    with _open(path) as handle:
+        writer = csv.DictWriter(handle, fieldnames=ION_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        for row in store.iter_ions(source=source, since=since, mmol=True):
+            writer.writerow(row)
+            count += 1
+    return count
+
+
+def export_argo_ions(store: Store, path: Path, since: str | None = None) -> int:
+    """Argo 층마다 염분에서 환산한 이온 조성 (g/kg)."""
+    count = 0
+    with _open(path) as handle:
+        writer = csv.DictWriter(handle, fieldnames=ARGO_ION_COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        for row in store.iter_argo_level_ions(since=since):
+            writer.writerow(row)
+            count += 1
     return count
 
 

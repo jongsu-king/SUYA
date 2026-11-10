@@ -64,6 +64,8 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
   HYCOM 서버 응답에 최대 1분 걸립니다.</td></tr>
  <tr><td>기온</td><td>GFS 현재값 8종, 5개 모델(GFS·ECMWF·ICON·GEM·JMA)의 7일 기온 예보 비교, 가까운 기지의 METAR 실측, 기압 고도별 기온.</td></tr>
  <tr><td>시계열</td><td>최근 30일 OISST 수온, 위성 염분(SMOS·SMAP), 해빙 농도, ERA5 일별 기온.</td></tr>
+ <tr><td>이온 조성</td><td>표층 염분에서 환산한 기준 염분 S<sub>R</sub>, 염소량, 이온 세기와 성분 15가지의 g/kg·mmol/kg·질량 비율, 자료별 주요 이온 여덟 가지.
+  염분에 기준 조성(Millero 외 2008)의 비율을 곱한 <b>환산값</b>이며 이온을 직접 잰 값이 아닙니다. 표층 탭과 같은 조회 결과를 쓰므로 통신을 더 하지 않습니다.</td></tr>
 </table>
 <p>모든 그래프 위의 도구막대: 처음 범위 / 이전 / 다음 / 이동 / 영역 확대 / 그림 저장(PNG·PDF·SVG) / <b>표</b>(값을 표로 보기).
 그래프에 마우스를 올리면 그 위치의 값이 풍선으로 나옵니다. 표에서 행을 고르고 Ctrl+C(⌘C)하면 엑셀에 바로 붙습니다.</p>
@@ -129,8 +131,9 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
 <ul>
  <li><code>antarctic.db</code>: 모든 원본 값(SQLite). 다른 프로그램(파이썬, R, DB Browser)에서 바로 열 수 있습니다.</li>
  <li><code>settings.env</code>: 설정. <code>monitor.log</code>: 로그(문제가 생기면 이 파일을 보세요). <code>crash.log</code>: 프로그램이 갑자기 꺼졌을 때만 내용이 생깁니다. <code>suya.lock</code>: 두 번째 복사본이 뜨지 않게 하는 잠금 파일.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 월간요약, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회.</li>
- <li><code>argo_levels_YYYY-MM.xlsx</code>: Argo 전 층(행이 많아 별도 파일).</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 월간요약, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회, 이온조성, 이온환산계수.</li>
+ <li><code>argo_levels_YYYY-MM.xlsx</code>: Argo 전 층과 층별 이온 환산값(행이 많아 별도 파일).</li>
+ <li>이온 값은 염분이 저장될 때마다 SQLite의 <code>seawater_ions</code> 표에 함께 쌓입니다(주요 이온 여덟 가지, g/kg). mmol/kg는 <code>seawater_ions_mmol</code>, Argo 층별 값은 <code>argo_level_ions</code> 뷰에서 읽습니다. 모두 환산값입니다.</li>
 </ul>
 <p><b>주의</b>: 엑셀 파일은 SQLite에서 <b>다시 생성</b>됩니다. 직접 고친 내용은 다음 저장 때 덮어쓰입니다. 분석은 복사본에서 하세요.
 Windows에서 엑셀로 파일을 열어 둔 채로는 저장이 실패하고 다음 주기에 다시 시도합니다. 지난달까지의 파일은 더 이상 건드리지 않습니다.</p>
@@ -150,6 +153,9 @@ suya daemon          창 없이 계속 수집
 suya collect         모든 소스 한 번 수집
 suya excel-sync      엑셀 파일 지금 쓰기 (--all: 모든 달)
 suya export measurements --out a.csv
+suya export ions --out ions.csv            염분에서 환산한 이온 조성
+suya export argo-ions --out argo_ions.csv  Argo 층별 이온 조성
+suya ions 34.5       염분 하나를 이온 양으로 환산 (--json)
 suya sources         소스 목록
 suya --lang en       영어로 실행</pre>
 
@@ -216,6 +222,8 @@ collection. Windy is used only through its <b>official Point Forecast API</b>, a
   The HYCOM server can take up to a minute.</td></tr>
  <tr><td>Air temperature</td><td>Eight GFS current values, 7-day forecasts from five models (GFS, ECMWF, ICON, GEM, JMA), METAR observations from the nearest station, temperature by pressure level.</td></tr>
  <tr><td>Time series</td><td>Last 30 days of OISST SST, satellite salinity (SMOS, SMAP), sea ice concentration and ERA5 daily air temperature.</td></tr>
+ <tr><td>Ion composition</td><td>Reference salinity S<sub>R</sub>, chlorinity, ionic strength and 15 components in g/kg, mmol/kg and mass share, derived from the surface salinity, plus the eight major ions for each source.
+  These are <b>derived</b> by multiplying salinity by the ratios of the Reference Composition (Millero et al. 2008); they are not direct ion measurements. The tab reuses the Surface query, so it makes no extra requests.</td></tr>
 </table>
 <p>Every chart has a toolbar: reset view / back / forward / pan / zoom to area / save figure (PNG, PDF, SVG) / <b>Table</b>.
 Hovering shows the values at the cursor. Select rows in any table and press Ctrl+C (⌘C) to paste them into Excel.</p>
@@ -280,8 +288,9 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
 <ul>
  <li><code>antarctic.db</code>: every raw value (SQLite). Open it directly from Python, R or DB Browser.</li>
  <li><code>settings.env</code>: settings. <code>monitor.log</code>: log file (check it when something goes wrong). <code>crash.log</code>: gets content only when the program dies suddenly. <code>suya.lock</code>: keeps a second copy from starting.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Monthly summary, Grid means, Water by area, Water vertical, Argo list, Ships, Stations, GFS air, Forecasts, Windy, Point queries.</li>
- <li><code>argo_levels_YYYY-MM.xlsx</code>: every Argo level (separate because of the row count).</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Monthly summary, Grid means, Water by area, Water vertical, Argo list, Ships, Stations, GFS air, Forecasts, Windy, Point queries, Ion composition, Ion factors.</li>
+ <li><code>argo_levels_YYYY-MM.xlsx</code>: every Argo level with its derived ion amounts (separate because of the row count).</li>
+ <li>Ion amounts are added to the SQLite table <code>seawater_ions</code> whenever a salinity is stored (eight major ions, g/kg). Read mmol/kg from the view <code>seawater_ions_mmol</code> and Argo levels from the view <code>argo_level_ions</code>. All of them are derived values.</li>
 </ul>
 <p><b>Note</b>: the workbooks are <b>regenerated</b> from SQLite. Manual edits are overwritten on the next save; analyse a copy.
 On Windows a workbook that is open in Excel cannot be replaced; the program retries on the next cycle. Months before the previous one are never touched again.</p>
@@ -301,6 +310,9 @@ suya daemon          collect continuously without a window
 suya collect         collect every source once
 suya excel-sync      write the workbooks now (--all: every month)
 suya export measurements --out a.csv
+suya export ions --out ions.csv            ion composition derived from salinity
+suya export argo-ions --out argo_ions.csv  ion composition for every Argo level
+suya ions 34.5       convert one salinity to ion amounts (--json)
 suya sources         list the sources
 suya --lang ko       run in Korean</pre>
 

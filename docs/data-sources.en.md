@@ -156,7 +156,43 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 | `measurements` | Point values: source, dataset, variable, kind (observation/satellite/analysis/model/forecast/climatology), lat, lon, level, depth_m, pressure_hpa, obs_time, value, unit, location_id, quality | (source, dataset, variable, lat, lon, level, obs_time) |
 | `grids` | Map-layer snapshots (gzip JSON) with statistics | (layer, valid_time) |
 | `argo_profiles` | Profile listing and level JSON | (platform, cycle) |
+| `seawater_ions` | Reference salinity and the eight major ions in g/kg, derived for every salinity row (section 11); triggers keep it in step with `measurements` | (source, dataset, lat, lon, level, obs_time) |
+| `seawater_ions_mmol` (view) | The same rows in mmol/kg | |
+| `argo_level_ions` (view) | Temperature, salinity and derived ions in g/kg per Argo level; uses no storage | |
 | `runs` / `source_state` | Collection history, next run, consecutive errors | |
 | `kv` | Source tokens, daily budgets, Excel stamp | |
 
 Variable names: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `sea_level_pressure`, `wind_speed`.
+
+## 11. Ion composition derived from salinity
+
+Not fetched from a remote service: SUYA computes it from the stored salinity (`composition.py`).
+The major ions dissolved in seawater keep nearly the same ratios in every ocean, so one practical salinity S_P gives the amount of each ion.
+
+- Reference salinity: S_R = (35.16504 / 35) × S_P [g/kg]
+- Amount of ion i: S_R × (mass fraction of i in the Reference Composition) [g/kg]; divided by the molar mass it is [mmol/kg]. The kg is one kilogram of seawater.
+- Chlorinity: S_P / 1.80655 [g/kg]. Ionic strength, per kg of water [mol/kg], is shown only in the window and by `suya ions`.
+- Mass fractions and molar masses: Millero, Feistel, Wright, McDougall (2008), "The composition of Standard Seawater and the definition of the Reference-Composition Salinity Scale", Deep-Sea Research I 55, 50–72 (doi:10.1016/j.dsr.2007.10.001).
+
+Eight components are stored in the database and in Excel; together they are 99.85 % of the dissolved salt by mass. The other seven (B(OH)₃, CO₃²⁻, Sr²⁺, B(OH)₄⁻, F⁻, OH⁻, CO₂) appear in the *Ion composition* tab, the *Ion factors* sheet and `suya ions`.
+
+| Component | Symbol | DB column | Mass share % | g/kg at salinity 35 | mmol/kg at salinity 35 |
+|---|---|---|---|---|---|
+| Chloride | Cl⁻ | `chloride_g_kg` | 55.0340 | 19.3527 | 545.870 |
+| Sodium | Na⁺ | `sodium_g_kg` | 30.6596 | 10.7815 | 468.967 |
+| Sulfate | SO₄²⁻ | `sulfate_g_kg` | 7.7132 | 2.7123 | 28.235 |
+| Magnesium | Mg²⁺ | `magnesium_g_kg` | 3.6506 | 1.2837 | 52.817 |
+| Calcium | Ca²⁺ | `calcium_g_kg` | 1.1719 | 0.4121 | 10.282 |
+| Potassium | K⁺ | `potassium_g_kg` | 1.1350 | 0.3991 | 10.208 |
+| Bicarbonate | HCO₃⁻ | `bicarbonate_g_kg` | 0.2980 | 0.1048 | 1.718 |
+| Bromide | Br⁻ | `bromide_g_kg` | 0.1913 | 0.0673 | 0.842 |
+
+**Limits.** These are derived values, not measurements.
+
+- Real seawater differs slightly from the Reference Composition. Any error in a satellite or model salinity carries over to the ion amounts in the same proportion.
+- Where sea ice forms or melts (brine) and where river or glacial meltwater mixes in, the ion ratios themselves can change; this conversion does not model that.
+- The carbonate and borate species (HCO₃⁻, CO₃²⁻, B(OH)₃, B(OH)₄⁻, CO₂, OH⁻) are the Reference Composition values for standard conditions and do not follow the actual speciation with temperature and pH.
+- Rows with no salinity, or a salinity of zero or less, are not converted.
+
+Storage: whenever a salinity row is inserted into, changed in or deleted from `measurements`, triggers bring the row with the same key in `seawater_ions` in line. The first start after the upgrade fills in every salinity row already stored, once (guarded by `ions:method` in `kv`).
+Argo level salinities are stored once, in `argo_profiles`; the view `argo_level_ions` computes the ion amounts when it is read, so the same hundreds of thousands of rows are not kept a second time.

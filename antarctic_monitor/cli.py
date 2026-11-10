@@ -13,12 +13,12 @@ import signal
 import sys
 from pathlib import Path
 
-from . import __version__, exporter
+from . import __version__, composition, exporter
 from .catalog import SOURCES
 from .collectors import JOBS
 from .collectors.base import Context
 from .config import app_data_dir, load_settings
-from .db import Store
+from .db import SALINITY, Measurement, Store
 from .engine import Engine, EventBus
 from .http import Fetcher
 from .i18n import default_language, render, set_language, tr
@@ -105,6 +105,10 @@ def _export(args: argparse.Namespace) -> None:
         count = exporter.export_measurements(store, out, args.source, args.variable, args.since)
     elif args.what == "argo":
         count = exporter.export_argo(store, out, args.since)
+    elif args.what == "ions":
+        count = exporter.export_ions(store, out, args.source, args.since)
+    elif args.what == "argo-ions":
+        count = exporter.export_argo_ions(store, out, args.since)
     else:
         if not args.layer:
             raise SystemExit("--layer is required for grid, e.g. --layer hycom_salt_0")
@@ -114,6 +118,50 @@ def _export(args: argparse.Namespace) -> None:
             raise SystemExit(str(exc)) from exc
     store.close()
     print(f"{out}: {count} rows")
+
+
+def _ions(args: argparse.Namespace) -> None:
+    """Convert one practical salinity to ion amounts with the Reference Composition. Needs no database."""
+    result = composition.derive(args.salinity)
+    if result is None:
+        raise SystemExit(tr("염분은 0보다 큰 수여야 합니다"))
+    if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    lines = [
+        f"{tr('실용 염분')} S_P: {result['practical_salinity']:.4f}",
+        f"{tr('기준 염분 S_R')}: {result['reference_salinity']:.4f} g/kg",
+        f"{tr('염소량')}: {result['chlorinity']:.4f} g/kg",
+        f"{tr('이온 세기')}: {result['ionic_strength']:.4f} mol/kg",
+        "",
+        f"{'':<9}{'g/kg':>10}{'mmol/kg':>11}{'%':>9}",
+    ]
+    for ion in result["ions"]:
+        lines.append(
+            f"{ion['symbol']:<9}{ion['g_per_kg']:>10.5f}{ion['mmol_per_kg']:>11.4f}{ion['mass_percent']:>9.4f}  {tr(ion['name'])}"
+        )
+    total = sum(ion["g_per_kg"] for ion in result["ions"])
+    share = sum(ion["mass_percent"] for ion in result["ions"])
+    lines.append(f"{'Σ':<9}{total:>10.5f}{'':>11}{share:>9.4f}  {tr('합계')}")
+    lines.append("")
+    lines.append(tr("염분에 기준 조성(Millero 외 2008)을 곱한 환산값입니다. 이온을 직접 잰 값이 아닙니다."))
+    print("\n".join(lines))
+
+
+def _ion_check(folder: Path) -> str:
+    """Store one salinity and read back the ion row the database derives from it."""
+    store = Store(folder / "ions.db")
+    store.upsert_measurements(
+        [Measurement("self-test", "self-test", SALINITY, "model", -60.0, 0.0, "2026-01-01T00:00:00Z", 35.0, "PSU")]
+    )
+    rows = list(store.iter_ions())
+    store.close()
+    expected = composition.grams_per_kg(35.0, composition.MAJOR)["chloride"]
+    if len(rows) != 1 or abs(rows[0]["chloride_g_kg"] - expected) > 1e-9:
+        raise SystemExit("ions failed: the database did not derive the ion row from the stored salinity")
+    return f"ions ok Cl {rows[0]['chloride_g_kg']:.4f} g/kg at salinity 35"
 
 
 def _excel_sync(args: argparse.Namespace) -> None:
@@ -179,6 +227,7 @@ def _self_test(args: argparse.Namespace) -> None:
             lines.append("gui skipped (window libraries not installed; collection and Excel only)")
             lines.append(f"excel ok {excel.sync(store, settings.excel_dir)['files']}")
             store.close()
+        lines.append(_ion_check(Path(temp)))
     lines.append(f"version {__version__}")
     text = "\n".join(lines) + "\n"
     if args.out:
@@ -250,12 +299,16 @@ def main(argv: list[str] | None = None) -> None:
     collect.add_argument("--sources", help="collect only these sources (comma separated)")
 
     export = sub.add_parser("export", help="export stored data to CSV")
-    export.add_argument("what", choices=["measurements", "argo", "grid"])
+    export.add_argument("what", choices=["measurements", "argo", "grid", "ions", "argo-ions"])
     export.add_argument("--out", required=True)
     export.add_argument("--source")
     export.add_argument("--variable")
     export.add_argument("--since")
     export.add_argument("--layer", help="layer for grid, e.g. hycom_salt_0, oisst_sst")
+
+    ions = sub.add_parser("ions", help="convert a practical salinity to seawater ion amounts (derived, not measured)")
+    ions.add_argument("salinity", type=float, help="practical salinity, e.g. 34.5")
+    ions.add_argument("--json", action="store_true", help="print the result as JSON")
 
     sync = sub.add_parser("excel-sync", help="write the monthly Excel workbooks now")
     sync.add_argument("--db")
@@ -290,6 +343,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     if command == "export":
         _export(args)
+        return
+    if command == "ions":
+        _ions(args)
         return
     if command == "excel-sync":
         _excel_sync(args)

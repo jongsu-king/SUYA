@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Ion composition derived from salinity.** Every stored salinity is converted to the eight major
+  ions (Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻) with the Reference Composition of Millero,
+  Feistel, Wright and McDougall (2008, doi:10.1016/j.dsr.2007.10.001): reference salinity
+  S_R = (35.16504 / 35) × S_P times each ion's mass fraction. These are derived values, not ion
+  measurements; real seawater differs slightly, and the changed ratios in sea-ice brine or where
+  river water or meltwater mixes in are not modelled.
+- **A `seawater_ions` table that fills itself.** Triggers on `measurements` add, change and remove
+  the ion row together with its salinity row, and salinity collected before the upgrade is filled in
+  once when the database is first opened. Two views use no storage: `seawater_ions_mmol` gives the
+  same rows in mmol/kg and `argo_level_ions` derives the ions of every Argo level when it is read.
+  Salinity that a point query stores (dataset `point_query`) gets its ion row the same way.
+- **An *Ion composition* tab** in the point window: reference salinity, chlorinity and ionic
+  strength, fifteen components in g/kg, mmol/kg and mass share, and the eight major ions for each
+  source's salinity. It reuses the Surface query, so it makes no extra calls.
+- **Two new sheets in the monthly workbook**, *Ion composition* and *Ion factors*, and a note on the
+  *Info* sheet saying the values are derived. The Argo levels workbook gains reference salinity and
+  the eight ions in g/kg for every level.
+- **Commands:** `suya ions 34.5` converts one salinity (`--json` for machine-readable output),
+  `suya export ions` and `suya export argo-ions` write the derived values as CSV, and
+  `suya self-test` now also checks that the database derives an ion row.
+
+### Changed
+- The Argo levels workbook is about 1.9 times larger and takes about 1.8 times longer to write
+  because of the nine new columns (measured on 433,396 levels: 17.8 MB in 10.2 s before, 33.7 MB in
+  17.8 s after). It is still written by the background process, so the window stays responsive.
+
 ## [0.1.5] - 2026-11-10
 
 Updates now install themselves by default, and a clearer Open-Meteo budget message. Version DOI:

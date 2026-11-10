@@ -66,6 +66,66 @@ def test_air_values_are_listed_two_per_row(app):
     assert grid.rowCount() == (len(AIR_FIELDS) + 1) // 2
 
 
+def _water(salinity) -> dict:
+    from antarctic_monitor import composition
+
+    rows = [
+        {"source": "oisst", "label": "OISST v2.1", "kind": "analysis", "variable": "temperature", "unit": "°C", "value": -1.2, "time": "2026-11-04T12:00:00Z", "note": None},
+        {"source": "hycom", "label": "HYCOM 0 m", "kind": "model", "variable": "salinity", "unit": "PSU", "value": salinity, "time": "2026-11-04T00:00:00Z", "note": None},
+        {"source": "smos", "label": "SMOS", "kind": "satellite", "variable": "salinity", "unit": "PSU", "value": None, "time": "2026-11-03T00:00:00Z", "note": None},
+    ]
+    best = rows[1] if salinity is not None else None
+    headline = {"temperature": rows[0], "salinity": best, "derived": None, "ions": composition.derive(salinity)}
+    return {"headline": headline, "rows": rows, "errors": []}
+
+
+def _column(table, column: int) -> list[str]:
+    return [table.item(row, column).text() if table.item(row, column) else "" for row in range(table.rowCount())]
+
+
+def test_ion_panel_lists_every_component_with_a_total(app):
+    from antarctic_monitor import composition
+    from antarctic_monitor.gui.panels import IonPanel
+
+    panel = IonPanel()
+    panel.resize(720, 700)
+    panel.show()
+    _settle(app)
+    panel.show_data(_water(35.0))
+    _settle(app)
+    assert "환산값" in panel.note.text() and "직접 잰 값이 아니며" in panel.note.text()
+    assert _column(panel.headline, 0) == ["표층 염분", "기준 염분 S_R", "염소량", "이온 세기"]
+    assert _column(panel.headline, 1)[:3] == ["35.000 PSU", "35.1650 g/kg", "19.3739 g/kg"]
+    assert "HYCOM 0 m" in panel.headline.item(0, 2).text()
+    assert panel.table.rowCount() == len(composition.COMPONENTS) + 1
+    assert _column(panel.table, 1)[:3] == ["Cl⁻", "Na⁺", "SO₄²⁻"]
+    assert panel.table.item(0, 2).text() == "19.35271"
+    assert _column(panel.table, 5)[:9] == ["DB·엑셀에 저장"] * 8 + [""]
+    total = panel.table.rowCount() - 1
+    assert panel.table.item(total, 0).text() == "합계" and panel.table.item(total, 2).text() == "35.16504"
+    assert panel.table.item(total, 4).text() == "100.0000"
+    assert _column(panel.sources, 0) == ["HYCOM 0 m", "SMOS"]
+    assert panel.sources.item(0, 2).text() == "19.3527" and panel.sources.item(1, 1).text() == "결측"
+    assert panel.sources.item(1, 2).text() == "–"
+    for table in (panel.headline, panel.table):
+        assert not table.verticalScrollBar().isVisible()
+
+
+def test_ion_panel_says_when_no_salinity_is_available(app):
+    from antarctic_monitor.gui.panels import IonPanel
+
+    panel = IonPanel()
+    panel.resize(720, 500)
+    panel.show()
+    _settle(app)
+    panel.show_data(_water(35.0))
+    panel.show_data(_water(None))
+    _settle(app)
+    assert panel.headline.rowCount() == 1 and "환산하지 못했습니다" in panel.headline.item(0, 2).text()
+    assert panel.table.rowCount() == 0 and not panel.table.isVisible()
+    assert _column(panel.sources, 1) == ["결측", "결측"]
+
+
 TIME_SLIDER_SCRIPT = r'''
 import os
 import tempfile
@@ -170,3 +230,62 @@ def test_map_steps_through_stored_times():
     env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
     done = subprocess.run([sys.executable, "-c", TIME_SLIDER_SCRIPT], capture_output=True, text=True, errors="replace", timeout=120, env=env)
     assert done.returncode == 0 and "frames ok" in done.stdout, done.stderr
+
+
+ION_TAB_SCRIPT = r'''
+import os
+import tempfile
+from pathlib import Path
+
+from PySide6.QtWidgets import QApplication
+
+from antarctic_monitor import composition, i18n
+from antarctic_monitor.config import Settings
+from antarctic_monitor.gui.app import DETAIL_TABS, MainWindow
+from antarctic_monitor.gui.backend import Backend
+
+i18n.set_language("en")
+app = QApplication([])
+folder = Path(tempfile.mkdtemp())
+settings = Settings(db_path=folder / "t.db", excel_dir=folder / "x", update_mode="off")
+backend = Backend(settings, collect=False)
+backend.start()
+window = MainWindow(backend, settings)
+window.show()
+row = {"source": "hycom", "label": "HYCOM 0 m", "kind": "model", "variable": "salinity", "unit": "PSU", "value": 34.5, "time": "2026-11-04T00:00:00Z", "note": None}
+payload = {
+    "query": {"lat": -65.0, "lon": 0.0}, "ocean": None, "rows": [row], "errors": [],
+    "headline": {"temperature": None, "salinity": row, "derived": None, "ions": composition.derive(34.5)},
+}
+asked = []
+
+
+def point(part, lat, lon, callback):
+    asked.append(part)
+    callback(payload, None)
+    return 0
+
+
+backend.point = point
+assert DETAIL_TABS[-1] == "ions" and window.detail_tabs.count() == len(DETAIL_TABS)
+assert window.detail_tabs.tabText(4) == "Ion composition"
+window.select_point(-65.0, 0.0, "test")
+window.detail_tabs.setCurrentIndex(4)
+for _ in range(20):
+    app.processEvents()
+panel = window.panels["ions"]
+assert asked == ["water", "water"], asked
+assert panel.table.rowCount() == len(composition.COMPONENTS) + 1, panel.table.rowCount()
+assert panel.table.item(0, 0).text() == "Chloride" and panel.headline.item(1, 0).text() == "Reference salinity S_R"
+print("ion tab ok", flush=True)
+os._exit(0)
+'''
+
+
+def test_ion_tab_reuses_the_surface_query():
+    import subprocess
+    import sys
+
+    env = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+    done = subprocess.run([sys.executable, "-c", ION_TAB_SCRIPT], capture_output=True, text=True, errors="replace", timeout=120, env=env)
+    assert done.returncode == 0 and "ion tab ok" in done.stdout, done.stderr

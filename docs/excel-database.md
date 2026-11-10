@@ -10,7 +10,7 @@ SUYA는 15분마다(`MONITOR_INTERVAL_EXCEL`) SQLite에 새 자료가 들어왔�
 | 파일 | 내용 |
 |---|---|
 | `antarctic_db_YYYY-MM.xlsx` | 그 달의 모든 지점값·격자 통계·목록 (아래 시트) |
-| `argo_levels_YYYY-MM.xlsx` | 그 달 Argo 프로파일의 모든 층. 월 수만 행이라 따로 둡니다 |
+| `argo_levels_YYYY-MM.xlsx` | 그 달 Argo 프로파일의 모든 층과 층별 이온 환산값. 월 수십만 행이라 따로 둡니다 |
 
 기본 폴더: Windows `문서\SUYA`, macOS·Linux `~/Documents/SUYA`. `파일 > 설정`이나 `MONITOR_EXCEL_DIR`로 바꿉니다.
 
@@ -36,7 +36,7 @@ SQLite가 원본이고 엑셀은 그것을 보기 좋게 펼친 사본이라고 
 ## `antarctic_db_YYYY-MM.xlsx` 시트
 
 ### 정보
-기간, 생성 시각(UTC), 시각 기준 안내, 주의 문구, 시트별 행 수.
+기간, 생성 시각(UTC), 시각 기준 안내, 주의 문구, 이온 환산 안내, 시트별 행 수.
 
 ### 월간요약 — 지점·자료·항목별 한 달 통계
 표층과 2 m 값만 셉니다. 앞날 예보(`kind = forecast`), 깊은 층, 지도에서 클릭한 임의 지점은 뺍니다.
@@ -104,6 +104,24 @@ GFS, ECMWF IFS, ICON, GEM, JMA GSM 다섯 모델의 2 m 기온이 열로 나란�
 ### 지점조회 — 지도에서 클릭한 지점
 클릭한 지점마다 소스별로 받은 값(OISST, MUR, SMOS, SMAP, HYCOM 40층, GFS 현재값, Marine). `location_id`가 없는 측정값이 여기로 옵니다.
 
+### 이온조성 — 염분이 있는 행마다 환산한 주요 이온
+SQLite `seawater_ions` 표의 그 달 행을 그대로 옮깁니다. 해역 표층, HYCOM 40층, 위성 염분, 지도에서 클릭한 지점의 염분이 모두 들어옵니다.
+**이온을 직접 잰 값이 아니라** 염분에 기준 조성(Millero 외 2008)의 비율을 곱한 환산값입니다. 식과 한계는 [데이터 출처 11절](data-sources.md#11-염분에서-환산하는-이온-조성)에 있습니다.
+
+| 열 | 설명 |
+|---|---|
+| 시각 UTC, 지점, 위도, 경도 | 염분 행과 같습니다. 클릭한 지점은 지점 칸이 비어 있습니다 |
+| 자료, 종류 | `hycom`, `smos`, `smap`, `argo` 등 / model, satellite, observation |
+| 층, 수심 m | `surface` 또는 `depth:<m>` |
+| 염분 PSU | 환산에 쓴 실용 염분 S_P |
+| 기준 염분 g/kg | S_R = (35.16504 / 35) × S_P |
+| Cl⁻ … Br⁻ g/kg | 주요 이온 여덟 가지(Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻). 바닷물 1 kg 기준 |
+| Cl⁻ … Br⁻ mmol/kg | 같은 여덟 가지의 물질량 |
+
+### 이온환산계수 — 환산에 쓴 기준 조성
+성분 열다섯 가지의 기호, 전하, 몰질량, 질량 비율 %, 염분 1당 g/kg·mmol/kg, 염분 35에서의 g/kg·mmol/kg.
+`DB 열`이 채워진 여덟 행이 DB와 엑셀에 쌓이는 성분입니다. 이 시트의 계수에 염분을 곱하면 어느 값이든 다시 계산할 수 있습니다.
+
 ## `argo_levels_YYYY-MM.xlsx`
 
 ### Argo층별
@@ -113,6 +131,10 @@ GFS, ECMWF IFS, ICON, GEM, JMA GSM 다섯 모델의 2 m 기온이 열로 나란�
 | 압력 dbar | 원시 압력(보정 모드면 보정 압력) |
 | 수심 m | Saunders & Fofonoff(1976)로 환산 |
 | 수온 °C, 염분 PSU | QC 1·2만. 없으면 빈 칸 |
+| 기준 염분 g/kg, Cl⁻ … Br⁻ g/kg | 그 층의 염분에서 환산한 기준 염분과 주요 이온 여덟 가지. 염분이 없는 층은 빈 칸 |
+
+이온 열 아홉 개가 붙어 이 파일은 전보다 약 1.9배 크고 쓰는 데 약 1.8배 걸립니다
+(2026-11-10 실측: 433,396행인 달이 17.8 MB·10.2초에서 33.7 MB·17.8초). 별도 프로세스가 쓰므로 화면은 멈추지 않습니다.
 
 ## 파이썬·R에서 바로 읽기
 
@@ -126,11 +148,16 @@ salt = pd.read_sql("""
   WHERE source='hycom' AND variable='sea_water_salinity' AND location_id='weddell'
   ORDER BY obs_time""", con)
 argo = pd.read_sql("SELECT platform, cycle, obs_time, lat, lon, surface_temp, surface_salt FROM argo_profiles", con)
+ions = pd.read_sql("SELECT obs_time, location_id, depth_m, practical_salinity, chloride_g_kg, sodium_g_kg FROM seawater_ions WHERE source='hycom'", con)
+argo_ions = pd.read_sql("SELECT * FROM argo_level_ions WHERE obs_time >= '2026-11-01'", con)
 ```
 
 ```r
 library(DBI); con <- dbConnect(RSQLite::SQLite(), "~/Documents/../Library/Application Support/SUYA/antarctic.db")
 dbGetQuery(con, "SELECT * FROM measurements WHERE variable='sea_water_temperature' LIMIT 10")
 ```
+
+이온 환산값은 표 하나와 뷰 둘로 읽습니다: `seawater_ions`(g/kg, 염분 행마다 한 행), `seawater_ions_mmol`(mmol/kg), `argo_level_ions`(Argo 층별, g/kg).
+CSV가 필요하면 `suya export ions --out ions.csv`, `suya export argo-ions --out argo_ions.csv`를 씁니다.
 
 `grids` 표의 `payload`는 gzip으로 압축한 JSON(`{"lats":[…],"lons":[…],"values":[…]}`)이며 `antarctic_monitor.db.Store.load_grid("oisst_sst")`로 풀 수 있습니다.

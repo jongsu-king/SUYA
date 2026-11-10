@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import logging
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -11,7 +12,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, Iterator
 
+from . import composition
 from .gridutil import Grid, grid_stats
+
+log = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS measurements (
@@ -96,6 +100,100 @@ MEASUREMENT_COLUMNS = (
     "obs_time", "value", "unit", "location_id", "quality", "fetched_at",
 )
 
+SALINITY = "sea_water_salinity"
+ION_KEY = ("source", "dataset", "lat", "lon", "level", "obs_time")
+ION_GRAM_COLUMNS = tuple(f"{component.key}_g_kg" for component in composition.MAJOR)
+ION_MMOL_COLUMNS = tuple(f"{component.key}_mmol_kg" for component in composition.MAJOR)
+ION_COLUMNS = (*ION_KEY, "kind", "depth_m", "location_id", "practical_salinity", "reference_salinity", *ION_GRAM_COLUMNS)
+ARGO_ION_COLUMNS = (
+    "platform", "cycle", "obs_time", "lat", "lon", "data_mode", "pressure_dbar", "depth_m", "temperature_c",
+    "practical_salinity", "reference_salinity", *ION_GRAM_COLUMNS,
+)
+ION_METHOD_KEY = "ions:method"
+ION_OBJECTS = (
+    "seawater_ions_insert", "seawater_ions_update", "seawater_ions_delete", "seawater_ions_mmol", "argo_level_ions",
+)
+
+ION_SCHEMA = f"""
+CREATE TABLE IF NOT EXISTS seawater_ions (
+    source TEXT NOT NULL,
+    dataset TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
+    level TEXT NOT NULL DEFAULT 'surface',
+    obs_time TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    depth_m REAL,
+    location_id TEXT,
+    practical_salinity REAL NOT NULL,
+    reference_salinity REAL NOT NULL,
+{"".join(f"    {name} REAL NOT NULL,{chr(10)}" for name in ION_GRAM_COLUMNS)}    PRIMARY KEY (source, dataset, lat, lon, level, obs_time)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS idx_ions_time ON seawater_ions (obs_time);
+"""
+
+
+def _ion_factors(salinity: str, mmol: bool = False) -> str:
+    """염분 식 하나에 기준 조성 계수를 곱한 SQL 항목들. 계수는 composition 모듈의 값을 그대로 씁니다."""
+    names = ION_MMOL_COLUMNS if mmol else ION_GRAM_COLUMNS
+    factors = [c.mmol_per_salinity if mmol else c.grams_per_salinity for c in composition.MAJOR]
+    return ", ".join(f"{salinity} * {factor!r} AS {name}" for name, factor in zip(names, factors))
+
+
+def _ion_select(row: str) -> str:
+    """측정 행 하나(NEW 또는 표 이름)에서 seawater_ions 한 행을 만드는 SELECT 목록."""
+    head = ", ".join(f"{row}.{name}" for name in (*ION_KEY, "kind", "depth_m", "location_id"))
+    reference = f"{row}.value * {composition.REFERENCE_SALINITY_FACTOR!r} AS reference_salinity"
+    return f"{head}, {row}.value AS practical_salinity, {reference}, {_ion_factors(f'{row}.value')}"
+
+
+def _ion_match(row: str) -> str:
+    return " AND ".join(f"{name} = {row}.{name}" for name in ION_KEY)
+
+
+ION_INSERT = f"INSERT INTO seawater_ions ({', '.join(ION_COLUMNS)})"
+ION_BACKFILL = (
+    f"{ION_INSERT} SELECT {_ion_select('m')} FROM measurements AS m WHERE m.variable = '{SALINITY}' AND m.value > 0"
+)
+ION_STATEMENTS = (
+    *(f"DROP TRIGGER IF EXISTS {name}" for name in ION_OBJECTS[:3]),
+    *(f"DROP VIEW IF EXISTS {name}" for name in ION_OBJECTS[3:]),
+    f"""CREATE TRIGGER seawater_ions_insert AFTER INSERT ON measurements
+        WHEN NEW.variable = '{SALINITY}'
+        BEGIN
+            DELETE FROM seawater_ions WHERE {_ion_match("NEW")};
+            {ION_INSERT} SELECT {_ion_select("NEW")} WHERE NEW.value > 0;
+        END""",
+    f"""CREATE TRIGGER seawater_ions_update AFTER UPDATE ON measurements
+        WHEN OLD.variable = '{SALINITY}' OR NEW.variable = '{SALINITY}'
+        BEGIN
+            DELETE FROM seawater_ions WHERE OLD.variable = '{SALINITY}' AND {_ion_match("OLD")};
+            DELETE FROM seawater_ions WHERE NEW.variable = '{SALINITY}' AND {_ion_match("NEW")};
+            {ION_INSERT} SELECT {_ion_select("NEW")} WHERE NEW.variable = '{SALINITY}' AND NEW.value > 0;
+        END""",
+    f"""CREATE TRIGGER seawater_ions_delete AFTER DELETE ON measurements
+        WHEN OLD.variable = '{SALINITY}'
+        BEGIN
+            DELETE FROM seawater_ions WHERE {_ion_match("OLD")};
+        END""",
+    f"""CREATE VIEW seawater_ions_mmol AS
+        SELECT {", ".join(ION_COLUMNS[:-len(ION_GRAM_COLUMNS)])}, {_ion_factors("practical_salinity", mmol=True)}
+        FROM seawater_ions""",
+    f"""CREATE VIEW argo_level_ions AS
+        SELECT platform, cycle, obs_time, lat, lon, data_mode, pressure_dbar, depth_m, temperature_c,
+               salt AS practical_salinity, salt * {composition.REFERENCE_SALINITY_FACTOR!r} AS reference_salinity,
+               {_ion_factors("salt")}
+        FROM (
+            SELECT p.platform, p.cycle, p.obs_time, p.lat, p.lon, p.data_mode,
+                   json_extract(l.value, '$.pressure_dbar') AS pressure_dbar,
+                   json_extract(l.value, '$.depth_m') AS depth_m,
+                   json_extract(l.value, '$.temp') AS temperature_c,
+                   json_extract(l.value, '$.salt') AS salt
+            FROM argo_profiles AS p, json_each(p.levels_json) AS l
+        )
+        WHERE salt > 0""",
+)
+
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -134,12 +232,46 @@ class Store:
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA synchronous=NORMAL")
-            self._conn.executescript(SCHEMA)
+            self._conn.executescript(SCHEMA + ION_SCHEMA)
             self._conn.commit()
+        self._ensure_ions()
 
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    def _ions_current(self) -> bool:
+        row = self._conn.execute("SELECT value FROM kv WHERE key = ?", (ION_METHOD_KEY,)).fetchone()
+        if not row or row[0] != composition.METHOD:
+            return False
+        marks = ",".join("?" * len(ION_OBJECTS))
+        found = self._conn.execute(f"SELECT name FROM sqlite_master WHERE name IN ({marks})", ION_OBJECTS).fetchall()
+        return {r[0] for r in found} == set(ION_OBJECTS)
+
+    def _ensure_ions(self) -> None:
+        """염분 행마다 이온 환산값이 seawater_ions 에 쌓이게 트리거와 뷰를 두고, 이미 있던 염분 행을 채웁니다.
+
+        환산 방식(composition.METHOD)이 바뀌었거나 트리거가 없을 때만 한 번 다시 계산합니다.
+        다른 프로세스가 DB 를 쓰는 중이라 잠금을 얻지 못하면 다음에 열 때 다시 시도합니다.
+        """
+        with self._lock:
+            if self._ions_current():
+                return
+            try:
+                self._conn.execute("BEGIN IMMEDIATE")
+                if not self._ions_current():
+                    for statement in ION_STATEMENTS:
+                        self._conn.execute(statement)
+                    self._conn.execute("DELETE FROM seawater_ions")
+                    self._conn.execute(ION_BACKFILL)
+                    self._conn.execute(
+                        "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+                        (ION_METHOD_KEY, composition.METHOD),
+                    )
+                self._conn.commit()
+            except sqlite3.OperationalError as exc:
+                self._conn.rollback()
+                log.warning("ion table not prepared: %s", exc)
 
     def upsert_measurements(self, rows: Iterable[Measurement]) -> int:
         now = iso()
@@ -266,6 +398,62 @@ class Store:
     def count_measurements(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM measurements").fetchone()[0]
+
+    def iter_ions(
+        self,
+        *,
+        source: str | None = None,
+        location_id: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        limit: int | None = None,
+        mmol: bool = False,
+    ) -> Iterator[dict]:
+        """염분에서 환산한 이온 조성 행을 시각 순으로 돌려줍니다. mmol=True 면 mmol/kg 열을 함께 붙입니다."""
+        clauses, params = [], []
+        for column, value, op in (
+            ("source", source, "="), ("location_id", location_id, "="), ("obs_time", since, ">="), ("obs_time", until, "<="),
+        ):
+            if value is not None:
+                clauses.append(f"{column} {op} ?")
+                params.append(value)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        tail = f" LIMIT {int(limit)}" if limit else ""
+        extra = f", {_ion_factors('practical_salinity', mmol=True)}" if mmol else ""
+        sql = f"SELECT *{extra} FROM seawater_ions {where} ORDER BY obs_time, source, level{tail}"
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        for row in rows:
+            yield dict(row)
+
+    def count_ions(self) -> int:
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM seawater_ions").fetchone()[0]
+
+    def iter_argo_level_ions(
+        self, *, since: str | None = None, until: str | None = None, batch: int = 5000
+    ) -> Iterator[dict]:
+        """Argo 층별 염분에서 환산한 이온 조성. argo_level_ions 뷰를 읽으며, 층이 많아 묶음으로 나눠 가져옵니다."""
+        clauses, params = [], []
+        for value, op in ((since, ">="), (until, "<=")):
+            if value is not None:
+                clauses.append(f"obs_time {op} ?")
+                params.append(value)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        sql = f"SELECT * FROM argo_level_ions {where} ORDER BY obs_time, platform, cycle, pressure_dbar"
+        with self._lock:
+            cursor = self._conn.execute(sql, params)
+        while True:
+            with self._lock:
+                rows = cursor.fetchmany(batch)
+            if not rows:
+                break
+            for row in rows:
+                yield dict(row)
+
+    def count_argo_level_ions(self) -> int:
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM argo_level_ions").fetchone()[0]
 
     def location_stats(
         self, since: str, until: str, sources: tuple[str, ...], variables: tuple[str, ...]

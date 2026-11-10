@@ -179,6 +179,7 @@ python -m antarctic_monitor
 | **수직 프로파일** | 깊이별 수온·염분(Argo 실측·HYCOM 모델·WOA23 기후값, 표층이 잘 보이도록 제곱근 수심축), T-S 다이어그램(σt 등치선, 어는점 선), 프로파일별 혼합층 깊이(10 m 수온에서 0.2 °C 차) 안내 | HYCOM 40층(최대 2분), WOA23(한 번 받으면 DB에 보관), 저장된 Argo |
 | **기온** | GFS 현재값 8종, 5개 모델 7일 예보 비교("지금" 선 포함), 400 km 안 가장 가까운 기지의 METAR 48시간, 기압 고도별 기온 1000~10 hPa(GFS·ECMWF) | Open-Meteo, 저장된 METAR, Windy(키 있을 때) |
 | **시계열** | 최근 30일 OISST 수온, 위성 염분(SMOS·SMAP), 해빙 농도, ERA5 일별 기온(최저~최고 띠) | OISST, SMOS, SMAP, ERA5 |
+| **이온 조성** | 그 지점의 염분에서 환산한 이온 양: 기준 염분, 염소량, 이온 세기, 성분 열다섯 가지의 g/kg·mmol/kg·질량 비율, 자료별 염분에서 환산한 주요 이온 여덟 가지. 기준 조성으로 환산한 값이며 측정값이 아님 | 없음(표층 조회 결과를 다시 씀) |
 
 모든 그래프 위에는 도구막대가 있습니다: 처음 범위 · 이전 · 다음 · 이동 · 영역 확대 · 그림 저장(PNG/PDF/SVG) · **표**(그려진 숫자).
 그래프 위에 마우스를 올리면 그 위치의 값이 나옵니다. 표에서 행을 고르고 **Ctrl+C**(**⌘C**)를 누르면 탭 구분 텍스트로 복사되어 엑셀에 바로 붙습니다.
@@ -266,6 +267,11 @@ python -m antarctic_monitor
 
 파생값: 어는점 Millero(1978), 밀도 σt EOS-80(Millero & Poisson 1981), 압력→수심 Saunders & Fofonoff(1976). UNESCO 1983 검증값으로 테스트합니다.
 
+이온 조성: 저장되는 모든 염분은 주요 이온 여덟 가지(Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻)로도 환산됩니다. Millero, Feistel, Wright, McDougall(2008)의 기준 조성을 써서
+기준 염분 S_R = (35.16504 / 35) × S_P 에 이온별 질량 분율을 곱합니다. 염분 35라면 염화 이온 19.3527 g/kg, 나트륨 이온 10.7815 g/kg입니다.
+**이온을 직접 잰 값이 아니라 환산값**입니다. 실제 바닷물은 기준 조성과 조금 다르고, 해빙 주변의 브라인이나 강물이 섞이는 곳의 비율 변화는 반영하지 않습니다.
+식·계수·한계: [docs/data-sources.md 11절](docs/data-sources.md#11-염분에서-환산하는-이온-조성).
+
 ## 7. 저장: SQLite와 엑셀 데이터베이스
 
 | 운영체제 | 데이터베이스 · 설정 · 로그 | 엑셀 DB (기본) |
@@ -285,6 +291,8 @@ python -m antarctic_monitor
 | `measurements` | 모든 지점값: `source`, `dataset`, `variable`, `kind`(observation / satellite / analysis / model / forecast / climatology), `lat`, `lon`, `level`, `depth_m`, `pressure_hpa`, `obs_time`, `value`, `unit`, `location_id`, `quality`, `fetched_at` | source, dataset, variable, lat, lon, level, obs_time |
 | `grids` | 지도 레이어 스냅샷(gzip JSON: `lats`, `lons`, `values`)과 미리 계산한 통계(평균·최소·최대·유효 비율·백분위·해역 평균) | layer, valid_time |
 | `argo_profiles` | 프로파일 목록(위치·모드·QC·표층 수온·염분)과 층별 값 JSON | platform, cycle |
+| `seawater_ions` | 염분 행마다 실용 염분, 기준 염분, 기준 조성으로 환산한 주요 이온 여덟 가지 g/kg. 트리거가 `measurements`와 함께 넣고 고치고 지우며, 올리기 전에 쌓인 염분은 한 번 채움 | source, dataset, lat, lon, level, obs_time |
+| `seawater_ions_mmol`, `argo_level_ions` (뷰) | 같은 행의 mmol/kg, 그리고 Argo 모든 층의 환산 이온. 읽을 때 계산하므로 층별 값을 두 번 저장하지 않음 | |
 | `runs`, `source_state` | 모든 수집 기록, 소스별 마지막 상태·자료 시각·다음 실행·연속 오류 수 | |
 | `kv` | 원천 갱신 토큰, 일일 호출 예산, 엑셀 생성 기준 | |
 
@@ -307,7 +315,9 @@ SUYA가 돌아가는 중에도 파이썬, R, [DB Browser for SQLite](https://sql
 | 모델예보 | 24개 지점 × 예보 시각 × 5개 모델 |
 | Windy | Windy API 값(키 있을 때) |
 | 지점조회 | 지도에서 클릭한 임의 지점의 조회 결과 |
-| *(두 번째 파일)* Argo층별 | Argo 전 층: 압력, 수심, 수온, 염분 |
+| 이온조성 | 그 달 염분 행마다 기준 염분과 주요 이온 여덟 가지의 g/kg·mmol/kg (환산값, 측정값 아님) |
+| 이온환산계수 | 환산에 쓴 기준 조성: 성분 열다섯 가지의 전하, 몰질량, 질량 비율, 염분 1당 계수 |
+| *(두 번째 파일)* Argo층별 | Argo 전 층: 압력, 수심, 수온, 염분, 기준 염분, 환산한 주요 이온 여덟 가지 g/kg |
 
 엑셀 파일은 **SQLite에서 다시 생성**되며, 임시 파일에 다 쓴 뒤 교체하므로 깨진 파일이 남지 않습니다. 이번 달·지난달과 아직 파일이 없는 달만 다시 쓰고
 그 전 달은 고정됩니다. 1,048,576행을 넘으면 `_2`, `_3` 시트로 이어 씁니다. 열 단위 설명: [docs/excel-database.md](docs/excel-database.md).
@@ -347,6 +357,9 @@ suya excel-sync                   # 엑셀 파일 지금 쓰기. --all: 모든 �
 suya export measurements --out all.csv [--source argo] [--variable sea_water_salinity] [--since 2026-11-01T00:00:00Z]
 suya export argo --out argo.csv
 suya export grid --layer hycom_salt_500 --out salt500.csv
+suya export ions --out ions.csv [--source hycom] [--since 2026-11-01T00:00:00Z]   # 환산 이온, g/kg와 mmol/kg
+suya export argo-ions --out argo_ions.csv [--since 2026-11-01T00:00:00Z]          # Argo 모든 층의 환산 이온
+suya ions 34.5                    # 염분 하나를 이온 조성으로 환산. --json: 기계가 읽는 출력
 suya sources                      # 소스 목록
 suya self-test                    # 설치 점검: 창을 화면 밖에 띄워 보고 엑셀을 써 봄
 suya --version
@@ -466,7 +479,7 @@ powershell -File packaging\build.ps1      # Windows setup.exe (Inno Setup 6 필�
 
 ```
 antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
-├── cli.py                gui, daemon, collect, export, excel-sync, sources, self-test
+├── cli.py                gui, daemon, collect, export, excel-sync, ions, sources, self-test
 ├── engine.py             스케줄러: 주기, 백오프, 호출 한도, 일정 저장, 이벤트 버스
 ├── collectors/           데이터 서비스별 모듈 (erddap, hycom, argo, gosud, openmeteo, metar, windy, woa)
 ├── db.py                 SQLite 저장소
@@ -475,6 +488,7 @@ antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
 ├── queries.py            화면용 개요·해역·상태 조회
 ├── gridutil.py           격자 표본 추출, 면적 가중 통계, 해역 집계
 ├── seawater.py           EOS-80 어는점·밀도·압력→수심
+├── composition.py        염분에서 환산하는 이온 조성 (기준 조성, Millero 외 2008)
 ├── geo.py                좌표 해석(nullschool·Windy 주소), 거리 계산
 ├── i18n.py               한국어·영어 문자열, 언어 중립 저장 메시지
 ├── help_text.py          내장 사용 설명서(두 언어)

@@ -154,7 +154,43 @@ SUYA가 호출하는 모든 원격 서비스, 정확한 요청 형태, 받아 �
 | `measurements` | 지점값. source, dataset, variable, kind(observation/satellite/analysis/model/forecast/climatology), lat, lon, level, depth_m, pressure_hpa, obs_time, value, unit, location_id, quality | (source, dataset, variable, lat, lon, level, obs_time) |
 | `grids` | 지도 레이어 스냅샷(gzip JSON)과 통계 | (layer, valid_time) |
 | `argo_profiles` | 프로파일 목록과 층별 값 JSON | (platform, cycle) |
+| `seawater_ions` | 염분 행마다 환산한 기준 염분과 주요 이온 여덟 가지 g/kg (11절). 트리거가 `measurements`와 맞춥니다 | (source, dataset, lat, lon, level, obs_time) |
+| `seawater_ions_mmol` (뷰) | 같은 행의 mmol/kg | |
+| `argo_level_ions` (뷰) | Argo 층마다 수온·염분과 환산 이온 g/kg. 저장 공간을 쓰지 않습니다 | |
 | `runs` / `source_state` | 수집 기록, 다음 실행 시각, 연속 오류 수 | |
 | `kv` | 원천 갱신 토큰, 일일 예산, 엑셀 생성 기준 | |
 
 변수 이름: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `sea_level_pressure`, `wind_speed`.
+
+## 11. 염분에서 환산하는 이온 조성
+
+원격 서비스에서 받는 값이 아니라 SUYA가 저장된 염분에서 계산하는 값입니다(`composition.py`).
+바닷물에 녹은 주요 이온의 비율은 어느 바다에서나 거의 같다는 성질을 써서, 실용 염분 S_P 하나에서 이온별 양을 환산합니다.
+
+- 기준 염분: S_R = (35.16504 / 35) × S_P [g/kg]
+- 이온 i의 양: S_R × (기준 조성에서 i의 질량 분율) [g/kg], 몰질량으로 나누면 [mmol/kg]. kg은 바닷물 1 kg입니다.
+- 염소량: S_P / 1.80655 [g/kg]. 이온 세기는 물 1 kg 기준 [mol/kg]으로 화면과 `suya ions`에만 보입니다.
+- 질량 분율과 몰질량: Millero, Feistel, Wright, McDougall (2008), "The composition of Standard Seawater and the definition of the Reference-Composition Salinity Scale", Deep-Sea Research I 55, 50–72 (doi:10.1016/j.dsr.2007.10.001).
+
+DB와 엑셀에 쌓는 성분은 여덟 가지이고 녹은 염 질량의 99.85 %입니다. 나머지 일곱 가지(B(OH)₃, CO₃²⁻, Sr²⁺, B(OH)₄⁻, F⁻, OH⁻, CO₂)는 화면의 `이온 조성` 탭, 엑셀 `이온환산계수` 시트, `suya ions`에서 봅니다.
+
+| 성분 | 기호 | DB 열 | 질량 비율 % | 염분 35에서 g/kg | 염분 35에서 mmol/kg |
+|---|---|---|---|---|---|
+| 염화 이온 | Cl⁻ | `chloride_g_kg` | 55.0340 | 19.3527 | 545.870 |
+| 나트륨 이온 | Na⁺ | `sodium_g_kg` | 30.6596 | 10.7815 | 468.967 |
+| 황산 이온 | SO₄²⁻ | `sulfate_g_kg` | 7.7132 | 2.7123 | 28.235 |
+| 마그네슘 이온 | Mg²⁺ | `magnesium_g_kg` | 3.6506 | 1.2837 | 52.817 |
+| 칼슘 이온 | Ca²⁺ | `calcium_g_kg` | 1.1719 | 0.4121 | 10.282 |
+| 칼륨 이온 | K⁺ | `potassium_g_kg` | 1.1350 | 0.3991 | 10.208 |
+| 탄산수소 이온 | HCO₃⁻ | `bicarbonate_g_kg` | 0.2980 | 0.1048 | 1.718 |
+| 브롬화 이온 | Br⁻ | `bromide_g_kg` | 0.1913 | 0.0673 | 0.842 |
+
+**한계.** 이 값은 측정값이 아니라 환산값입니다.
+
+- 실제 바닷물의 조성은 기준 조성과 조금 다릅니다. 위성·모델 염분의 오차는 이온 값에도 같은 비율로 들어갑니다.
+- 해빙이 얼거나 녹는 곳의 브라인, 강물·빙하 융해수가 섞이는 곳에서는 이온 비율 자체가 달라질 수 있는데, 이 환산은 그것을 반영하지 않습니다.
+- 탄산·붕산 계열(HCO₃⁻, CO₃²⁻, B(OH)₃, B(OH)₄⁻, CO₂, OH⁻)은 표준 조건의 기준 조성 값이며 수온과 pH에 따른 실제 화학종 분포를 따르지 않습니다.
+- 염분이 없거나 0 이하인 행은 환산하지 않습니다.
+
+저장: 염분 행이 `measurements`에 들어오거나 바뀌거나 지워질 때마다 트리거가 `seawater_ions`의 같은 키 행을 맞춥니다. 프로그램을 처음 올린 뒤 한 번, 이미 있던 염분 행을 모두 채웁니다(`kv`의 `ions:method`로 한 번만).
+Argo 층별 염분은 `argo_profiles`에 한 번만 저장하고, 이온 값은 `argo_level_ions` 뷰가 읽을 때 계산합니다. 같은 수십만 행을 표로 한 번 더 두지 않기 위해서입니다.

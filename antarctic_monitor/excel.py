@@ -1,7 +1,7 @@
 """SQLite에 쌓인 값을 월별 엑셀 파일로 축적합니다.
 
-- antarctic_db_YYYY-MM.xlsx : 수온·염분·기온을 시트별로 정리한 파일
-- argo_levels_YYYY-MM.xlsx  : Argo 프로파일의 모든 층. 행이 많아 따로 둡니다.
+- antarctic_db_YYYY-MM.xlsx : 수온·염분·기온과 염분에서 환산한 이온 조성을 시트별로 정리한 파일
+- argo_levels_YYYY-MM.xlsx  : Argo 프로파일의 모든 층과 층별 이온 환산값. 행이 많아 따로 둡니다.
 
 파일은 SQLite에서 다시 생성합니다. 추가 쓰기는 파일 전체를 읽어야 해서 행이 늘수록 느려지고,
 중간에 끊기면 파일이 깨질 수 있기 때문입니다. 임시 파일을 다 쓴 뒤 교체하므로 파일이 깨지지 않습니다.
@@ -22,9 +22,10 @@ from pathlib import Path
 
 import xlsxwriter
 
+from . import composition
 from .collectors.base import CollectResult, Context
 from .collectors.openmeteo import MODELS
-from .db import Store, iso, utcnow
+from .db import ION_GRAM_COLUMNS, ION_MMOL_COLUMNS, Store, iso, utcnow
 from .gridutil import SECTORS
 from .http import FetchError
 from .i18n import get_language, join, msg, tr
@@ -54,6 +55,10 @@ SUMMARY_SOURCES = WATER_SOURCES + ("openmeteo", "metar")
 SUMMARY_VARIABLES = {**WATER_VARIABLES, "air_temperature": "기온"}
 MAIN_FILE = "antarctic_db_{month}.xlsx"
 ARGO_FILE = "argo_levels_{month}.xlsx"
+ION_GRAM_HEADERS = [(f"{component.symbol} g/kg", 11) for component in composition.MAJOR]
+ION_MMOL_HEADERS = [(f"{component.symbol} mmol/kg", 13) for component in composition.MAJOR]
+ION_GRAM_FACTORS = tuple(component.grams_per_salinity for component in composition.MAJOR)
+ION_NOTE = "이온 시트와 이온 열은 염분에 기준 조성(Millero 외 2008)을 곱한 환산값. 이온을 직접 잰 값이 아님"
 
 
 def parse_time(text: str) -> datetime:
@@ -161,6 +166,8 @@ def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
         "모델예보": _sheet_forecast(book, store, start, until),
         "Windy": _sheet_windy(book, store, start, until),
         "지점조회": _sheet_points(book, store, start, until),
+        "이온조성": _sheet_ions(book, store, start, until),
+        "이온환산계수": _sheet_ion_factors(book),
     }
     info.set_column(0, 0, 18)
     info.set_column(1, 1, 70)
@@ -169,13 +176,15 @@ def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
         ("생성 시각 UTC", iso()),
         ("시각 기준", tr("모든 시각은 UTC")),
         ("주의", tr("SQLite에서 다시 생성되는 파일. 직접 고친 내용은 다음 저장 때 덮어씀")),
+        ("이온 환산", tr(ION_NOTE)),
     )
     for index, (label, value) in enumerate(rows):
         info.write_string(index, 0, tr(label), book.header)
         info.write_string(index, 1, value)
-    info.write_string(5, 0, tr("시트"), book.header)
-    info.write_string(5, 1, tr("행 수"), book.header)
-    for index, (name, count) in enumerate(counts.items(), start=6):
+    top = len(rows) + 1
+    info.write_string(top, 0, tr("시트"), book.header)
+    info.write_string(top, 1, tr("행 수"), book.header)
+    for index, (name, count) in enumerate(counts.items(), start=top + 1):
         info.write_string(index, 0, tr(name))
         info.write_number(index, 1, count)
     book.close()
@@ -375,22 +384,70 @@ def _sheet_points(book: Book, store: Store, start: str, until: str) -> int:
     return sheet.finish()
 
 
+def _ion_cells(salinity) -> list:
+    """기준 염분과 주요 이온 여덟 가지의 g/kg. 환산할 수 없는 염분이면 칸을 비웁니다."""
+    if not composition.usable(salinity):
+        return []
+    value = float(salinity)
+    return [round(value * composition.REFERENCE_SALINITY_FACTOR, 4), *[round(value * factor, 5) for factor in ION_GRAM_FACTORS]]
+
+
+def _sheet_ions(book: Book, store: Store, start: str, until: str) -> int:
+    """염분이 있는 모든 행의 이온 환산값. DB의 seawater_ions 표를 그대로 옮깁니다."""
+    sheet = Sheet(
+        book, "이온조성",
+        [("시각 UTC", 17), ("지점", 20), ("위도", 9), ("경도", 9), ("자료", 18), ("종류", 11), ("층", 10), ("수심 m", 8),
+         ("염분 PSU", 9), ("기준 염분 g/kg", 13), *ION_GRAM_HEADERS, *ION_MMOL_HEADERS],
+    )
+    for row in store.iter_ions(since=start, until=until, mmol=True):
+        sheet.add(
+            [
+                parse_time(row["obs_time"]), location_name(row["location_id"]), row["lat"], row["lon"], row["source"],
+                row["kind"], row["level"], row["depth_m"], row["practical_salinity"], round(row["reference_salinity"], 4),
+                *[round(row[column], 5) for column in ION_GRAM_COLUMNS],
+                *[round(row[column], 4) for column in ION_MMOL_COLUMNS],
+            ]
+        )
+    return sheet.finish()
+
+
+def _sheet_ion_factors(book: Book) -> int:
+    """환산에 쓴 기준 조성. 이 시트만 있으면 어느 염분이든 같은 값을 다시 계산할 수 있습니다."""
+    sheet = Sheet(
+        book, "이온환산계수",
+        [("성분", 16), ("기호", 9), ("전하", 6), ("몰질량 g/mol", 12), ("질량 비율 %", 11), ("염분 1당 g/kg", 14),
+         ("염분 1당 mmol/kg", 16), ("염분 35에서 g/kg", 15), ("염분 35에서 mmol/kg", 17), ("DB 열", 20)],
+    )
+    stored = {component.key for component in composition.MAJOR}
+    for component in composition.COMPONENTS:
+        sheet.add(
+            [
+                tr(component.name), component.symbol, component.charge, component.molar_mass,
+                round(component.mass_fraction * 100.0, 5), component.grams_per_salinity, component.mmol_per_salinity,
+                round(35.0 * component.grams_per_salinity, 5), round(35.0 * component.mmol_per_salinity, 4),
+                f"{component.key}_g_kg" if component.key in stored else None,
+            ]
+        )
+    return sheet.finish()
+
+
 def write_argo_workbook(store: Store, path: Path, month: str) -> int:
     start, end = month_bounds(month)
     book = Book(path)
     sheet = Sheet(
         book, "Argo층별",
         [("시각 UTC", 17), ("플로트", 10), ("회차", 6), ("위도", 9), ("경도", 9), ("모드", 6), ("압력 dbar", 9), ("수심 m", 8),
-         ("수온 °C", 8), ("염분 PSU", 9)],
+         ("수온 °C", 8), ("염분 PSU", 9), ("기준 염분 g/kg", 13), *ION_GRAM_HEADERS],
     )
     profiles = [p for p in store.argo_with_levels(since=start) if p["obs_time"] < end]
     for profile in sorted(profiles, key=lambda p: (p["obs_time"], p["platform"])):
         when = parse_time(profile["obs_time"])
         for level in profile["levels"]:
+            salt = level.get("salt")
             sheet.add(
                 [
                     when, profile["platform"], profile["cycle"], profile["lat"], profile["lon"], profile["data_mode"],
-                    level.get("pressure_dbar"), level.get("depth_m"), level.get("temp"), level.get("salt"),
+                    level.get("pressure_dbar"), level.get("depth_m"), level.get("temp"), salt, *_ion_cells(salt),
                 ]
             )
     count = sheet.finish()

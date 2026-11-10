@@ -448,6 +448,7 @@ def test_self_test_runs_without_qt(monkeypatch, capsys):
     cli._self_test(argparse.Namespace(out=None))
     out = capsys.readouterr().out
     assert "gui skipped" in out and "excel ok" in out and "version" in out
+    assert "ions ok Cl 19.3527 g/kg at salinity 35" in out
 
 
 def test_release_check_compares_versions():

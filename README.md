@@ -184,6 +184,7 @@ within 2000 km) for water values. Air temperature is for the clicked point itsel
 | **Vertical profile** | Temperature and salinity against depth (Argo in situ, HYCOM model, WOA23 climatology; square-root depth axis so the upper ocean is readable), a T-S diagram with σt contours and the freezing line, and a note with each profile's mixed-layer depth (0.2 °C from the 10 m temperature) | HYCOM 40 levels (up to 2 min), WOA23 (kept in the database once fetched), stored Argo |
 | **Air temperature** | Eight GFS current values; 7-day forecasts from five models with a "now" line; 48 h of METAR from the nearest station within 400 km; temperature by pressure level 1000–10 hPa (GFS and ECMWF) | Open-Meteo, stored METAR, Windy (with a key) |
 | **Time series** | Last 30 days of OISST SST, satellite salinity (SMOS, SMAP), sea-ice concentration and ERA5 daily air temperature with a min–max band | OISST, SMOS, SMAP, ERA5 |
+| **Ion composition** | Ion amounts derived from the salinity at the point: reference salinity, chlorinity, ionic strength, fifteen components in g/kg, mmol/kg and mass share, and the eight major ions for each source's salinity. Derived with the Reference Composition, not measured | None (reuses the Surface query) |
 
 Every chart has a toolbar: reset view · back · forward · pan · zoom to area · save figure (PNG, PDF, SVG) · **Table** (the plotted numbers).
 Hovering shows the values at the cursor. Select rows in any table and press **Ctrl+C** (**⌘C**) to copy tab-separated text straight into Excel.
@@ -275,6 +276,12 @@ Real responses contain values that must not be used as they are. Each rule below
 Derived values: freezing point Millero (1978), density σt from EOS-80 (Millero & Poisson 1981), pressure→depth Saunders & Fofonoff (1976),
 all tested against the UNESCO 1983 check values.
 
+Ion composition: every stored salinity is also converted to the eight major ions (Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻) with the
+Reference Composition of Millero, Feistel, Wright and McDougall (2008): reference salinity S_R = (35.16504 / 35) × S_P, times each ion's mass
+fraction. At salinity 35 that is 19.3527 g/kg of chloride and 10.7815 g/kg of sodium. These are **derived values, not ion measurements**: real
+seawater differs slightly, and the changed ratios in sea-ice brine or where river water mixes in are not modelled. Formula, factors and limits:
+[docs/data-sources.en.md, section 11](docs/data-sources.en.md#11-ion-composition-derived-from-salinity).
+
 ## 7. Storage: SQLite and the Excel database
 
 | OS | Database, settings, log | Excel database (default) |
@@ -294,6 +301,8 @@ ignored), `matplotlib/` (font cache, installer builds only) and, while an update
 | `measurements` | Every point value: `source`, `dataset`, `variable`, `kind` (observation / satellite / analysis / model / forecast / climatology), `lat`, `lon`, `level`, `depth_m`, `pressure_hpa`, `obs_time`, `value`, `unit`, `location_id`, `quality`, `fetched_at` | source, dataset, variable, lat, lon, level, obs_time |
 | `grids` | Map-layer snapshots as gzip JSON (`lats`, `lons`, `values`) plus precomputed statistics (mean, min, max, coverage, percentiles, sector means) | layer, valid_time |
 | `argo_profiles` | Profile listing (position, mode, QC, surface T/S) and the level data as JSON | platform, cycle |
+| `seawater_ions` | For every salinity row: practical and reference salinity and the eight major ions in g/kg, derived with the Reference Composition. Triggers add, change and remove rows together with `measurements`; salinity stored before the upgrade is filled in once | source, dataset, lat, lon, level, obs_time |
+| `seawater_ions_mmol`, `argo_level_ions` (views) | The same rows in mmol/kg; and the derived ions of every Argo level, computed when read so the levels are not stored twice | |
 | `runs`, `source_state` | Every collection run; per-source last status, data time, next run, consecutive errors | |
 | `kv` | Source update tokens, daily call budgets, Excel stamp | |
 
@@ -317,7 +326,9 @@ while SUYA is running.
 | Forecasts | 24 points × forecast time × five models |
 | Windy | Windy API values (with a key) |
 | Point queries | Results for arbitrary points clicked on the map |
-| *(second file)* Argo levels | Every Argo level: pressure, depth, temperature, salinity |
+| Ion composition | Every salinity row of the month with reference salinity and the eight major ions in g/kg and mmol/kg (derived, not measured) |
+| Ion factors | The Reference Composition used: fifteen components with charge, molar mass, mass share and the factors per unit of salinity |
+| *(second file)* Argo levels | Every Argo level: pressure, depth, temperature, salinity, reference salinity and the eight derived ions in g/kg |
 
 Workbooks are **regenerated from SQLite**, written to a temporary file and swapped in, so a crash never leaves a broken file. Only the current
 month, the previous month and months without a file are rewritten; older months are frozen. Sheets beyond 1,048,576 rows continue as `_2`, `_3`.
@@ -359,6 +370,9 @@ suya excel-sync                   # write the workbooks now. --all: every month,
 suya export measurements --out all.csv [--source argo] [--variable sea_water_salinity] [--since 2026-11-01T00:00:00Z]
 suya export argo --out argo.csv
 suya export grid --layer hycom_salt_500 --out salt500.csv
+suya export ions --out ions.csv [--source hycom] [--since 2026-11-01T00:00:00Z]   # derived ions, g/kg and mmol/kg
+suya export argo-ions --out argo_ions.csv [--since 2026-11-01T00:00:00Z]          # derived ions of every Argo level
+suya ions 34.5                    # convert one salinity to its ion composition. --json for machine-readable output
 suya sources                      # list the sources
 suya self-test                    # installation check: opens a window off-screen and writes a workbook
 suya --version
@@ -487,7 +501,7 @@ tests on every push on Linux and Windows with Python 3.11–3.13 and on macOS wi
 
 ```
 antarctic_monitor/        Python package (CLI name: suya)
-├── cli.py                commands: gui, daemon, collect, export, excel-sync, sources, self-test
+├── cli.py                commands: gui, daemon, collect, export, excel-sync, ions, sources, self-test
 ├── engine.py             scheduler: intervals, back-off, rate limits, persisted schedule, event bus
 ├── collectors/           one module per data service (erddap, hycom, argo, gosud, openmeteo, metar, windy, woa)
 ├── db.py                 SQLite store
@@ -496,6 +510,7 @@ antarctic_monitor/        Python package (CLI name: suya)
 ├── queries.py            overview, sector and status queries for the GUI
 ├── gridutil.py           grid sampling, area-weighted statistics, sector aggregation
 ├── seawater.py           EOS-80 freezing point, density, pressure→depth
+├── composition.py        ion composition derived from salinity (Reference Composition, Millero et al. 2008)
 ├── geo.py                coordinate parsing (nullschool / Windy URLs), haversine
 ├── i18n.py               English/Korean strings; language-neutral stored messages
 ├── help_text.py          built-in user guide (both languages)

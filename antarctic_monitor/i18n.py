@@ -426,6 +426,62 @@ EN: dict[str, str] = {
     "{path}: {count}행 저장": "{path}: {count} rows saved",
     "저장 실패: {error}": "Save failed: {error}",
     "다시 시작 전까지 일부 설정은 적용되지 않을 수 있습니다": "Some settings may apply after a restart",
+    "이온 조성": "Ion composition",
+    "이온조성": "Ion composition",
+    "이온환산계수": "Ion factors",
+    "이온 환산": "Ion conversion",
+    "기준 염분 g/kg": "Reference salinity g/kg",
+    "기준 염분 S_R": "Reference salinity S_R",
+    "실용 염분": "Practical salinity",
+    "염소량": "Chlorinity",
+    "이온 세기": "Ionic strength",
+    "물 1 kg 기준": "per kg of water",
+    "성분": "Component",
+    "기호": "Symbol",
+    "전하": "Charge",
+    "몰질량 g/mol": "Molar mass g/mol",
+    "질량 비율 %": "Mass share %",
+    "염분 1당 g/kg": "g/kg per unit salinity",
+    "염분 1당 mmol/kg": "mmol/kg per unit salinity",
+    "염분 35에서 g/kg": "g/kg at salinity 35",
+    "염분 35에서 mmol/kg": "mmol/kg at salinity 35",
+    "DB 열": "DB column",
+    "합계": "Total",
+    "DB·엑셀에 저장": "Stored in DB and Excel",
+    "기준 염분 S_R 과 같음": "Equals reference salinity S_R",
+    "자료별 염분에서 환산한 주요 이온 (g/kg)": "Major ions derived from each source's salinity (g/kg)",
+    "이 지점에서 쓸 수 있는 염분 값이 없어 환산하지 못했습니다": "No usable salinity at this point, so nothing was derived",
+    "염분은 0보다 큰 수여야 합니다": "Salinity must be a number greater than 0",
+    "염분에 기준 조성(Millero 외 2008)을 곱한 환산값입니다. 이온을 직접 잰 값이 아닙니다.": (
+        "Derived by multiplying salinity by the Reference Composition (Millero et al. 2008). "
+        "These are not direct ion measurements."
+    ),
+    "이온 시트와 이온 열은 염분에 기준 조성(Millero 외 2008)을 곱한 환산값. 이온을 직접 잰 값이 아님": (
+        "Ion sheets and ion columns are derived by multiplying salinity by the Reference Composition "
+        "(Millero et al. 2008). They are not direct ion measurements"
+    ),
+    "염분에 기준 조성(Millero 외 2008)의 비율을 곱한 환산값입니다. 이온을 직접 잰 값이 아니며, "
+    "해빙 주변의 브라인이나 강물이 섞이는 곳에서는 실제 비율이 다를 수 있습니다. "
+    "주요 이온 여덟 가지는 염분이 저장될 때마다 DB와 엑셀에 함께 쌓입니다.": (
+        "Derived by multiplying salinity by the ratios of the Reference Composition (Millero et al. 2008). "
+        "These are not direct ion measurements, and real ratios can differ near sea-ice brine or where river "
+        "water mixes in. The eight major ions are added to the database and Excel whenever a salinity is stored."
+    ),
+    "염화 이온": "Chloride",
+    "나트륨 이온": "Sodium",
+    "황산 이온": "Sulfate",
+    "마그네슘 이온": "Magnesium",
+    "칼슘 이온": "Calcium",
+    "칼륨 이온": "Potassium",
+    "탄산수소 이온": "Bicarbonate",
+    "브롬화 이온": "Bromide",
+    "붕산": "Boric acid",
+    "탄산 이온": "Carbonate",
+    "스트론튬 이온": "Strontium",
+    "붕산 이온": "Borate",
+    "플루오린화 이온": "Fluoride",
+    "수산화 이온": "Hydroxide",
+    "이산화 탄소": "Carbon dioxide",
 }
 
 

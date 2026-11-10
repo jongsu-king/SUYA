@@ -10,7 +10,7 @@ Every 15 minutes (`MONITOR_INTERVAL_EXCEL`) SUYA checks whether new data reached
 | File | Contents |
 |---|---|
 | `antarctic_db_YYYY-MM.xlsx` | Every point value, grid statistic and listing for that month (sheets below) |
-| `argo_levels_YYYY-MM.xlsx` | Every level of every Argo profile that month; tens of thousands of rows, hence a separate file |
+| `argo_levels_YYYY-MM.xlsx` | Every level of every Argo profile that month with its derived ion amounts; hundreds of thousands of rows, hence a separate file |
 
 Default folder: Windows `Documents\SUYA`, macOS/Linux `~/Documents/SUYA`. Change it in `File > Settings` or with `MONITOR_EXCEL_DIR`.
 
@@ -35,7 +35,7 @@ Why regenerate rather than append: an xlsx file is zipped XML, so appending one 
 ## Sheets in `antarctic_db_YYYY-MM.xlsx`
 
 ### Info
-Period, creation time (UTC), time-basis note, warning, rows per sheet.
+Period, creation time (UTC), time-basis note, warning, ion-conversion note, rows per sheet.
 
 ### Monthly summary — one month's statistics per point, source and item
 Only surface and 2 m values count. Forecasts for days ahead (`kind = forecast`), deep levels and points clicked on the map are left out.
@@ -103,6 +103,24 @@ Only with a key: forecast time, point, model, level (surface, hpa:850 …), item
 ### Point queries — points clicked on the map
 Every value fetched for an arbitrary point (OISST, MUR, SMOS, SMAP, HYCOM 40 levels, GFS current, Marine). Measurements without a `location_id` end up here.
 
+### Ion composition — major ions derived for every row that has a salinity
+That month's rows of the SQLite table `seawater_ions`: surface values of the sea areas, the 40 HYCOM levels, satellite salinity and salinity at points clicked on the map.
+These are **not direct ion measurements**; each salinity is multiplied by the ratios of the Reference Composition (Millero et al. 2008). The formula and its limits are in [Data sources, section 11](data-sources.en.md#11-ion-composition-derived-from-salinity).
+
+| Column | Meaning |
+|---|---|
+| Time UTC, Point, Lat, Lon | As in the salinity row. Clicked points have no point name |
+| Data, Type | `hycom`, `smos`, `smap`, `argo`, … / model, satellite, observation |
+| Level, Depth m | `surface` or `depth:<m>` |
+| Salinity PSU | The practical salinity S_P that was converted |
+| Reference salinity g/kg | S_R = (35.16504 / 35) × S_P |
+| Cl⁻ … Br⁻ g/kg | The eight major ions (Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻) per kg of seawater |
+| Cl⁻ … Br⁻ mmol/kg | The same eight as amounts of substance |
+
+### Ion factors — the Reference Composition used
+Fifteen components with symbol, charge, molar mass, mass share %, g/kg and mmol/kg per unit of salinity, and g/kg and mmol/kg at salinity 35.
+The eight rows with a `DB column` are the ones stored in the database and in Excel. Multiplying these factors by any salinity reproduces every value.
+
 ## `argo_levels_YYYY-MM.xlsx`
 
 ### Argo levels
@@ -112,6 +130,10 @@ Every value fetched for an arbitrary point (OISST, MUR, SMOS, SMAP, HYCOM 40 lev
 | Pressure dbar | Raw pressure (adjusted in modes A/D) |
 | Depth m | Converted with Saunders & Fofonoff (1976) |
 | Temp °C, Salinity PSU | QC 1 and 2 only; blank otherwise |
+| Reference salinity g/kg, Cl⁻ … Br⁻ g/kg | Reference salinity and the eight major ions derived from that level's salinity; blank where the level has no salinity |
+
+The nine ion columns make this file about 1.9 times larger and about 1.8 times slower to write than before
+(measured 2026-11-10: a month of 433,396 rows went from 17.8 MB in 10.2 s to 33.7 MB in 17.8 s). It is written by the child process, so the window does not block.
 
 ## Reading the data directly from Python or R
 
@@ -125,11 +147,16 @@ salt = pd.read_sql("""
   WHERE source='hycom' AND variable='sea_water_salinity' AND location_id='weddell'
   ORDER BY obs_time""", con)
 argo = pd.read_sql("SELECT platform, cycle, obs_time, lat, lon, surface_temp, surface_salt FROM argo_profiles", con)
+ions = pd.read_sql("SELECT obs_time, location_id, depth_m, practical_salinity, chloride_g_kg, sodium_g_kg FROM seawater_ions WHERE source='hycom'", con)
+argo_ions = pd.read_sql("SELECT * FROM argo_level_ions WHERE obs_time >= '2026-11-01'", con)
 ```
 
 ```r
 library(DBI); con <- dbConnect(RSQLite::SQLite(), "~/Library/Application Support/SUYA/antarctic.db")
 dbGetQuery(con, "SELECT * FROM measurements WHERE variable='sea_water_temperature' LIMIT 10")
 ```
+
+Derived ion amounts are read from one table and two views: `seawater_ions` (g/kg, one row per salinity row), `seawater_ions_mmol` (mmol/kg) and `argo_level_ions` (per Argo level, g/kg).
+For CSV use `suya export ions --out ions.csv` and `suya export argo-ions --out argo_ions.csv`.
 
 `grids.payload` is gzip-compressed JSON (`{"lats":[…],"lons":[…],"values":[…]}`); `antarctic_monitor.db.Store.load_grid("oisst_sst")` decodes it.
