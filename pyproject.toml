@@ -1,6 +1,6 @@
 [project]
 name = "suya"
-version = "0.1.5"
+version = "0.1.6"
 description = "Desktop program that continuously collects Antarctic ocean temperature, salinity and air temperature from public APIs, stores them in SQLite and monthly Excel workbooks, and shows them on a polar map."
 readme = "README.md"
 requires-python = ">=3.11"

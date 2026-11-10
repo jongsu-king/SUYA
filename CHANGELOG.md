@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-10
+
+The eight major ions are now derived from every stored salinity and kept in the database, the
+workbooks and a new tab of the point window. Concept DOI for all versions: 10.5281/zenodo.23937852.
+
 ### Added
 - **Ion composition derived from salinity.** Every stored salinity is converted to the eight major
   ions (Cl⁻, Na⁺, SO₄²⁻, Mg²⁺, Ca²⁺, K⁺, HCO₃⁻, Br⁻) with the Reference Composition of Millero,

@@ -24,8 +24,8 @@ SUYA의 저작권은 아래 두 사람에게 있으며 MIT 라이선스로 배�
 
 ## How to cite / 인용
 
-> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.5) [Computer software]. Incheon National University. https://doi.org/10.5281/zenodo.23937852
+> Jongsu Lim and Suyeon Park (2026). *SUYA — Antarctic Ocean Monitor* (version 0.1.6) [Computer software]. Incheon National University. https://doi.org/10.5281/zenodo.23937852
 
 - Concept DOI (all versions; always resolves to the latest archived release): [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852)
-- Version DOIs: 0.1.5 — [10.5281/zenodo.24096560](https://doi.org/10.5281/zenodo.24096560) · 0.1.4 — [10.5281/zenodo.24054813](https://doi.org/10.5281/zenodo.24054813) · 0.1.3 — [10.5281/zenodo.23981834](https://doi.org/10.5281/zenodo.23981834) · 0.1.2 — [10.5281/zenodo.23967499](https://doi.org/10.5281/zenodo.23967499) · 0.1.1 — [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) · 0.1.0 — [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853)
+- Version DOIs: 0.1.6 — issued when Zenodo archives the release · 0.1.5 — [10.5281/zenodo.24096560](https://doi.org/10.5281/zenodo.24096560) · 0.1.4 — [10.5281/zenodo.24054813](https://doi.org/10.5281/zenodo.24054813) · 0.1.3 — [10.5281/zenodo.23981834](https://doi.org/10.5281/zenodo.23981834) · 0.1.2 — [10.5281/zenodo.23967499](https://doi.org/10.5281/zenodo.23967499) · 0.1.1 — [10.5281/zenodo.23945830](https://doi.org/10.5281/zenodo.23945830) · 0.1.0 — [10.5281/zenodo.23937853](https://doi.org/10.5281/zenodo.23937853)
 - Machine-readable: [`CITATION.cff`](CITATION.cff) · GitHub "Cite this repository" button · Zenodo records: https://doi.org/10.5281/zenodo.23937852
