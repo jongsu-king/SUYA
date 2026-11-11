@@ -16,6 +16,11 @@ All notable changes to this project are documented here. The format follows
   window. The saving process is now stopped and waited for before its folder is removed, an
   unfinished `.tmp.xlsx` it leaves in the Excel folder is deleted, and a failure inside the saving
   process is passed back in the result file and shown in the status tab, not in an error window.
+- **A save that was stopped is written again.** A save that was stopped or failed after its first
+  workbook was complete could be taken for a finished one: when the Excel folder had been empty and
+  no new data came in, the remaining workbooks were not written until the next data arrived. The
+  mark of a finished save is now cleared when a save starts and set only when all workbooks are
+  written.
 - **Temporary files left behind by a failed save.** The workbook writer keeps the rows of every
   sheet in temporary files until the workbook is complete: up to 14 times the size of the finished
   workbook, 468 MB for one month of Argo levels in a measurement on 2026-11-12. When a save failed

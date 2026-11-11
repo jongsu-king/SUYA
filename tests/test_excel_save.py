@@ -277,7 +277,37 @@ async def test_cancelled_save_stops_the_child_before_removing_its_folder(tmp_pat
     assert seen["process"].returncode is not None
     assert not seen["result"].parent.exists()
     assert not leftover.exists()
-    assert store.kv_get("excel:stamp") is None
+    assert not store.kv_get("excel:stamp")
+
+
+async def test_stopped_save_is_written_again_without_new_data(tmp_path, store, monkeypatch):
+    directory = tmp_path / "xl"
+    first = directory / MAIN
+    script = tmp_path / "child.py"
+    script.write_text(
+        "import pathlib, sys, time\npathlib.Path(sys.argv[1]).write_bytes(b'x')\ntime.sleep(60)\n", encoding="utf-8",
+    )
+    real = excel.sync_command
+    store.kv_set("excel:stamp", store.data_stamp())
+    monkeypatch.setattr(
+        excel, "sync_command",
+        lambda store_path, target, result_path=None: [sys.executable, str(script), str(first)],
+    )
+    task = asyncio.create_task(excel.collect(_ctx(store, directory)))
+    async with asyncio.timeout(30):
+        while not first.exists():
+            await asyncio.sleep(0.01)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert first.exists()
+    assert store.kv_get("excel:stamp") != store.data_stamp()
+    monkeypatch.setattr(excel, "sync_command", real)
+    result = await excel.collect(_ctx(store, directory))
+    assert not result.unchanged
+    assert zipfile.is_zipfile(first) and zipfile.is_zipfile(directory / ARGO)
+    assert store.kv_get("excel:stamp") == store.data_stamp()
+    assert (await excel.collect(_ctx(store, directory))).unchanged
 
 
 def _fake_child(tmp_path, monkeypatch, body: str) -> None:
@@ -316,11 +346,12 @@ async def test_failed_child_is_reported_in_its_own_words(tmp_path, store, monkey
     directory.mkdir()
     leftover = directory / ".argo_levels_2026-11.tmp.xlsx"
     leftover.write_bytes(b"x")
+    store.kv_set("excel:stamp", store.data_stamp())
     with pytest.raises(FetchError) as failure:
         await excel.collect(_ctx(store, directory))
     assert render(str(failure.value)) == expected
     assert not leftover.exists()
-    assert store.kv_get("excel:stamp") is None
+    assert store.kv_get("excel:stamp") == ""
 
 
 async def test_save_runs_in_a_child_and_leaves_only_the_workbooks(tmp_path, store, monkeypatch):
@@ -352,4 +383,4 @@ async def test_failure_inside_the_real_child_reaches_the_caller(tmp_path, store,
     )
     with pytest.raises(FetchError, match="unable to open database file"):
         await excel.collect(_ctx(store, tmp_path / "xl"))
-    assert store.kv_get("excel:stamp") is None
+    assert not store.kv_get("excel:stamp")

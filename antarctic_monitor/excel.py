@@ -747,13 +747,15 @@ async def collect(ctx: Context) -> CollectResult:
     """바뀐 내용이 있을 때만 별도 프로세스에서 파일을 만듭니다. 화면과 수집을 막지 않기 위함입니다.
 
     결과 파일과 조각 폴더는 이 함수가 만든 임시 폴더에 둡니다. 시간 초과나 프로그램 종료로 이 작업이 취소되면
-    저장 프로세스를 먼저 끝낸 뒤에 폴더를 지웁니다.
+    저장 프로세스를 먼저 끝낸 뒤에 폴더를 지웁니다. 저장을 시작할 때 저장 표시를 비워 두고 끝까지 쓴 뒤에만 다시
+    적으므로, 중간에 멈추거나 실패한 저장은 새 자료가 없어도 다음 차례에 다시 씁니다.
     """
     stamp = ctx.store.data_stamp()
     directory = ctx.settings.excel_dir
     if stamp and ctx.store.kv_get("excel:stamp") == stamp and any(directory.glob("antarctic_db_*.xlsx")):
         return CollectResult(unchanged=True, message=msg("새 자료 없음"))
     directory.mkdir(parents=True, exist_ok=True)
+    ctx.store.kv_set("excel:stamp", "")
     with tempfile.TemporaryDirectory(prefix=SCRATCH_PREFIX, ignore_cleanup_errors=True) as temp:
         result_path = Path(temp) / "result.json"
         flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
