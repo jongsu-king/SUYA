@@ -111,6 +111,7 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
  <tr><td>HYCOM ESPC-D-V02</td><td>미 해군 / HYCOM.org</td><td>3시간</td><td>1/12° 모델의 40개 층 수온·염분. 지도는 약 0.5° 간격, 6개 수심. 80°S 이남 없음</td></tr>
  <tr><td>Argo</td><td>Argo / Ifremer</td><td>1시간 확인</td><td>최근 30일, 55°S 이남 플로트 프로파일(~2000 m). 염분의 기준값</td></tr>
  <tr><td>GOSUD</td><td>Ifremer</td><td>1시간 확인</td><td>항해 중 선박 표층 수온·염분</td></tr>
+ <tr><td>OSMC</td><td>NOAA OSMC</td><td>1시간</td><td>GTS로 들어온 표류 부이·해빙 부이·선박·무인 수상정·계측 동물의 실시간 관측. 표층 수온·염분, 기온·이슬점·해면 기압, 계측 동물의 수심별 수온·염분. 50°S 이남, 최근 30일</td></tr>
  <tr><td>WOA23</td><td>NOAA NCEI</td><td>지점 조회 시</td><td>월별 기후값(1500 m 아래는 연평균)</td></tr>
  <tr><td>ERA5</td><td>ECMWF / Open-Meteo</td><td>지점 조회 시</td><td>일별 평균·최저·최고 기온</td></tr>
  <tr><td>Windy</td><td>Windy.com 공식 API</td><td>3시간</td><td>키가 있을 때만. 기온·이슬점·습도·기압. 수온·염분 항목은 이 API에 없음</td></tr>
@@ -118,6 +119,7 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
 <ul>
  <li><b>Argo 품질</b>: 플래그 1(양호)·2(대체로 양호)만 받습니다. 보정 모드(A·D)면 보정값을, 실시간(R)이면 원시값을 씁니다. 상승 관측이 있으면 그것만 씁니다. 표층 값은 받아 둔 층별 값 가운데 100 dbar 안에서 가장 얕은 유효 층이고, 층별 값을 받기 전까지만 목록의 값을 임시로 씁니다.</li>
  <li><b>범위 밖 값 제거</b>: 수온 −3~40 °C, 위성 염분 28~37 PSU, 모델·Argo 염분 20~42 PSU 밖은 버립니다(위성 염분에서 실제로 0.0이나 42.8이 내려옵니다).</li>
+ <li><b>OSMC 품질</b>: 이 자료에는 품질 플래그가 없습니다. 수온 −3~40 °C, 염분 20~42 PSU, 기온·이슬점 −95~30 °C, 해면 기압 890~1070 hPa 밖은 버리고, 이슬점이 기온보다 높으면 둘 다 버립니다. 해수 값은 79°S 이북 것만 남기고, 표류 부이의 시간별 보고가 12회 연속 제자리(위도·경도 0.002° 안)에 있으면 그 동안의 해수 값을 버립니다. Argo와 겹치는 프로파일링 플로트는 받지 않습니다. 이렇게 걸러도 튀는 값이 남을 수 있어 대표값에는 쓰지 않습니다.</li>
  <li><b>염분 범위 표시</b>: 저장된 염분이 그 수심의 남극해 범위(Boyer &amp; Levitus 1994, NOAA Technical Report NESDIS 81)를 벗어나면 낮음·높음으로 표시만 합니다. 값은 지우지 않으며, 범위가 넓어 큰 오류만 걸립니다.</li>
  <li><b>대표값</b>: 100 km·10일 안의 Argo 실측이 있으면 그것, 없으면 수온은 OISST → MUR → HYCOM, 염분은 HYCOM → SMOS → SMAP 순.</li>
  <li><b>파생값</b>: 어는점 Millero(1978), 밀도 σt EOS-80(Millero &amp; Poisson 1981), 압력→수심 Saunders &amp; Fofonoff(1976). 이온의 mmol/L은 mmol/kg에 그 수온과 염분의 1기압 밀도를 곱한 값이고 현장 압력은 넣지 않습니다.</li>
@@ -134,7 +136,7 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
 <ul>
  <li><code>antarctic.db</code>: 모든 원본 값(SQLite). 다른 프로그램(파이썬, R, DB Browser)에서 바로 열 수 있습니다.</li>
  <li><code>settings.env</code>: 설정. <code>monitor.log</code>: 로그(문제가 생기면 이 파일을 보세요). <code>crash.log</code>: 프로그램이 갑자기 꺼졌을 때만 내용이 생깁니다. <code>suya.lock</code>: 두 번째 복사본이 뜨지 않게 하는 잠금 파일.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 월간요약, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회, 이온조성, 격자이온, 이온환산계수, 염분범위.</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: 월별 엑셀. 시트 = 정보, 월간요약, 격자평균, 수온염분_해역, 수온염분_수직, Argo_목록, 선박관측, OSMC관측, 기지기온, GFS기온, 모델예보, Windy, 지점조회, 이온조성, 격자이온, 이온환산계수, 염분범위.</li>
  <li><code>argo_levels_YYYY-MM.xlsx</code>: Argo 전 층과 층별 이온 환산값, 범위 검사 표시(행이 많아 별도 파일).</li>
  <li>이온 값은 염분이 저장될 때마다 SQLite의 <code>seawater_ions</code> 표에 함께 쌓입니다(주요 이온 여덟 가지, g/kg). mmol/kg는 <code>seawater_ions_mmol</code>, Argo 층별 값은 <code>argo_level_ions</code> 뷰에서 읽습니다. 모두 환산값입니다. 범위 검사 결과는 <code>salinity_check</code> 열(<code>ok</code>·<code>low</code>·<code>high</code>)에 있고, 1기압 밀도와 mmol/L은 엑셀 이온조성 시트와 <code>suya export ions</code>에 들어갑니다. 지도에 쓰는 염분 격자는 <code>grid_ions</code> 뷰가 60°S 이남 평균과 해역 평균을 환산하고(엑셀 격자이온 시트), 칸마다의 값은 <code>suya export grid-ions</code>가 CSV로 냅니다. 격자 쪽 이온 값은 저장하지 않고 읽을 때 계산합니다.</li>
 </ul>
@@ -146,6 +148,7 @@ Windows에서 엑셀로 파일을 열어 둔 채로는 저장이 실패하고 �
  <li>Windy 무료(testing) 키는 Windy가 값을 섞고 변형해서 돌려줍니다. 그래프에 "(변형값)"으로 표시하며 실제 예보로 쓰면 안 됩니다.</li>
  <li>위성 염분은 해빙 아래와 연안에서 값이 없습니다. 염분 지도는 HYCOM 모델을, 실측은 Argo를 보세요.</li>
  <li>HYCOM은 80°S 이남(로스·필히너 빙붕 아래 등)을 다루지 않습니다.</li>
+ <li>OSMC 실시간 관측은 품질 검사를 거치지 않은 값입니다. 범위와 위치 검사로만 거르므로 한두 번 튀는 값은 그대로 남을 수 있습니다.</li>
  <li>Open-Meteo 무료 한도(하루 10,000 호출) 안에서 하루 9,000 호출까지만 쓰도록 스스로 제한합니다.</li>
  <li>수치모델·위성 값은 관측이 아니라 추정값이며, 어느 제공 기관도 정확도를 보증하지 않습니다.</li>
 </ul>
@@ -273,6 +276,7 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
  <tr><td>HYCOM ESPC-D-V02</td><td>US Navy / HYCOM.org</td><td>3 h</td><td>1/12° model, 40 levels. Map at about 0.5° and six depths. Nothing south of 80°S</td></tr>
  <tr><td>Argo</td><td>Argo Program via Ifremer</td><td>checked hourly</td><td>Float profiles (to ~2000 m) south of 55°S from the last 30 days. The reference for salinity</td></tr>
  <tr><td>GOSUD</td><td>Ifremer</td><td>checked hourly</td><td>Underway ship SST and salinity</td></tr>
+ <tr><td>OSMC</td><td>NOAA OSMC</td><td>1 h</td><td>Real-time reports sent over the GTS by drifting buoys, ice buoys, ships, an uncrewed surface vehicle and tagged animals. SST and surface salinity, air temperature, dew point and sea-level pressure, tagged-animal temperature and salinity by depth. South of 50°S, last 30 days</td></tr>
  <tr><td>WOA23</td><td>NOAA NCEI</td><td>on point query</td><td>Monthly climatology (annual below 1500 m)</td></tr>
  <tr><td>ERA5</td><td>ECMWF via Open-Meteo</td><td>on point query</td><td>Daily mean / min / max air temperature</td></tr>
  <tr><td>Windy</td><td>Windy.com official API</td><td>3 h</td><td>Only with a key. Air temperature, dew point, humidity, pressure. The API has no water temperature or salinity</td></tr>
@@ -280,6 +284,7 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
 <ul>
  <li><b>Argo quality</b>: only QC flags 1 (good) and 2 (probably good). Adjusted values in modes A/D, raw values in mode R. Ascending profiles are preferred. The surface value is the shallowest valid level within 100 dbar of the stored profile; the listed value is used only until the levels arrive.</li>
  <li><b>Range checks</b>: temperature −3…40 °C, satellite salinity 28…37 PSU, model and Argo salinity 20…42 PSU. Values outside are dropped (satellite salinity really does return 0.0 and 42.8).</li>
+ <li><b>OSMC quality</b>: this data has no QC flags. Values outside temperature −3…40 °C, salinity 20…42 PSU, air temperature and dew point −95…30 °C and sea-level pressure 890…1070 hPa are dropped, and a dew point above the air temperature drops both. Sea values are kept only north of 79°S, and when a drifting buoy's hourly reports stay in place (within 0.002° in latitude and longitude) for 12 reports in a row, its sea values from those hours are dropped. Profiling floats are not collected because Argo covers them. Outliers can still get through, so these values are not used for the representative value.</li>
  <li><b>Salinity range label</b>: a stored salinity outside the Southern Ocean range for its depth (Boyer &amp; Levitus 1994, NOAA Technical Report NESDIS 81) is labelled low or high. Nothing is dropped, and the ranges are broad, so only gross errors are caught.</li>
  <li><b>Representative value</b>: an Argo profile within 100 km and 10 days if there is one; otherwise temperature OISST → MUR → HYCOM, salinity HYCOM → SMOS → SMAP.</li>
  <li><b>Derived values</b>: freezing point Millero (1978), density σt from EOS-80 (Millero &amp; Poisson 1981), pressure to depth Saunders &amp; Fofonoff (1976). Ion amounts in mmol/L are mmol/kg times the density at 1 atm for that temperature and salinity; in-situ pressure is not included.</li>
@@ -296,7 +301,7 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
 <ul>
  <li><code>antarctic.db</code>: every raw value (SQLite). Open it directly from Python, R or DB Browser.</li>
  <li><code>settings.env</code>: settings. <code>monitor.log</code>: log file (check it when something goes wrong). <code>crash.log</code>: gets content only when the program dies suddenly. <code>suya.lock</code>: keeps a second copy from starting.</li>
- <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Monthly summary, Grid means, Water by area, Water vertical, Argo list, Ships, Stations, GFS air, Forecasts, Windy, Point queries, Ion composition, Grid ions, Ion factors, Salinity ranges.</li>
+ <li><code>antarctic_db_YYYY-MM.xlsx</code>: monthly workbook. Sheets: Info, Monthly summary, Grid means, Water by area, Water vertical, Argo list, Ships, OSMC obs, Stations, GFS air, Forecasts, Windy, Point queries, Ion composition, Grid ions, Ion factors, Salinity ranges.</li>
  <li><code>argo_levels_YYYY-MM.xlsx</code>: every Argo level with its derived ion amounts and the range check (separate because of the row count).</li>
  <li>Ion amounts are added to the SQLite table <code>seawater_ions</code> whenever a salinity is stored (eight major ions, g/kg). Read mmol/kg from the view <code>seawater_ions_mmol</code> and Argo levels from the view <code>argo_level_ions</code>. All of them are derived values. The range check is in the column <code>salinity_check</code> (<code>ok</code>, <code>low</code>, <code>high</code>); density at 1 atm and mmol/L are added in the Ion composition sheet and by <code>suya export ions</code>. For the salinity grids behind the map, the view <code>grid_ions</code> converts the mean south of 60°S and the sector means (the Grid ions sheet), and <code>suya export grid-ions</code> writes the value of every cell to CSV. Grid ion amounts are not stored; they are computed when read.</li>
 </ul>
@@ -308,6 +313,7 @@ On Windows a workbook that is open in Excel cannot be replaced; the program retr
  <li>Windy's free (testing) key returns shuffled, altered values. Charts label them "(altered)"; do not use them as a forecast.</li>
  <li>Satellite salinity has no values under sea ice or near the coast. Use the HYCOM layer for a complete salinity map and Argo for measurements.</li>
  <li>HYCOM does not cover south of 80°S (under the Ross and Filchner ice shelves, for example).</li>
+ <li>OSMC real-time reports have not been quality controlled. They are filtered only by range and position checks, so an isolated bad value can remain.</li>
  <li>The program caps itself at 9,000 Open-Meteo calls per day, under the free limit of 10,000.</li>
  <li>Model and satellite values are estimates, not measurements, and no provider guarantees their accuracy.</li>
 </ul>

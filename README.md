@@ -181,7 +181,7 @@ within 2000 km) for water values. Air temperature is for the clicked point itsel
 
 | Tab | Contents | Sources called |
 |---|---|---|
-| **Surface** | Representative SST and salinity, freezing point, margin above freezing, density σt, and a table of every source with value, kind, data time, age and notes | OISST, MUR, Open-Meteo Marine, HYCOM (stored grid), SMOS, SMAP, stored Argo and GOSUD |
+| **Surface** | Representative SST and salinity, freezing point, margin above freezing, density σt, and a table of every source with value, kind, data time, age and notes | OISST, MUR, Open-Meteo Marine, HYCOM (stored grid), SMOS, SMAP, stored Argo, GOSUD and OSMC |
 | **Vertical profile** | Temperature and salinity against depth (Argo in situ, HYCOM model, WOA23 climatology; square-root depth axis so the upper ocean is readable), a T-S diagram with σt contours and the freezing line, and a note with each profile's mixed-layer depth (0.2 °C from the 10 m temperature) | HYCOM 40 levels (up to 2 min), WOA23 (kept in the database once fetched), stored Argo |
 | **Air temperature** | Eight GFS current values; 7-day forecasts from five models with a "now" line; 48 h of METAR from the nearest station within 400 km; temperature by pressure level 1000–10 hPa (GFS and ECMWF) | Open-Meteo, stored METAR, Windy (with a key) |
 | **Time series** | Last 30 days of OISST SST, satellite salinity (SMOS, SMAP), sea-ice concentration and ERA5 daily air temperature with a min–max band | OISST, SMOS, SMAP, ERA5 |
@@ -231,7 +231,7 @@ Per-source status, interval, data time, age, last run, countdown to the next run
 
 ## 5. Data collected
 
-Thirteen scheduled sources plus three that run only on point queries. Request formats, URLs and per-source caveats: [docs/data-sources.en.md](docs/data-sources.en.md).
+Fourteen scheduled sources plus three that run only on point queries. Request formats, URLs and per-source caveats: [docs/data-sources.en.md](docs/data-sources.en.md).
 
 | ID | Data | Provider | Default interval | What you get | Relation to the two sites |
 |---|---|---|---|---|---|
@@ -245,6 +245,7 @@ Thirteen scheduled sources plus three that run only on point queries. Request fo
 | `hycom_profiles` | HYCOM area profiles | same | 24 h | 40 levels at the 10 sea areas | Depth history per point |
 | `argo` | Argo floats | Argo GDAC via Ifremer ERDDAP | checked hourly | Every profile south of 55°S from the last 30 days; level data fetched 60 profiles per run, newest first | **The reference for salinity** |
 | `gosud` | GOSUD ship data | GOSUD via Ifremer ERDDAP | checked hourly | Underway SST and salinity south of 50°S, last 30 days | Only along shipping routes |
+| `osmc` | OSMC real-time in situ reports | NOAA OSMC ERDDAP | 1 h | Reports sent over the GTS south of 50°S by drifting buoys, ice buoys, ships, uncrewed surface vehicles and tagged animals: SST, surface salinity, air temperature, dew point, sea-level pressure, and temperature and salinity at depth from tagged animals. The last 30 days once a day, the last 3 days in between | Not on either site. **No quality flags**: range and position checks only |
 | `smos` | SMOS salinity | ESA via NOAA CoastWatch | checked every 6 h | 3-day composite, 0.25° → 0.5° | Mostly missing south of 65°S |
 | `smap` | SMAP salinity | NASA via NOAA CoastWatch | checked every 6 h | Daily, 0.25° → 0.5° | Mostly missing south of 65°S |
 | `windy` | Windy Point Forecast | Windy.com official API | 3 h | With a key only: air temperature, dew point, humidity (surface–150 hPa), pressure at 24 points | Official API; no water temperature or salinity |
@@ -254,7 +255,8 @@ On point queries only: **MUR SST** (NASA JPL, 0.01°, with analysis error), **Wo
 **ERA5** (ECMWF via Open-Meteo, daily mean/min/max air temperature).
 
 Not collected, and why: nullschool internals (no public API), Windy website endpoints (prohibited by its terms), Copernicus Marine (login required),
-MEOP marine-mammal CTD (file distribution only), NSIDC sea ice (covered by OISST and MUR).
+MEOP marine-mammal CTD (the quality-controlled set is distributed as files only; the real-time values that reach the GTS come through
+OSMC), NSIDC sea ice (covered by OISST and MUR).
 
 ## 6. Quality-control rules
 
@@ -270,6 +272,7 @@ Real responses contain values that must not be used as they are. Each rule below
 | Temperature outside −3…40 °C, model/Argo salinity outside 20–42 PSU dropped | Physically impossible |
 | Open-Meteo Marine SST discarded when the cell elevation is > 0 | Land cells still return values like −1.8 °C |
 | GOSUD QC flags 1 and 2 only | 26 °C at 59°S with flag 4 was present |
+| OSMC, which carries no QC flags: range checks (water −3…40 °C, salinity 20–42 PSU, air −95…30 °C, sea-level pressure 890–1070 hPa), no sea values south of 79°S, none from a drifting buoy that stayed within 0.002° for 12 hourly reports, no report dated more than 6 h ahead | Platform 1897495 reported 44.38 °C and salinity 76.84 at 88°S; drifter 2802071 sent sea temperatures from one spot for 712 hours |
 | Representative value: an **Argo profile within 100 km and 10 days** first; otherwise SST OISST → MUR → HYCOM, salinity HYCOM → SMOS → SMAP | A float 336 km away and 7 days old disagreed with the map |
 | HYCOM grid time remembered; identical times are not downloaded again | Saves server load and calls |
 | Days of OISST, SMOS and SMAP that appeared while the program was off or the server was down are filled in, oldest first, up to 7 days back | The daily series keeps no holes after a short outage |
@@ -289,7 +292,7 @@ add the density at 1 atm and the ions in mmol/L (in-situ pressure not included).
 reads a salinity layer as an ion concentration, the *Grid ions* sheet keeps the ion composition of the mean south of 60°S and of the five sector means
 for every grid time, and `suya export grid-ions` writes the value of every grid cell to CSV. Cell values are computed when read and not stored.
 Formula, factors, ranges and limits:
-[docs/data-sources.en.md, section 11](docs/data-sources.en.md#11-ion-composition-derived-from-salinity).
+[docs/data-sources.en.md, section 12](docs/data-sources.en.md#12-ion-composition-derived-from-salinity).
 
 ## 7. Storage: SQLite and the Excel database
 
@@ -331,6 +334,7 @@ while SUYA is running.
 | Water vertical | HYCOM 40-level temperature and salinity at the 10 areas, one row per level |
 | Argo list | Per profile: time, position, mode, QC, surface T/S, max depth, level count |
 | Ships | GOSUD per ship: time, position, SST, salinity |
+| OSMC obs | OSMC per report: time, platform, type, position, depth, water temperature, salinity, air temperature, dew point, sea-level pressure |
 | Stations | METAR per station: air temperature, dew point, pressure |
 | GFS air | Eight GFS current values at 24 points |
 | Forecasts | 24 points × forecast time × five models |
@@ -422,7 +426,7 @@ and a desktop copy must not share one database at the same time.
 ```
       ┌─ collectors/ ──────────────┐      ┌─ engine.py ────────────────┐
       │ metar  openmeteo  erddap   │◄─────┤ one asyncio task per source │
-      │ hycom  argo  gosud  windy  │      │ interval · back-off · budget│
+      │ hycom argo gosud osmc windy│      │ interval · back-off · budget│
       └────────────┬───────────────┘      └──────────┬─────────────────┘
                    ▼                                  │ events
             db.py (SQLite, WAL) ─────────────────────►│
@@ -439,6 +443,8 @@ and a desktop copy must not share one database at the same time.
   User-Agent (`suya/<version> (…github.com/jongsu-king/SUYA)`).
 - **HYCOM** is read through OPeNDAP `.ascii` subsets. The `tds` host returns 500 for some requests, so `ncss` is tried first.
 - **ERDDAP** sources (OISST, SMOS, SMAP, Argo, GOSUD) ask `time[(last)]` first and skip the download when that time is already stored.
+- **OSMC** has no such token. Four queries run one after another, each thinned to one report per platform and hour on the server; the last
+  3 days are asked for every hour and all 30 days once a day, which picks up reports that arrived late.
 - **Map**: a south-polar stereographic projection; every screen pixel is inverse-projected and the grid bilinearly interpolated (missing when
   less than half the weight is valid). Zooming resamples, so the 1/12° HYCOM detail shows up when you zoom in.
 - **GUI thread safety**: the engine runs in a worker thread with its own event loop; results reach the window through Qt signals. Excel writing
@@ -517,7 +523,7 @@ tests on every push on Linux and Windows with Python 3.11–3.13 and on macOS wi
 antarctic_monitor/        Python package (CLI name: suya)
 ├── cli.py                commands: gui, daemon, collect, export, excel-sync, ions, sources, self-test
 ├── engine.py             scheduler: intervals, back-off, rate limits, persisted schedule, event bus
-├── collectors/           one module per data service (erddap, hycom, argo, gosud, openmeteo, metar, windy, woa)
+├── collectors/           one module per data service (erddap, hycom, argo, gosud, osmc, openmeteo, metar, windy, woa)
 ├── db.py                 SQLite store
 ├── excel.py              monthly workbook writer
 ├── pointquery.py         point inspector: parallel source calls, TTL cache, land → nearest ocean cell
@@ -587,7 +593,7 @@ sidebar) builds APA and BibTeX entries from it — and in [.zenodo.json](.zenodo
 
 Data: NOAA NCEI OISST v2.1 (Huang et al. 2021) · NOAA NCEP GFS · NOAA Aviation Weather Center METAR · NASA JPL MUR SST v4.1 ·
 ESA SMOS and NASA SMAP sea-surface salinity via NOAA CoastWatch · US Naval Research Laboratory HYCOM ESPC-D-V02 · International Argo Program
-(doi:10.17882/42182) via Ifremer · GOSUD · NOAA World Ocean Atlas 2023 · ECMWF ERA5 and IFS, DWD ICON, ECCC GEM, JMA GSM via Open-Meteo (CC BY 4.0) ·
+(doi:10.17882/42182) via Ifremer · GOSUD · NOAA OSMC · NOAA World Ocean Atlas 2023 · ECMWF ERA5 and IFS, DWD ICON, ECCC GEM, JMA GSM via Open-Meteo (CC BY 4.0) ·
 Natural Earth coastlines · cmocean colormaps (Thyng et al. 2016). Exact terms and required acknowledgements: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## 18. License and copyright

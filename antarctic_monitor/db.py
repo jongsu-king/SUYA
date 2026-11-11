@@ -419,6 +419,26 @@ class Store:
             self._conn.commit()
         return removed
 
+    def delete_measurements(
+        self, source: str, dataset: str, variables: Iterable[str], spans: Iterable[tuple[str, str]]
+    ) -> int:
+        """한 데이터셋에서 지정한 시각 구간(양 끝 포함)의 변수 행을 지웁니다. 수집한 뒤에 버리기로 한 값을 정리할 때 씁니다.
+
+        염분 행이 지워지면 이온 행도 트리거가 따라 지웁니다.
+        """
+        names = list(variables)
+        marks = ",".join("?" * len(names))
+        sql = (
+            "DELETE FROM measurements WHERE source = ? AND dataset = ? AND obs_time BETWEEN ? AND ? "
+            f"AND variable IN ({marks})"
+        )
+        removed = 0
+        with self._lock:
+            for start, end in spans:
+                removed += self._conn.execute(sql, (source, dataset, start, end, *names)).rowcount
+            self._conn.commit()
+        return removed
+
     def relabel_metar_pressure(self) -> int:
         """예전에 ``surface_pressure``로 저장된 METAR 해면 기압을 ``sea_level_pressure``로 옮깁니다."""
         with self._lock:

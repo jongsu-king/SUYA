@@ -10,7 +10,7 @@ from typing import Any, Awaitable, Callable
 
 from . import composition, seawater
 from .collectors import argo as argo_collector
-from .collectors import erddap, hycom, openmeteo, windy, woa
+from .collectors import erddap, hycom, openmeteo, osmc, windy, woa
 from .collectors.base import Context
 from .db import Measurement, iso, utcnow
 from .i18n import msg
@@ -23,6 +23,8 @@ ARGO_WINDOW_DAYS = 45
 ARGO_REPRESENTATIVE_KM = 100.0
 ARGO_REPRESENTATIVE_DAYS = 10
 OBS_RADIUS_KM = 400.0
+OSMC_RADIUS_KM = 300.0
+OSMC_SURFACE_DEPTH_M = 10.0
 TTL = {"air": 900.0, "water": 1800.0, "profile": 10800.0, "series": 3600.0}
 PARTIAL_TTL = 120.0
 GUARD_TIMEOUT = {"HYCOM": 120.0, "WOA23": 60.0}
@@ -208,6 +210,11 @@ async def water(ctx: Context, lat: float, lon: float) -> dict:
         add(rows, "gosud", msg("선박 {ship}", ship=item["dataset"]), "observation",
             "temperature" if item["variable"] == "sea_water_temperature" else "salinity",
             item["unit"], item["value"], item["obs_time"], f"{item['distance_km']:.0f} km")
+    for item in await asyncio.to_thread(nearest_osmc, ctx, query_lat, query_lon):
+        add(rows, "osmc", msg("OSMC {kind}", kind=msg(osmc.platform_label(item["quality"]))), "observation",
+            "temperature" if item["variable"] == "sea_water_temperature" else "salinity",
+            item["unit"], item["value"], item["obs_time"],
+            msg("플랫폼 {code}, {km} km", code=item["dataset"], km=round(item["distance_km"])))
 
     lead = ("argo",) if representative_argo else ()
     best_temp = _first_value(rows, "temperature", (*lead, "oisst", "mur", "hycom"))
@@ -247,7 +254,7 @@ def _store_water_rows(ctx: Context, rows: list[dict], lat: float, lon: float) ->
     }
     output = []
     for row in rows:
-        if row["value"] is None or not row["time"] or row["source"] in ("argo", "gosud"):
+        if row["value"] is None or not row["time"] or row["source"] in ("argo", "gosud", "osmc"):
             continue
         output.append(
             Measurement(
@@ -282,6 +289,20 @@ def nearest_ship(ctx: Context, lat: float, lon: float, radius_km: float = 300.0)
             row["variable"] not in closest or distance < closest[row["variable"]]["distance_km"]
         ):
             closest[row["variable"]] = row | {"distance_km": distance}
+    return list(closest.values())
+
+
+def nearest_osmc(ctx: Context, lat: float, lon: float, radius_km: float = OSMC_RADIUS_KM) -> list[dict]:
+    """최근 30일의 OSMC 표층 관측 가운데 가장 가까운 것을 항목별로 하나씩 돌려줍니다. 수심 10 m까지를 표층으로 봅니다."""
+    since = iso(utcnow() - timedelta(days=30))
+    closest: dict[str, dict] = {}
+    for variable in osmc.SEA_VARIABLES:
+        for row in ctx.store.iter_measurements(source="osmc", variable=variable, since=since):
+            if (row["depth_m"] or 0.0) > OSMC_SURFACE_DEPTH_M:
+                continue
+            distance = haversine_km(lat, lon, row["lat"], row["lon"])
+            if distance <= radius_km and (variable not in closest or distance < closest[variable]["distance_km"]):
+                closest[variable] = dict(row) | {"distance_km": distance}
     return list(closest.values())
 
 

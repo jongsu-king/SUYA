@@ -150,7 +150,7 @@ class AboutDialog(QDialog):
             f'DOI: <a href="https://doi.org/{__concept_doi__}">{__concept_doi__}</a> ({tr("모든 버전")})<br>'
             f"{tr('인용')}: Lim, J. &amp; Park, S. (2026). <i>SUYA: Antarctic ocean temperature, salinity and air "
             f"temperature monitor</i> ({__version__}). Zenodo. https://doi.org/{__concept_doi__}<br><br>"
-            f"{tr('자료 출처')}: NOAA (GFS, OISST, METAR, WOA23), NASA JPL (MUR, SMAP), ESA (SMOS), "
+            f"{tr('자료 출처')}: NOAA (GFS, OISST, METAR, WOA23, OSMC), NASA JPL (MUR, SMAP), ESA (SMOS), "
             "US Navy / HYCOM.org, Argo Program (Ifremer), GOSUD, ECMWF ERA5, Open-Meteo (CC BY 4.0), "
             "Natural Earth, cmocean."
         )

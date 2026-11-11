@@ -29,6 +29,7 @@ a = Analysis(
         "antarctic_monitor.collectors.hycom",
         "antarctic_monitor.collectors.metar",
         "antarctic_monitor.collectors.openmeteo",
+        "antarctic_monitor.collectors.osmc",
         "antarctic_monitor.collectors.windy",
         "antarctic_monitor.collectors.woa",
         "matplotlib.backends.backend_qtagg",

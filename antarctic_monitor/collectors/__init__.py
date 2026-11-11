@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Awaitable, Callable
 
-from . import argo, erddap, gosud, hycom, metar, openmeteo, windy
+from . import argo, erddap, gosud, hycom, metar, openmeteo, osmc, windy
 from .base import CollectResult, Context
 
 Job = Callable[[Context], Awaitable[CollectResult]]
@@ -29,6 +29,7 @@ JOBS: dict[str, Job] = {
     "hycom_profiles": hycom.collect_profiles,
     "argo": argo.collect,
     "gosud": gosud.collect,
+    "osmc": osmc.collect,
     "windy": windy.collect,
     "excel": _excel,
 }

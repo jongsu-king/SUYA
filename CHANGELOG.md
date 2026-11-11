@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A new source: real-time in situ reports from NOAA OSMC.** The collector `osmc` reads the
+  dataset `OSMC_30day` of the OSMC ERDDAP server (the reports that reach the WMO Global
+  Telecommunication System, CC0) south of 50°S every hour: sea-surface temperature and salinity,
+  air temperature, dew point and sea-level pressure from drifting buoys, ice buoys, ships and
+  uncrewed surface vehicles, and temperature and salinity at depth from tagged animals. Profiling
+  floats are left out because the Argo collector already has them. The last 3 days are asked for
+  every hour and all 30 days once a day, so late reports are picked up. A first run on 2026-11-11
+  stored 46,096 values from 71 platforms. No key and no account are needed.
+- **Quality rules for a source without flags.** OSMC carries no quality flags, so the values pass
+  range checks only (water −3…40 °C, salinity 20–42 PSU, air −95…30 °C, sea-level pressure
+  890–1070 hPa, a dew point above the air temperature drops both). Sea values south of 79°S are
+  dropped, as are sea values of a drifting buoy that stayed within 0.002° for 12 hourly reports
+  (stranded or recovered; values stored before the buoy was recognised are removed again) and
+  reports dated more than 6 hours ahead. What these rules cannot catch stays in: a single warm
+  report from an otherwise cold buoy, for example. Treat OSMC as unchecked observations.
+- **OSMC in the workbook, the point inspector and the ion composition.** A new sheet, *OSMC obs*,
+  holds one row per time, platform, position and depth. A click on the map lists the nearest OSMC
+  surface values within 300 km and 30 days in the Surface tab, for comparison only: they are never
+  chosen as the representative value. OSMC salinity is converted to ions like every other salinity.
+
 ## [0.1.7] - 2026-11-11
 
 The ion composition now carries a salinity range check and a volume basis, the whole-area salinity

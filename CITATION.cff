@@ -9,11 +9,11 @@ abstract: >-
   SUYA is a desktop program that continuously collects Antarctic sea surface and
   subsurface temperature, salinity and coastal air temperature from public
   scientific APIs (NOAA METAR, Open-Meteo, NOAA OISST and MUR, SMOS and SMAP
-  salinity, HYCOM ESPC-D-V02, Argo floats, GOSUD, World Ocean Atlas 2023 and the
-  Windy Point Forecast API), stores every value with its provenance in SQLite and
-  monthly Excel workbooks, and shows the data on a south-polar stereographic map
-  with per-location profiles and time series. The interface is available in
-  Korean and English.
+  salinity, HYCOM ESPC-D-V02, Argo floats, GOSUD, NOAA OSMC, World Ocean Atlas
+  2023 and the Windy Point Forecast API), stores every value with its provenance
+  in SQLite and monthly Excel workbooks, and shows the data on a south-polar
+  stereographic map with per-location profiles and time series. The interface is
+  available in Korean and English.
 authors:
   - family-names: Lim
     given-names: Jongsu

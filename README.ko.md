@@ -176,7 +176,7 @@ python -m antarctic_monitor
 
 | 탭 | 내용 | 호출하는 소스 |
 |---|---|---|
-| **표층** | 대표 수온·염분, 어는점, 어는점과의 차, 밀도 σt, 소스별 값 표(값·종류·자료 시각·경과·비고) | OISST, MUR, Open-Meteo Marine, HYCOM(저장된 격자), SMOS, SMAP, 저장된 Argo·GOSUD |
+| **표층** | 대표 수온·염분, 어는점, 어는점과의 차, 밀도 σt, 소스별 값 표(값·종류·자료 시각·경과·비고) | OISST, MUR, Open-Meteo Marine, HYCOM(저장된 격자), SMOS, SMAP, 저장된 Argo·GOSUD·OSMC |
 | **수직 프로파일** | 깊이별 수온·염분(Argo 실측·HYCOM 모델·WOA23 기후값, 표층이 잘 보이도록 제곱근 수심축), T-S 다이어그램(σt 등치선, 어는점 선), 프로파일별 혼합층 깊이(10 m 수온에서 0.2 °C 차) 안내 | HYCOM 40층(최대 2분), WOA23(한 번 받으면 DB에 보관), 저장된 Argo |
 | **기온** | GFS 현재값 8종, 5개 모델 7일 예보 비교("지금" 선 포함), 400 km 안 가장 가까운 기지의 METAR 48시간, 기압 고도별 기온 1000~10 hPa(GFS·ECMWF) | Open-Meteo, 저장된 METAR, Windy(키 있을 때) |
 | **시계열** | 최근 30일 OISST 수온, 위성 염분(SMOS·SMAP), 해빙 농도, ERA5 일별 기온(최저~최고 띠) | OISST, SMOS, SMAP, ERA5 |
@@ -225,7 +225,7 @@ python -m antarctic_monitor
 
 ## 5. 수집하는 데이터
 
-자동 수집 소스 13개와 지점 조회 시에만 호출하는 소스 3개입니다. 요청 형식·URL·소스별 주의점은 [docs/data-sources.md](docs/data-sources.md).
+자동 수집 소스 14개와 지점 조회 시에만 호출하는 소스 3개입니다. 요청 형식·URL·소스별 주의점은 [docs/data-sources.md](docs/data-sources.md).
 
 | ID | 자료 | 제공 | 기본 주기 | 받는 것 | 두 사이트와의 관계 |
 |---|---|---|---|---|---|
@@ -239,6 +239,7 @@ python -m antarctic_monitor
 | `hycom_profiles` | HYCOM 해역 프로파일 | 위와 같음 | 24시간 | 해역 10곳의 40개 층 | 지점별 깊이 이력 |
 | `argo` | Argo 플로트 | Argo GDAC / Ifremer ERDDAP | 1시간 확인 | 최근 30일, 55°S 이남 모든 프로파일 목록 + 층별 값(한 번에 60개, 최신순) | **염분의 기준값** |
 | `gosud` | GOSUD 선박 관측 | GOSUD / Ifremer ERDDAP | 1시간 확인 | 최근 30일, 50°S 이남 항해 중 표층 수온·염분 | 항로에 있는 곳만 |
+| `osmc` | OSMC 실시간 현장 관측 | NOAA OSMC ERDDAP | 1시간 | 50°S 이남의 표류 부이·해빙 부이·선박·무인 수상정·계측 동물이 GTS로 보낸 보고: 표층 수온·염분, 기온·이슬점·해면 기압, 계측 동물의 수심별 수온·염분. 하루 한 번 최근 30일, 그 사이에는 최근 3일 | 두 사이트에 없음. **품질 플래그 없음**: 범위와 위치 검사만 |
 | `smos` | SMOS 위성 염분 | ESA / NOAA CoastWatch | 6시간 확인 | 3일 합성, 0.25°→0.5° | 65°S 이남 대부분 결측 |
 | `smap` | SMAP 위성 염분 | NASA / NOAA CoastWatch | 6시간 확인 | 일별, 0.25°→0.5° | 65°S 이남 대부분 결측 |
 | `windy` | Windy Point Forecast | Windy.com 공식 API | 3시간 | 키가 있을 때만: 24개 지점의 기온·이슬점·습도(지표~150 hPa)·기압 | 공식 API. 수온·염분 없음 |
@@ -246,7 +247,7 @@ python -m antarctic_monitor
 
 지점 조회 시에만: **MUR SST**(NASA JPL, 0.01°, 분석 오차 포함), **World Ocean Atlas 2023**(NOAA, 1500 m까지 월별, 그 아래 연평균 기후값), **ERA5**(ECMWF / Open-Meteo, 일별 평균·최저·최고 기온).
 
-수집하지 않는 것과 이유: nullschool 내부 데이터(공개 API 없음), Windy 웹사이트 내부 주소(약관 금지), Copernicus Marine(로그인 필요), MEOP 해양 포유류 CTD(파일 배포), NSIDC 해빙(OISST·MUR로 대체).
+수집하지 않는 것과 이유: nullschool 내부 데이터(공개 API 없음), Windy 웹사이트 내부 주소(약관 금지), Copernicus Marine(로그인 필요), MEOP 해양 포유류 CTD(품질 검사를 마친 자료는 파일로만 배포. GTS로 들어온 실시간 값은 OSMC로 받음), NSIDC 해빙(OISST·MUR로 대체).
 
 ## 6. 품질 관리 규칙
 
@@ -262,6 +263,7 @@ python -m antarctic_monitor
 | 수온 −3~40 °C, 모델·Argo 염분 20~42 PSU 밖 제거 | 물리적으로 불가능한 값 |
 | Open-Meteo Marine에서 격자 고도 > 0이면 수온 버림 | 육지 격자에서도 −1.8 °C 같은 값이 내려옴 |
 | GOSUD QC 플래그 1·2만 | 남위 59°에서 26 °C(플래그 4)가 있었음 |
+| QC 플래그가 없는 OSMC는 범위 검사(수온 −3~40 °C, 염분 20~42 PSU, 기온 −95~30 °C, 해면 기압 890~1070 hPa)를 하고, 79°S 이남의 해수 값, 한 시간 간격 보고 12회 동안 0.002° 안에 머문 표류 부이의 해수 값, 6시간 넘게 앞선 시각의 보고를 버림 | 플랫폼 1897495가 남위 88°에서 수온 44.38 °C, 염분 76.84를 보냄. 표류 부이 2802071은 한자리에서 712시간 동안 수온을 보냄 |
 | 대표값: **100 km·10일 안의 Argo** 실측 우선, 없으면 수온 OISST → MUR → HYCOM, 염분 HYCOM → SMOS → SMAP | 336 km 떨어진 7일 전 플로트를 대표값으로 쓰면 지도와 어긋남 |
 | HYCOM 격자 시각을 기억해 같은 시각이면 다시 받지 않음 | 서버 부하와 호출 수 절약 |
 | 프로그램이 꺼져 있거나 서버가 멈춘 사이에 나온 OISST·SMOS·SMAP의 날을 오래된 순으로 최대 7일치 채움 | 잠깐 멈춰도 일별 시계열에 구멍이 남지 않음 |
@@ -276,7 +278,7 @@ python -m antarctic_monitor
 염분마다 그 수심의 남극해 범위(Boyer & Levitus 1994, NOAA Technical Report NESDIS 81)와 견주어 `ok`·`low`·`high`로 표시합니다. 값은 지우지 않고, 범위가 넓어 큰 오류만 걸립니다.
 같은 행에 짝이 되는 수온이 있으면 엑셀과 CSV에 1기압 밀도와 mmol/L도 넣습니다(현장 압력은 넣지 않음).
 전범위 격자도 환산합니다: 지도의 **표시** 상자로 염분 레이어를 이온 농도로 읽고, 엑셀 `격자이온` 시트에 격자 시각마다 60°S 이남 평균과 해역 5곳 평균의 이온 조성이 쌓이며, `suya export grid-ions`가 격자 칸마다의 값을 CSV로 냅니다. 칸별 값은 DB에 따로 저장하지 않고 읽을 때 계산합니다.
-식·계수·범위·한계: [docs/data-sources.md 11절](docs/data-sources.md#11-염분에서-환산하는-이온-조성).
+식·계수·범위·한계: [docs/data-sources.md 12절](docs/data-sources.md#12-염분에서-환산하는-이온-조성).
 
 ## 7. 저장: SQLite와 엑셀 데이터베이스
 
@@ -317,6 +319,7 @@ SUYA가 돌아가는 중에도 파이썬, R, [DB Browser for SQLite](https://sql
 | 수온염분_수직 | 해역 10곳 HYCOM 40층 수온·염분, 층마다 한 행 |
 | Argo_목록 | 프로파일별 시각·위치·모드·QC·표층 수온·염분·최대 수심·층 수 |
 | 선박관측 | GOSUD 선박별 시각·위치·수온·염분 |
+| OSMC관측 | OSMC 보고별 시각·플랫폼·종류·위치·수심·수온·염분·기온·이슬점·해면 기압 |
 | 기지기온 | METAR 기지별 기온·이슬점·기압 |
 | GFS기온 | 24개 지점 GFS 현재값 8종 |
 | 모델예보 | 24개 지점 × 예보 시각 × 5개 모델 |
@@ -406,7 +409,7 @@ docker run --rm -v suya-data:/data suya suya collect  # 손으로 한 바퀴
 ```
       ┌─ collectors/ ──────────────┐      ┌─ engine.py ────────────────┐
       │ metar  openmeteo  erddap   │◄─────┤ 소스마다 asyncio 태스크 하나 │
-      │ hycom  argo  gosud  windy  │      │ 주기 · 백오프 · 호출 예산    │
+      │ hycom argo gosud osmc windy│      │ 주기 · 백오프 · 호출 예산    │
       └────────────┬───────────────┘      └──────────┬─────────────────┘
                    ▼                                  │ 이벤트
             db.py (SQLite, WAL) ─────────────────────►│
@@ -422,6 +425,7 @@ docker run --rm -v suya-data:/data suya suya collect  # 손으로 한 바퀴
 - **예의 바른 클라이언트**: 호스트별 동시 연결 2~4개, 연결 20초·응답 60~300초 제한, 백오프 3회, 출처를 밝힌 User-Agent(`suya/<버전> (…github.com/jongsu-king/SUYA)`).
 - **HYCOM**은 OPeNDAP `.ascii` 부분 요청으로 필요한 격자만 받습니다. tds 호스트가 일부 요청에 500을 돌려줘 ncss 호스트를 먼저 씁니다.
 - **ERDDAP**(OISST·SMOS·SMAP·Argo·GOSUD)은 `time[(last)]`로 최신 시각을 먼저 확인하고 이미 받은 시각이면 내려받지 않습니다.
+- **OSMC**에는 그런 토큰이 없습니다. 질의 네 개를 차례로 보내고, 서버에서 플랫폼·시간마다 보고 하나로 줄여 받습니다. 한 시간마다 최근 3일을, 하루에 한 번 30일 전체를 받아 늦게 들어온 보고를 채웁니다.
 - **지도**는 남극 중심 스테레오 투영. 화면 픽셀마다 역투영해 격자를 이중 선형 보간합니다(유효 가중치가 절반 미만이면 결측). 확대하면 다시 표본을 뽑아 1/12° HYCOM의 세부가 드러납니다.
 - **스레드 안전**: 엔진은 작업 스레드의 이벤트 루프에서 돌고 결과는 Qt 시그널로 창에 전달됩니다. 엑셀 쓰기는 별도 프로세스라 창도 수집도 멈추지 않습니다.
 - **테스트**는 개발 중 실제로 받은 응답 형태(불량 QC 플래그, 범위 밖 값, 육지 격자, HYCOM ascii 등)를 파서에 넣어 검증하고, 해수 공식을 발표된 검증값과 비교합니다.
@@ -492,7 +496,7 @@ powershell -File packaging\build.ps1      # Windows setup.exe (Inno Setup 6 필�
 antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
 ├── cli.py                gui, daemon, collect, export, excel-sync, ions, sources, self-test
 ├── engine.py             스케줄러: 주기, 백오프, 호출 한도, 일정 저장, 이벤트 버스
-├── collectors/           데이터 서비스별 모듈 (erddap, hycom, argo, gosud, openmeteo, metar, windy, woa)
+├── collectors/           데이터 서비스별 모듈 (erddap, hycom, argo, gosud, osmc, openmeteo, metar, windy, woa)
 ├── db.py                 SQLite 저장소
 ├── excel.py              월별 엑셀 작성
 ├── pointquery.py         지점 상세: 소스 병렬 호출, TTL 캐시, 육지 → 최근접 바다
@@ -561,7 +565,7 @@ APA·BibTeX 항목을 만들어 줍니다. [.zenodo.json](.zenodo.json)은 Zenod
 ```
 
 데이터: NOAA NCEI OISST v2.1(Huang et al. 2021) · NOAA NCEP GFS · NOAA Aviation Weather Center METAR · NASA JPL MUR SST v4.1 ·
-ESA SMOS와 NASA SMAP 표층 염분(NOAA CoastWatch 배포) · 미 해군연구소 HYCOM ESPC-D-V02 · International Argo Program(doi:10.17882/42182, Ifremer 배포) · GOSUD ·
+ESA SMOS와 NASA SMAP 표층 염분(NOAA CoastWatch 배포) · 미 해군연구소 HYCOM ESPC-D-V02 · International Argo Program(doi:10.17882/42182, Ifremer 배포) · GOSUD · NOAA OSMC ·
 NOAA World Ocean Atlas 2023 · ECMWF ERA5·IFS, DWD ICON, ECCC GEM, JMA GSM(Open-Meteo, CC BY 4.0) · Natural Earth 해안선 · cmocean 색표(Thyng et al. 2016).
 정확한 조건과 필수 표기: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

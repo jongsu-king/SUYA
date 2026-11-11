@@ -15,6 +15,7 @@ with the code location so you know where to look when a service changes.
 | hycom_grid, hycom_profiles | `collectors/hycom.py` | OPeNDAP ascii | ncss.hycom.org, tds.hycom.org | none | 3 h / 24 h |
 | argo | `collectors/argo.py` | ERDDAP tabledap CSV | erddap.ifremer.fr | none | hourly |
 | gosud | `collectors/gosud.py` | ERDDAP tabledap CSV | erddap.ifremer.fr | none | hourly |
+| osmc | `collectors/osmc.py` | ERDDAP tabledap CSV | osmc.noaa.gov | none | hourly |
 | (woa23) | `collectors/woa.py` | THREDDS NCSS CSV | www.ncei.noaa.gov | none | on point query |
 | windy | `collectors/windy.py` | REST JSON POST | api.windy.com | API key | 3 h |
 
@@ -126,13 +127,42 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 - QC 1 and 2 only. Real case: 26 °C at 59°S with flag 4.
 - Only ships with a thermosalinograph report salinity.
 
-## 7. World Ocean Atlas 2023 (on point query)
+## 7. OSMC — real-time in situ reports from the GTS
+
+- Dataset `OSMC_30day` at osmc.noaa.gov (tabledap, CSV): the last 30 days of in situ reports that reached the Global Telecommunication System (GTS), gathered by NOAA's Observing System Monitoring Center. The dataset metadata states CC0 1.0.
+- Platforms: drifting buoys, ice buoys, ships, uncrewed surface vehicles and tagged animals (such as seals carrying sensors). `PROFILING FLOATS AND GLIDERS` is left out of the request because Argo (section 5) covers it.
+- Values: surface `sst` (°C) and `sss` (PSU); `observation_depth` (m) with `ztmp` and `zsal`; weather `atmp`, `dewpoint` (°C) and `slp` (hPa).
+- Request: four queries, one after another, each with the common constraints `latitude<=-50&time>=now-<N>days&platform_type!="PROFILING FLOATS AND GLIDERS"`. One collection takes about 50 s.
+
+  | Columns | Value constraint | Thinning |
+  |---|---|---|
+  | `observation_depth,ztmp,zsal` | `ztmp>=-5` | `orderByLimit("platform_code,observation_depth,time/1hour,1")` |
+  | `sst` | `sst>=-5` | `orderByLimit("platform_code,time/1hour,1")` |
+  | `sss` | `sss>=0` | same |
+  | `atmp,dewpoint,slp` | `slp>=800` | same |
+
+  - One point per platform per hour (per depth for the depth values).
+  - Filtering missing values with `!=NaN` makes the server answer 500, so a lower bound on the value is used instead. As a result, depth reports with salinity but no temperature and weather reports with air temperature but no pressure are not fetched.
+  - A 404 the server sends when it briefly cannot find the dataset is recorded as a failure, not as "no observations". Only "Your query produced no matching results" counts as an empty result.
+- Window: the full 30 days once a day and only the last 3 days in between (`osmc:last_full` in `kv`). Reports that arrive late are filled in by the next full collection.
+- **Quality rules** (`osmc.read_reports`, `osmc.stuck_hours`, `osmc.build_rows`): the dataset carries no QC flags, so values are screened by range and position only.
+  - Dropped outside: temperature −3…40 °C, salinity 20…42 PSU, depth 0…12000 m, air temperature and dew point −95…30 °C, sea-level pressure 890…1070 hPa. A dew point above the air temperature drops both.
+  - Sea values are kept only north of 79°S; farther south is ice shelf or continent. Weather values have no such limit.
+  - Reports dated more than 6 hours after the collection time are treated as a wrong clock and dropped.
+  - **Stuck drifting buoys**: when twelve consecutive hourly reports stay within 0.002° in both latitude and longitude, the buoy is taken to be aground or recovered and its sea values for those hours are dropped. Sea values already stored for those hours are deleted as well (`Store.delete_measurements`). Weather values are kept. The rule applies to drifting buoys only, because a ship at anchor is expected to stay put.
+  - Real cases (2026-11-11): drifting buoy 2802071 had not moved for 712 hours. None of its sea values were stored; its sea-level pressure agreed with neighbouring buoys within 1 hPa and was kept. Platform 1897495 reported 44.38 °C with salinity 76.84 at 29.2 m and 12.34 °C at 1725 m from 88.0°S, and failed both the range and the position rule. Ship 2KZJ7DD reported a sea-level pressure of 868.9 hPa, outside the range.
+- Stored as `source=osmc`, `dataset=<platform_code>`, `quality=<platform_type>`, `kind=observation`. Surface values use `level=surface`, depth values `level=depth:<m>` with `depth_m` (depth 0 becomes `surface`), weather values `level=2m`. `2m` only matches the notation of the other weather sources; it is not the sensor height (buoys sit near the waterline, ships carry sensors higher up).
+- Use: the Excel sheets `OSMC obs` and `Ion composition`. The point query shows the nearest temperature and salinity within 300 km, the last 30 days and the top 10 m, one line each. OSMC values are not used for the representative value or the monthly summary.
+- Real collection (2026-11-11, full 30 days): 46,096 rows from 71 platforms. Drifting buoys 40 / 37,165 rows, ships 20 / 4,770, ice buoys 3 / 2,144, uncrewed surface vehicle 1 / 1,511, tagged animals 7 / 506. By variable: surface temperature 27,031 rows, sea-level pressure 15,287, air temperature 1,693, dew point 1,172, surface salinity 407 (a single uncrewed surface vehicle), temperature and salinity at depth 253 each (tagged animals).
+- Limits: the values are not quality controlled, so an isolated bad value stays. Cases seen: 13.57 °C at 61.7°S, the only report of drifting buoy 7810718, and 9.54 °C as the first report of ice buoy 4804098 (−1.24 °C in the next one). A check against the neighbouring values in time caught nothing in this data and was not added. When surveyed, only one platform, an uncrewed surface vehicle, reported surface salinity.
+
+## 8. World Ocean Atlas 2023 (on point query)
 
 - `https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/<temperature|salinity>/netcdf/decav/0.25/woa23_decav_<t|s><MM>_04.nc?var=<t|s>_an&latitude=…&longitude=…&accept=csv`
 - `decav` = 1955–2022 average, 0.25°. Monthly files (`01`–`12`) stop at 1500 m, the annual file (`00`) reaches 5500 m, so deeper levels come from the annual mean.
 - `_an` = objectively analysed value; NaN on land.
 
-## 8. Windy Point Forecast API (optional)
+## 9. Windy Point Forecast API (optional)
 
 - `POST https://api.windy.com/api/point-forecast/v2` with JSON `{lat, lon, model, parameters:[temp,dewpoint,rh,pressure], levels:[surface,1000h,…,150h], key}`.
 - Response: `ts` (ms epoch), `units`, `temp-surface`, `temp-850h`, …; kelvin and pascal are converted to °C and hPa.
@@ -140,25 +170,25 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 - The API offers no water temperature or salinity (confirmed in the documentation and Windy community answers). Models include GFS, ICON and AROME; ECMWF is excluded for licensing reasons.
 - The website's internal endpoints are never used: Windy's general terms §4.6.1 prohibit automated collection and crawling.
 
-## 9. Not used, and why
+## 10. Not used, and why
 
 | Candidate | Reason |
 |---|---|
 | nullschool internal data files | No public API; the About page refers licensing to inquiries@nullschool.net. The upstream data (GFS, OISST) is fetched directly |
 | Windy website endpoints | Prohibited by the terms of use |
 | Copernicus Marine (GLORYS12, ARMOR3D, OSTIA) | Requires an account. With one, an adapter can be added under `collectors/` |
-| MEOP marine-mammal CTD | The best in-situ salinity under ice, but distributed as files without a real-time API |
+| MEOP marine-mammal CTD | The best in-situ salinity under ice, but the quality-controlled data is distributed as files without a real-time API. The real-time values that reach the GTS are collected through OSMC (section 7) |
 | NSIDC sea-ice concentration | Covered by OISST `ice` and MUR `sea_ice_fraction` |
 | IEM METAR archive | AWC serves recent reports directly; a candidate if history is needed |
 
-## 10. Where values are stored
+## 11. Where values are stored
 
 | Table | Contents | Key |
 |---|---|---|
 | `measurements` | Point values: source, dataset, variable, kind (observation/satellite/analysis/model/forecast/climatology), lat, lon, level, depth_m, pressure_hpa, obs_time, value, unit, location_id, quality | (source, dataset, variable, lat, lon, level, obs_time) |
 | `grids` | Map-layer snapshots (gzip JSON) with statistics | (layer, valid_time) |
 | `argo_profiles` | Profile listing and level JSON | (platform, cycle) |
-| `seawater_ions` | Reference salinity and the eight major ions in g/kg, derived for every salinity row, and the range-check verdict `salinity_check` (section 11); triggers keep it in step with `measurements` | (source, dataset, lat, lon, level, obs_time) |
+| `seawater_ions` | Reference salinity and the eight major ions in g/kg, derived for every salinity row, and the range-check verdict `salinity_check` (section 12); triggers keep it in step with `measurements` | (source, dataset, lat, lon, level, obs_time) |
 | `seawater_ions_mmol` (view) | The same rows in mmol/kg | |
 | `argo_level_ions` (view) | Temperature, salinity, derived ions in g/kg and the range-check verdict per Argo level; uses no storage | |
 | `grid_ions` (view) | Reference salinity, ions in g/kg and mmol/kg and the range-check verdict derived from the mean south of 60°S and each sector mean of every salinity grid; uses no storage | |
@@ -167,7 +197,7 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 
 Variable names: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `sea_level_pressure`, `wind_speed`.
 
-## 11. Ion composition derived from salinity
+## 12. Ion composition derived from salinity
 
 Not fetched from a remote service: SUYA computes it from the stored salinity (`composition.py`).
 The major ions dissolved in seawater keep nearly the same ratios in every ocean, so one practical salinity S_P gives the amount of each ion.

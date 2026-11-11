@@ -21,6 +21,7 @@ keep these attributions.
 | HYCOM ESPC-D-V02 global analysis | US Naval Research Laboratory via [HYCOM.org](https://www.hycom.org/) | Open. Cite HYCOM consortium; funding by the US Office of Naval Research. |
 | Argo float profiles | [Argo Program](https://argo.ucsd.edu/) via Ifremer ERDDAP | Free. Required acknowledgement: "These data were collected and made freely available by the International Argo Program and the national programs that contribute to it (https://argo.ucsd.edu, https://www.ocean-ops.org). The Argo Program is part of the Global Ocean Observing System." doi:10.17882/42182. |
 | GOSUD underway ship data | [GOSUD](https://www.gosud.org/) via Ifremer ERDDAP | Free for research; acknowledge GOSUD and the contributing ships. |
+| Real-time in situ reports from the GTS (drifting and ice buoys, ships, uncrewed surface vehicles, tagged animals) | [NOAA OSMC](https://www.osmc.noaa.gov/) via the [OSMC ERDDAP](https://osmc.noaa.gov/erddap/tabledap/OSMC_30day.html) | CC0 1.0 as stated in the dataset metadata. Not quality controlled; acknowledge NOAA OSMC and the platform operators. |
 | World Ocean Atlas 2023 | NOAA NCEI | Public domain. Cite Reagan et al. (2024) / Locarnini et al. (2024). |
 | Windy Point Forecast API (optional, needs your own key) | [Windy.com](https://api.windy.com/) | Subject to Windy's API terms. The free *testing* tier returns shuffled, altered values and may not be used in production. This program never uses Windy's website endpoints (terms of use §4.6.1). |
 

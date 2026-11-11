@@ -88,6 +88,21 @@ Ten areas × time × depth; temperature and salinity share a row (blank when one
 ### Ships — GOSUD
 Per call sign: time, position, SST and salinity (when available). QC 1 and 2 only.
 
+### OSMC obs — OSMC real-time in situ observations
+Reports sent over the GTS by drifting buoys, ice buoys, ships, uncrewed surface vehicles and tagged animals. Values of the same time, platform, position and depth share a row.
+
+| Column | Meaning |
+|---|---|
+| Time UTC | Report time |
+| Platform | WMO number or ship call sign |
+| Type | Drifting buoy, ice buoy, ship, uncrewed surface vehicle, tagged animal, … |
+| Lat, Lon | |
+| Depth m | Depth of a value at depth; blank in rows of surface and weather values |
+| Temp °C, Salinity PSU | The surface value or the value at that depth; blank when absent |
+| Air temp °C, Dew point °C, Sea-level pressure hPa | Weather values of the same report; blank when absent |
+
+The data carries no quality flags; the values passed a range and a position check only. Rules and limits: [Data sources, section 7](data-sources.en.md#7-osmc--real-time-in-situ-reports-from-the-gts).
+
 ### Stations — METAR
 Per ICAO station: report time, name, position, air temperature, dew point, pressure.
 
@@ -104,8 +119,8 @@ Only with a key: forecast time, point, model, level (surface, hpa:850 …), item
 Every value fetched for an arbitrary point (OISST, MUR, SMOS, SMAP, HYCOM 40 levels, GFS current, Marine). Measurements without a `location_id` end up here.
 
 ### Ion composition — major ions derived for every row that has a salinity
-That month's rows of the SQLite table `seawater_ions`: surface values of the sea areas, the 40 HYCOM levels, satellite salinity and salinity at points clicked on the map.
-These are **not direct ion measurements**; each salinity is multiplied by the ratios of the Reference Composition (Millero et al. 2008). The formula and its limits are in [Data sources, section 11](data-sources.en.md#11-ion-composition-derived-from-salinity).
+That month's rows of the SQLite table `seawater_ions`: surface values of the sea areas, the 40 HYCOM levels, satellite salinity, salinity observed by Argo, GOSUD and OSMC, and salinity at points clicked on the map.
+These are **not direct ion measurements**; each salinity is multiplied by the ratios of the Reference Composition (Millero et al. 2008). The formula and its limits are in [Data sources, section 12](data-sources.en.md#12-ion-composition-derived-from-salinity).
 
 | Column | Meaning |
 |---|---|
@@ -123,7 +138,7 @@ These are **not direct ion measurements**; each salinity is multiplied by the ra
 
 ### Grid ions — ions derived from the area means of the salinity grids
 That month's rows of the SQLite view `grid_ions`: for every time of a salinity grid (the HYCOM salinity layer of each depth, SMOS, SMAP) one row for the whole area south of 60°S and one per sector.
-These are **derived values**: the mean salinity times the same factors. The conversion is proportional to salinity, so the result equals converting every cell and averaging. Cell values come from `suya export grid-ions`. The formula and its limits are in [Data sources, section 11](data-sources.en.md#11-ion-composition-derived-from-salinity).
+These are **derived values**: the mean salinity times the same factors. The conversion is proportional to salinity, so the result equals converting every cell and averaging. Cell values come from `suya export grid-ions`. The formula and its limits are in [Data sources, section 12](data-sources.en.md#12-ion-composition-derived-from-salinity).
 
 | Column | Meaning |
 |---|---|
@@ -153,7 +168,7 @@ The Southern Ocean table of Boyer & Levitus (1994, NOAA Technical Report NESDIS 
 | Deeper than m, Down to m | The depth window this row's range applies to; the outer side of the first and the last row is blank |
 | Salinity minimum, Salinity maximum | Below the minimum is `low`, above the maximum `high` |
 
-The ranges are broad and catch gross errors only. Rule and limits: [Data sources, section 11](data-sources.en.md#11-ion-composition-derived-from-salinity).
+The ranges are broad and catch gross errors only. Rule and limits: [Data sources, section 12](data-sources.en.md#12-ion-composition-derived-from-salinity).
 
 ## `argo_levels_YYYY-MM.xlsx`
 

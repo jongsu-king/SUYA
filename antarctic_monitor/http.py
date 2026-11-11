@@ -20,6 +20,7 @@ HOST_LIMITS = {
     "tds.hycom.org": 2,
     "ncss.hycom.org": 2,
     "www.ncei.noaa.gov": 2,
+    "osmc.noaa.gov": 2,
     "api.windy.com": 2,
 }
 DEFAULT_HOST_LIMIT = 4

@@ -23,6 +23,7 @@ DEFAULT_INTERVALS = {
     "hycom_profiles": 86400,
     "argo": 3600,
     "gosud": 3600,
+    "osmc": 3600,
     "windy": 10800,
     "excel": 900,
 }

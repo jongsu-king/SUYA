@@ -15,6 +15,7 @@ SUYA가 호출하는 모든 원격 서비스, 정확한 요청 형태, 받아 �
 | hycom_grid, hycom_profiles | `collectors/hycom.py` | OPeNDAP ascii | ncss.hycom.org, tds.hycom.org | 없음 | 3시간 / 24시간 |
 | argo | `collectors/argo.py` | ERDDAP tabledap CSV | erddap.ifremer.fr | 없음 | 1시간 |
 | gosud | `collectors/gosud.py` | ERDDAP tabledap CSV | erddap.ifremer.fr | 없음 | 1시간 |
+| osmc | `collectors/osmc.py` | ERDDAP tabledap CSV | osmc.noaa.gov | 없음 | 1시간 |
 | (woa23) | `collectors/woa.py` | THREDDS NCSS CSV | www.ncei.noaa.gov | 없음 | 지점 조회 시 |
 | windy | `collectors/windy.py` | REST JSON POST | api.windy.com | API 키 | 3시간 |
 
@@ -124,13 +125,42 @@ SUYA가 호출하는 모든 원격 서비스, 정확한 요청 형태, 받아 �
 - QC 1·2만. 실제 사례: 59°S에서 26 °C(플래그 4).
 - 염분을 보내는 선박은 일부(열염 센서 장착 선박)뿐입니다.
 
-## 7. World Ocean Atlas 2023 (지점 조회 시)
+## 7. OSMC — GTS로 들어온 실시간 현장 관측
+
+- 데이터셋 `OSMC_30day` @ osmc.noaa.gov (tabledap, CSV). NOAA OSMC(Observing System Monitoring Center)가 세계기상통신망(GTS)으로 들어온 현장 보고를 최근 30일치 모아 둔 표입니다. 메타데이터의 라이선스는 CC0 1.0입니다.
+- 받는 플랫폼: 표류 부이, 해빙 부이, 선박, 무인 수상정, 계측 동물(센서를 단 물범 등). `PROFILING FLOATS AND GLIDERS`는 Argo(5절)와 겹치므로 요청에서 뺍니다.
+- 받는 값: 표층 `sst`(°C)·`sss`(PSU), 수심별 `observation_depth`(m)·`ztmp`·`zsal`, 기상 `atmp`·`dewpoint`(°C)·`slp`(hPa).
+- 요청: 공통 조건 `latitude<=-50&time>=now-<N>days&platform_type!="PROFILING FLOATS AND GLIDERS"`에 아래 넷을 차례로 붙여 보냅니다. 한 번 수집에 약 50초 걸립니다.
+
+  | 받는 열 | 값 조건 | 솎기 |
+  |---|---|---|
+  | `observation_depth,ztmp,zsal` | `ztmp>=-5` | `orderByLimit("platform_code,observation_depth,time/1hour,1")` |
+  | `sst` | `sst>=-5` | `orderByLimit("platform_code,time/1hour,1")` |
+  | `sss` | `sss>=0` | 같음 |
+  | `atmp,dewpoint,slp` | `slp>=800` | 같음 |
+
+  - 플랫폼마다(수심별 값은 수심마다) 1시간에 1점으로 줄입니다.
+  - 빈 값(NaN)을 `!=NaN`으로 거르면 서버가 500을 돌려줍니다. 그래서 값의 아래 한계를 조건으로 씁니다. 이 때문에 수온 없이 염분만 있는 수심 보고와 기압 없이 기온만 있는 기상 보고는 받지 못합니다.
+  - 서버가 데이터셋을 잠시 찾지 못해 내는 404는 "관측 없음"이 아니라 실패로 기록합니다. "Your query produced no matching results"일 때만 빈 결과로 봅니다.
+- 기간: 하루에 한 번은 30일 전체를, 그 사이에는 최근 3일만 받습니다(`kv`의 `osmc:last_full`). 늦게 들어온 보고는 다음 전체 수집 때 채워집니다.
+- **품질 규칙** (`osmc.read_reports`, `osmc.stuck_hours`, `osmc.build_rows`): 이 데이터셋에는 QC 플래그가 없습니다. 그래서 범위와 위치로만 거릅니다.
+  - 수온 −3~40 °C, 염분 20~42 PSU, 수심 0~12000 m, 기온·이슬점 −95~30 °C, 해면 기압 890~1070 hPa 밖은 버립니다. 이슬점이 기온보다 높으면 둘 다 버립니다.
+  - 해수 값은 79°S 이북 것만 남깁니다. 그보다 남쪽은 빙붕이나 대륙 위입니다. 기상 값에는 이 제한이 없습니다.
+  - 수집 시각보다 6시간 넘게 앞선 시각의 보고는 시계가 틀린 것으로 보고 버립니다.
+  - **멈춘 표류 부이**: 시간별 보고가 12회 연속 위도·경도 0.002° 안에 있으면 좌초했거나 회수된 부이로 보고, 그 시간대의 해수 값을 버립니다. 이미 저장된 그 시간대의 해수 값도 지웁니다(`Store.delete_measurements`). 기상 값은 남깁니다. 정박한 선박은 멈춰 있는 것이 정상이라 표류 부이에만 적용합니다.
+  - 실제 사례(2026-11-11): 표류 부이 2802071은 712시간 동안 제자리였습니다. 해수 값은 한 행도 저장하지 않았고, 해면 기압은 주변 부이와 1 hPa 안에서 맞아 남겼습니다. 플랫폼 1897495는 88.0°S에서 수심 29.2 m에 수온 44.38 °C·염분 76.84, 수심 1725 m에 수온 12.34 °C를 보냈고 범위와 위치 규칙에 모두 걸렸습니다. 선박 2KZJ7DD의 해면 기압 868.9 hPa는 범위 밖이라 버렸습니다.
+- 저장: `source=osmc`, `dataset=<platform_code>`, `quality=<platform_type>`, `kind=observation`. 표층 값은 `level=surface`, 수심별 값은 `level=depth:<m>`과 `depth_m`(수심 0은 `surface`), 기상 값은 `level=2m`입니다. `2m`는 다른 기상 자료와 맞춘 표기이고 실제 센서 높이가 아닙니다(부이는 수면 가까이, 선박은 더 높이 있습니다).
+- 쓰임: 엑셀 `OSMC관측` 시트와 `이온조성` 시트에 들어갑니다. 지점 조회에서는 300 km 안, 최근 30일, 수심 10 m까지의 가장 가까운 수온·염분을 한 줄씩 보여 줍니다. 대표값과 `월간요약`에는 쓰지 않습니다.
+- 실제 수집(2026-11-11, 30일 전체): 플랫폼 71개 46,096행. 표류 부이 40개 37,165행, 선박 20개 4,770행, 해빙 부이 3개 2,144행, 무인 수상정 1개 1,511행, 계측 동물 7개 506행. 항목별로는 표층 수온 27,031행, 해면 기압 15,287행, 기온 1,693행, 이슬점 1,172행, 표층 염분 407행(무인 수상정 한 대), 수심별 수온·염분 253행씩(계측 동물)입니다.
+- 한계: 품질 검사를 거치지 않은 값이라 한두 번 튀는 값은 그대로 남습니다. 확인한 사례: 표류 부이 7810718이 61.7°S에서 단 한 번 보낸 13.57 °C, 해빙 부이 4804098의 첫 보고 9.54 °C(다음 보고는 −1.24 °C). 앞뒤 값과 비교하는 검사는 이 자료에서 한 건도 잡지 못해 넣지 않았습니다. 표층 염분을 보내는 플랫폼은 조사 당시 무인 수상정 한 대뿐이었습니다.
+
+## 8. World Ocean Atlas 2023 (지점 조회 시)
 
 - URL: `https://www.ncei.noaa.gov/thredds-ocean/ncss/grid/woa23/DATA/<temperature|salinity>/netcdf/decav/0.25/woa23_decav_<t|s><MM>_04.nc?var=<t|s>_an&latitude=…&longitude=…&accept=csv`
 - `decav` = 1955–2022 전 기간 평균, 0.25°. 월별 파일(`01`~`12`)은 1500 m까지, 연평균 파일(`00`)은 5500 m까지라 깊은 층은 연평균으로 채웁니다.
 - `_an` = 객관 분석값. 격자상 육지면 NaN.
 
-## 8. Windy Point Forecast API (선택)
+## 9. Windy Point Forecast API (선택)
 
 - `POST https://api.windy.com/api/point-forecast/v2` JSON `{lat, lon, model, parameters:[temp,dewpoint,rh,pressure], levels:[surface,1000h,…,150h], key}`.
 - 응답 `ts`(ms epoch), `units`, `temp-surface`, `temp-850h` … 켈빈과 파스칼을 °C·hPa로 바꿉니다.
@@ -138,25 +168,25 @@ SUYA가 호출하는 모든 원격 서비스, 정확한 요청 형태, 받아 �
 - 이 API에는 수온·염분 항목이 없습니다(Windy 커뮤니티 답변과 문서로 확인). 모델은 GFS, ICON, AROME 등이며 ECMWF는 라이선스상 제외됩니다.
 - 웹사이트(windy.com)의 내부 엔드포인트는 쓰지 않습니다. 일반 이용약관 4.6.1이 자동화된 수집·크롤링을 금지합니다.
 
-## 9. 쓰지 않는 것과 이유
+## 10. 쓰지 않는 것과 이유
 
 | 후보 | 이유 |
 |---|---|
 | nullschool 내부 데이터 파일 | 공개 API 없음. About 페이지는 라이선스를 inquiries@nullschool.net 문의로 안내. 원천(GFS·OISST)을 직접 받음 |
 | Windy 웹사이트 내부 주소 | 이용약관 금지 |
 | Copernicus Marine (GLORYS12, ARMOR3D, OSTIA) | 계정 로그인 필요. 계정이 있으면 `collectors/`에 어댑터를 추가할 수 있음 |
-| MEOP 해양 포유류 CTD | 해빙 아래 염분에 가장 좋은 실측이지만 실시간 API 없이 파일로만 배포 |
+| MEOP 해양 포유류 CTD | 해빙 아래 염분에 가장 좋은 실측이지만 품질 검사를 마친 자료는 실시간 API 없이 파일로만 배포. GTS로 들어온 실시간 값은 OSMC(7절)로 받음 |
 | NSIDC 해빙 농도 | OISST의 `ice`와 MUR의 `sea_ice_fraction`으로 대체 |
 | IEM(Iowa Environmental Mesonet) METAR 아카이브 | AWC가 최근 자료를 바로 주므로 불필요. 과거 자료가 필요하면 후보 |
 
-## 10. 수집한 값이 저장되는 표
+## 11. 수집한 값이 저장되는 표
 
 | 표 | 내용 | 키 |
 |---|---|---|
 | `measurements` | 지점값. source, dataset, variable, kind(observation/satellite/analysis/model/forecast/climatology), lat, lon, level, depth_m, pressure_hpa, obs_time, value, unit, location_id, quality | (source, dataset, variable, lat, lon, level, obs_time) |
 | `grids` | 지도 레이어 스냅샷(gzip JSON)과 통계 | (layer, valid_time) |
 | `argo_profiles` | 프로파일 목록과 층별 값 JSON | (platform, cycle) |
-| `seawater_ions` | 염분 행마다 환산한 기준 염분과 주요 이온 여덟 가지 g/kg, 범위 검사 결과 `salinity_check` (11절). 트리거가 `measurements`와 맞춥니다 | (source, dataset, lat, lon, level, obs_time) |
+| `seawater_ions` | 염분 행마다 환산한 기준 염분과 주요 이온 여덟 가지 g/kg, 범위 검사 결과 `salinity_check` (12절). 트리거가 `measurements`와 맞춥니다 | (source, dataset, lat, lon, level, obs_time) |
 | `seawater_ions_mmol` (뷰) | 같은 행의 mmol/kg | |
 | `argo_level_ions` (뷰) | Argo 층마다 수온·염분, 환산 이온 g/kg, 범위 검사 결과. 저장 공간을 쓰지 않습니다 | |
 | `grid_ions` (뷰) | 염분 격자마다 60°S 이남 평균과 해역 평균에서 환산한 기준 염분, 이온 g/kg·mmol/kg, 범위 검사 결과. 저장 공간을 쓰지 않습니다 | |
@@ -165,7 +195,7 @@ SUYA가 호출하는 모든 원격 서비스, 정확한 요청 형태, 받아 �
 
 변수 이름: `sea_water_temperature`, `sea_water_salinity`, `sst_anomaly`, `sea_ice_fraction`, `sst_uncertainty`, `air_temperature`, `apparent_temperature`, `dew_point`, `wet_bulb_temperature`, `surface_temperature`, `relative_humidity`, `surface_pressure`, `sea_level_pressure`, `wind_speed`.
 
-## 11. 염분에서 환산하는 이온 조성
+## 12. 염분에서 환산하는 이온 조성
 
 원격 서비스에서 받는 값이 아니라 SUYA가 저장된 염분에서 계산하는 값입니다(`composition.py`).
 바닷물에 녹은 주요 이온의 비율은 어느 바다에서나 거의 같다는 성질을 써서, 실용 염분 S_P 하나에서 이온별 양을 환산합니다.

@@ -68,6 +68,12 @@ SOURCES: list[dict] = [
         "url": "https://www.gosud.org/",
     },
     {
+        "id": "osmc", "name": "OSMC 실시간 현장 관측", "provider": "NOAA OSMC ERDDAP", "kind": "observation",
+        "measures": "표층 수온·염분, 기온·이슬점·해면 기압, 계측 동물 수심별 수온·염분", "cadence": "1시간",
+        "relation": "QC 플래그 없음. 범위와 위치 검사로 거름",
+        "url": "https://osmc.noaa.gov/erddap/tabledap/OSMC_30day.html",
+    },
+    {
         "id": "smos", "name": "SMOS 위성 염분", "provider": "ESA SMOS / NOAA CoastWatch", "kind": "satellite",
         "measures": "표층 염분 3일 합성 (0.25°)", "cadence": "1일", "relation": "65°S 이남 대부분 결측",
         "url": "https://coastwatch.noaa.gov/cwn/products/sea-surface-salinity-near-real-time-smos.html",
@@ -100,7 +106,7 @@ NOT_INCLUDED: list[dict] = [
     {"name": "nullschool 내부 데이터", "reason": "공개 API 없음. 데이터 라이선스는 별도 문의. 같은 원천인 GFS와 OISST를 직접 수집"},
     {"name": "Windy 웹사이트 내부 엔드포인트", "reason": "이용약관 4.6.1이 자동 수집 금지. 공식 Point Forecast API만 사용"},
     {"name": "Copernicus Marine", "reason": "계정 로그인 필요"},
-    {"name": "MEOP 해양 포유류 CTD", "reason": "실시간 API 없음"},
+    {"name": "MEOP 해양 포유류 CTD", "reason": "품질 검사를 마친 자료는 실시간 API 없음. GTS로 들어온 실시간 값은 OSMC로 수집"},
 ]
 
 DEPTH_LAYERS = (0, 100, 200, 500, 1000, 2000)

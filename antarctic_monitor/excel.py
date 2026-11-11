@@ -25,6 +25,7 @@ import xlsxwriter
 from . import composition, ranges
 from .collectors.base import CollectResult, Context
 from .collectors.openmeteo import MODELS
+from .collectors.osmc import platform_label
 from .db import (
     GRID_ALL,
     ION_CHECK,
@@ -185,6 +186,7 @@ def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
         "수온염분_수직": _sheet_vertical(book, store, start, until),
         "Argo_목록": _sheet_argo_list(book, store, start, end),
         "선박관측": _sheet_ships(book, store, start, until),
+        "OSMC관측": _sheet_osmc(book, store, start, until),
         "기지기온": _sheet_metar(book, store, start, until),
         "GFS기온": _sheet_air(book, store, start, until),
         "모델예보": _sheet_forecast(book, store, start, until),
@@ -329,6 +331,30 @@ def _sheet_ships(book: Book, store: Store, start: str, until: str) -> int:
     for key in sorted(merged):
         values = merged[key]
         sheet.add([parse_time(key[0]), key[1], key[2], key[3], values.get("sea_water_temperature"), values.get("sea_water_salinity")])
+    return sheet.finish()
+
+
+def _sheet_osmc(book: Book, store: Store, start: str, until: str) -> int:
+    """OSMC 보고를 시각·플랫폼·위치·수심별로 한 행에 모읍니다. 수심 칸이 빈 행은 표층 값과 기상 값입니다."""
+    sheet = Sheet(
+        book, "OSMC관측",
+        [("시각 UTC", 17), ("플랫폼", 11), ("종류", 16), ("위도", 9), ("경도", 9), ("수심 m", 8), ("수온 °C", 9), ("염분 PSU", 9),
+         ("기온 °C", 8), ("이슬점 °C", 9), ("해면 기압 hPa", 12)],
+    )
+    merged: dict[tuple, dict] = defaultdict(dict)
+    for row in store.iter_measurements(source="osmc", since=start, until=until):
+        entry = merged[(row["obs_time"], row["dataset"], row["lat"], row["lon"], row["depth_m"] or 0.0)]
+        entry[row["variable"]] = row["value"]
+        entry["kind"] = row["quality"]
+    for key in sorted(merged):
+        values = merged[key]
+        sheet.add(
+            [
+                parse_time(key[0]), key[1], tr(platform_label(values.get("kind"))), key[2], key[3], key[4] or None,
+                values.get("sea_water_temperature"), values.get("sea_water_salinity"), values.get("air_temperature"),
+                values.get("dew_point"), values.get("sea_level_pressure"),
+            ]
+        )
     return sheet.finish()
 
 
