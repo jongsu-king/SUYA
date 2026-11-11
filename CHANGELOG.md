@@ -39,6 +39,11 @@ of Argo profiles come from the quality-controlled levels.
   upgrade. On a copy of a real database this changed 10 of 781 profiles: one surface salinity
   went from 27.581 to 33.995, and a salinity of 39.063 was removed because that profile has no
   usable value within 100 dbar.
+- **GOSUD outages recorded as "no ship observations".** Every HTTP 404 from the GOSUD server was
+  taken as an empty answer, including the 404 ERDDAP sends while it cannot find the dataset. A run
+  two minutes after an HTTP 503 was therefore recorded as successful with no ships, while the runs
+  before and after found five. Only the "no matching results" 404 now means no observations; any
+  other 404 is recorded as a failure, as for Argo.
 
 ## [0.1.6] - 2026-11-10
 

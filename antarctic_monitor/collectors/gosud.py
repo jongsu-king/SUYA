@@ -7,7 +7,7 @@ from urllib.parse import quote
 from ..db import Measurement
 from ..http import FetchError
 from ..i18n import msg
-from .argo import VALID_SALT, VALID_TEMP, parse_csv
+from .argo import VALID_SALT, VALID_TEMP, _no_results, parse_csv
 from .base import CollectResult, Context, finite, to_iso_utc
 
 BASE = "https://erddap.ifremer.fr/erddap/tabledap/gosud.csv"
@@ -43,6 +43,7 @@ def parse_rows(text: str) -> list[Measurement]:
 
 
 async def collect(ctx: Context) -> CollectResult:
+    """최근 30일 선박 관측을 받습니다. ERDDAP이 데이터셋을 잠시 찾지 못해 내는 404는 관측 없음이 아니라 실패입니다."""
     query = "&".join(
         [
             "ship_call_sign,time,latitude,longitude,SSTP,SSTP_QC,SSPS,SSPS_QC",
@@ -52,7 +53,7 @@ async def collect(ctx: Context) -> CollectResult:
         ]
     )
     response = await ctx.fetcher.request("GET", f"{BASE}?{query}", timeout=120.0)
-    if response.status_code == 404:
+    if _no_results(response):
         return CollectResult(message=msg("최근 30일 이 해역의 선박 관측 없음"))
     if response.status_code >= 400:
         raise FetchError(f"GOSUD HTTP {response.status_code}: {' '.join(response.text.split())[:160]}")

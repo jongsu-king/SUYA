@@ -351,6 +351,28 @@ def test_gosud_drops_flag_4():
     }
 
 
+async def test_gosud_unknown_dataset_is_a_failure_and_not_an_empty_answer(tmp_path):
+    import httpx
+
+    from antarctic_monitor.collectors.base import Context
+    from antarctic_monitor.config import Settings
+    from antarctic_monitor.db import Store
+    from antarctic_monitor.http import FetchError
+
+    store = Store(tmp_path / "t.db")
+    missing = ERDDAP_UNKNOWN_DATASET.replace("ArgoFloats", "gosud")
+    fetcher, _ = _argo_fetcher(lambda request: httpx.Response(404, text=missing))
+    with pytest.raises(FetchError, match="unknown datasetID"):
+        await gosud.collect(Context(store, fetcher, Settings()))
+    await fetcher.aclose()
+
+    fetcher, _ = _argo_fetcher(lambda request: httpx.Response(404, text=ERDDAP_NO_RESULTS))
+    result = await gosud.collect(Context(store, fetcher, Settings()))
+    assert result.rows == 0
+    await fetcher.aclose()
+    store.close()
+
+
 HYCOM_ASCII = """Dataset {
     Grid {
      ARRAY:
