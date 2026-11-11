@@ -22,6 +22,8 @@ Default folder: Windows `Documents\SUYA`, macOS/Linux `~/Documents/SUYA`. Change
 4. Each workbook is written completely to `.antarctic_db_YYYY-MM.tmp.xlsx` and then moved into place with `os.replace`; a crash never leaves a broken file.
 5. On Windows a workbook that is open in Excel cannot be replaced. That month is skipped, retried on the next cycle, and the status tab shows "Could not save … because the file is open".
 6. When a sheet reaches Excel's limit (1,048,576 rows) it continues as `<sheet>_2`, `_3`, …
+7. Until a workbook is complete, the rows of its sheets are kept as pieces in a `suya-excel-…` folder inside the system's temporary folder (up to 14 times the size of the finished workbook, measured on 2026-11-12). That folder is removed whether the save succeeds or fails. Before a save starts, the free space of the temporary folder and of the Excel folder is checked; when it is short nothing is written and the status tab shows "Not enough disk space to save".
+8. When the program is closed during a save, the saving process is stopped and its unfinished `.tmp.xlsx` is deleted. The next start writes the workbooks again from the beginning.
 
 Why regenerate rather than append: an xlsx file is zipped XML, so appending one row means reading and rewriting the whole file. It gets slower as it grows and a crash mid-write corrupts it. Treat SQLite as the master and the workbooks as a readable copy. **Manual edits are lost on the next save**; analyse a copy.
 

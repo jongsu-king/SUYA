@@ -180,6 +180,9 @@ EN: dict[str, str] = {
     "해면 기압 hPa": "Sea-level pressure hPa",
     "풍속 km/h": "Wind km/h",
     "{name} 파일이 열려 있어 저장하지 못했습니다": "Could not save {name} because the file is open",
+    "저장할 공간이 부족합니다: {path} 여유 {free} MB, 필요 {need} MB": (
+        "Not enough disk space to save: {path} has {free} MB free, {need} MB needed"
+    ),
     "정보": "Info",
     "기간": "Period",
     "생성 시각 UTC": "Created UTC",

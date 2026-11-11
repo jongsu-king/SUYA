@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The "Unhandled exception in script" window on Windows.** When the program was closed, or a save
+  ran past its time limit, while the monthly workbooks were being written, the program removed the
+  temporary folder of the save but left the saving process running. That process finished its work,
+  could not write its result file into the folder that no longer existed, and ended with
+  `FileNotFoundError: [Errno 2] No such file or directory: '…\Temp\tmp…\result.json'` in an error
+  window. The saving process is now stopped and waited for before its folder is removed, an
+  unfinished `.tmp.xlsx` it leaves in the Excel folder is deleted, and a failure inside the saving
+  process is passed back in the result file and shown in the status tab, not in an error window.
+- **Temporary files left behind by a failed save.** The workbook writer keeps the rows of every
+  sheet in temporary files until the workbook is complete: up to 14 times the size of the finished
+  workbook, 468 MB for one month of Argo levels in a measurement on 2026-11-12. When a save failed
+  partway, for example because the disk filled up, these files stayed in the system's temporary
+  folder and added up with every attempt. Each workbook now keeps its pieces in a folder of its own
+  (`suya-excel-…`) that is removed whether the save succeeds or fails. A folder of that name older
+  than a day, left by a process that was killed, is removed at the start of the next save. Files
+  left by 0.1.8 and earlier carry no name of their own and are not touched; the disk cleanup of the
+  operating system removes them.
+- **A save no longer starts without room for it.** Before writing, the free space of the temporary
+  folder and of the Excel folder is compared with what the largest workbook of the months to write
+  needs: 20 times its size for the pieces and twice its size for the new file, at least 128 MB and
+  32 MB. When it is short nothing is written and the status tab shows "Not enough disk space to
+  save: … has … MB free, … MB needed".
+
 ## [0.1.8] - 2026-11-11
 
 A new source, NOAA OSMC, adds the real-time in situ reports of drifting buoys, ice buoys, ships,

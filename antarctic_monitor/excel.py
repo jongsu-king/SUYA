@@ -5,6 +5,8 @@
 
 파일은 SQLite에서 다시 생성합니다. 추가 쓰기는 파일 전체를 읽어야 해서 행이 늘수록 느려지고,
 중간에 끊기면 파일이 깨질 수 있기 때문입니다. 임시 파일을 다 쓴 뒤 교체하므로 파일이 깨지지 않습니다.
+
+저장 중에 생기는 조각 파일은 통합 문서마다 따로 만든 폴더에 두고, 저장이 끝나든 실패하든 폴더째 지웁니다.
 """
 
 from __future__ import annotations
@@ -13,9 +15,11 @@ import asyncio
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -66,6 +70,13 @@ SUMMARY_SOURCES = WATER_SOURCES + ("openmeteo", "metar")
 SUMMARY_VARIABLES = {**WATER_VARIABLES, "air_temperature": "기온"}
 MAIN_FILE = "antarctic_db_{month}.xlsx"
 ARGO_FILE = "argo_levels_{month}.xlsx"
+SCRATCH_PREFIX = "suya-excel-"
+SCRATCH_MAX_AGE = 86400.0
+STOP_WAIT = 5.0
+MIB = 1024 * 1024
+PIECES_FLOOR = 128 * MIB
+OUTPUT_FLOOR = 32 * MIB
+PIECES_PER_BYTE = 20
 ION_GRAM_HEADERS = [(f"{component.symbol} g/kg", 11) for component in composition.MAJOR]
 ION_MMOL_HEADERS = [(f"{component.symbol} mmol/kg", 13) for component in composition.MAJOR]
 ION_GRAM_FACTORS = tuple(component.grams_per_salinity for component in composition.MAJOR)
@@ -154,71 +165,107 @@ class Sheet:
         return self.total
 
 
-class Book:
-    """임시 파일에 쓰고 끝나면 교체합니다. 엑셀에서 파일을 열어 두면 Windows에서는 교체가 실패합니다."""
+def temp_path(path: Path) -> Path:
+    """통합 문서를 다 쓸 때까지 쓰는 같은 폴더의 임시 이름."""
+    return path.with_name(f".{path.stem}.tmp.xlsx")
 
-    def __init__(self, path: Path):
+
+class Book:
+    """임시 파일에 쓰고 끝나면 교체합니다. 엑셀에서 파일을 열어 두면 Windows에서는 교체가 실패합니다.
+
+    xlsxwriter는 시트의 행과 xlsx의 부품을 조각 파일로 먼저 쓰고, 저장이 실패하면 그 조각을 지우지 않습니다.
+    그래서 조각을 이 통합 문서만 쓰는 폴더(scratch 아래, 없으면 시스템 임시 폴더 아래)에 두고
+    저장이 끝나든 실패하든 폴더째 지웁니다. with 문으로 쓰면 시트를 쓰다가 난 오류에서도 지워집니다.
+    """
+
+    def __init__(self, path: Path, scratch: Path | None = None):
         self.path = path
-        self.temp = path.with_name(f".{path.stem}.tmp.xlsx")
+        self.temp = temp_path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.workbook = xlsxwriter.Workbook(str(self.temp), {"constant_memory": True})
+        self.pieces = Path(tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=scratch))
+        self.workbook = xlsxwriter.Workbook(str(self.temp), {"constant_memory": True, "tmpdir": str(self.pieces)})
         self.header = self.workbook.add_format({"bold": True, "bottom": 1})
         self.time = self.workbook.add_format({"num_format": "yyyy-mm-dd hh:mm"})
 
+    def __enter__(self) -> "Book":
+        return self
+
+    def __exit__(self, kind, error, trace) -> None:
+        if kind is None:
+            self.close()
+        else:
+            self.discard()
+
     def close(self) -> None:
-        self.workbook.close()
         try:
-            os.replace(self.temp, self.path)
-        except PermissionError as exc:
+            self.workbook.close()
+            try:
+                os.replace(self.temp, self.path)
+            except PermissionError as exc:
+                raise PermissionError(tr("{name} 파일이 열려 있어 저장하지 못했습니다", name=self.path.name)) from exc
+        finally:
+            self.discard()
+
+    def discard(self) -> None:
+        """조각 폴더와 쓰다 만 임시 파일을 지웁니다. 열린 조각은 먼저 닫아야 Windows에서 지워집니다."""
+        for sheet in self.workbook.worksheets():
+            for handle in (getattr(sheet, "row_data_fh", None), getattr(sheet, "fh", None)):
+                if handle is not None and not getattr(handle, "closed", True):
+                    try:
+                        handle.close()
+                    except OSError:
+                        pass
+        shutil.rmtree(self.pieces, ignore_errors=True)
+        try:
             self.temp.unlink(missing_ok=True)
-            raise PermissionError(tr("{name} 파일이 열려 있어 저장하지 못했습니다", name=self.path.name)) from exc
+        except OSError:
+            pass
 
 
-def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
+def write_main_workbook(store: Store, path: Path, month: str, scratch: Path | None = None) -> dict[str, int]:
     start, end = month_bounds(month)
     until = _before(end)
-    book = Book(path)
-    info = book.workbook.add_worksheet(tr("정보"))
-    counts = {
-        "월간요약": _sheet_summary(book, store, month),
-        "격자평균": _sheet_grids(book, store, start, end),
-        "수온염분_해역": _sheet_water(book, store, start, until),
-        "수온염분_수직": _sheet_vertical(book, store, start, until),
-        "Argo_목록": _sheet_argo_list(book, store, start, end),
-        "선박관측": _sheet_ships(book, store, start, until),
-        "OSMC관측": _sheet_osmc(book, store, start, until),
-        "기지기온": _sheet_metar(book, store, start, until),
-        "GFS기온": _sheet_air(book, store, start, until),
-        "모델예보": _sheet_forecast(book, store, start, until),
-        "Windy": _sheet_windy(book, store, start, until),
-        "지점조회": _sheet_points(book, store, start, until),
-        "이온조성": _sheet_ions(book, store, start, until),
-        "격자이온": _sheet_grid_ions(book, store, start, until),
-        "이온환산계수": _sheet_ion_factors(book),
-        "염분범위": _sheet_ranges(book),
-    }
-    info.set_column(0, 0, 18)
-    info.set_column(1, 1, 70)
-    rows = (
-        ("기간", month),
-        ("생성 시각 UTC", iso()),
-        ("시각 기준", tr("모든 시각은 UTC")),
-        ("주의", tr("SQLite에서 다시 생성되는 파일. 직접 고친 내용은 다음 저장 때 덮어씀")),
-        ("이온 환산", tr(ION_NOTE)),
-        ("범위 검사", tr(RANGE_NOTE)),
-        ("부피 기준", tr(VOLUME_NOTE)),
-        ("격자 이온 환산", tr(GRID_ION_NOTE)),
-    )
-    for index, (label, value) in enumerate(rows):
-        info.write_string(index, 0, tr(label), book.header)
-        info.write_string(index, 1, value)
-    top = len(rows) + 1
-    info.write_string(top, 0, tr("시트"), book.header)
-    info.write_string(top, 1, tr("행 수"), book.header)
-    for index, (name, count) in enumerate(counts.items(), start=top + 1):
-        info.write_string(index, 0, tr(name))
-        info.write_number(index, 1, count)
-    book.close()
+    with Book(path, scratch) as book:
+        info = book.workbook.add_worksheet(tr("정보"))
+        counts = {
+            "월간요약": _sheet_summary(book, store, month),
+            "격자평균": _sheet_grids(book, store, start, end),
+            "수온염분_해역": _sheet_water(book, store, start, until),
+            "수온염분_수직": _sheet_vertical(book, store, start, until),
+            "Argo_목록": _sheet_argo_list(book, store, start, end),
+            "선박관측": _sheet_ships(book, store, start, until),
+            "OSMC관측": _sheet_osmc(book, store, start, until),
+            "기지기온": _sheet_metar(book, store, start, until),
+            "GFS기온": _sheet_air(book, store, start, until),
+            "모델예보": _sheet_forecast(book, store, start, until),
+            "Windy": _sheet_windy(book, store, start, until),
+            "지점조회": _sheet_points(book, store, start, until),
+            "이온조성": _sheet_ions(book, store, start, until),
+            "격자이온": _sheet_grid_ions(book, store, start, until),
+            "이온환산계수": _sheet_ion_factors(book),
+            "염분범위": _sheet_ranges(book),
+        }
+        info.set_column(0, 0, 18)
+        info.set_column(1, 1, 70)
+        rows = (
+            ("기간", month),
+            ("생성 시각 UTC", iso()),
+            ("시각 기준", tr("모든 시각은 UTC")),
+            ("주의", tr("SQLite에서 다시 생성되는 파일. 직접 고친 내용은 다음 저장 때 덮어씀")),
+            ("이온 환산", tr(ION_NOTE)),
+            ("범위 검사", tr(RANGE_NOTE)),
+            ("부피 기준", tr(VOLUME_NOTE)),
+            ("격자 이온 환산", tr(GRID_ION_NOTE)),
+        )
+        for index, (label, value) in enumerate(rows):
+            info.write_string(index, 0, tr(label), book.header)
+            info.write_string(index, 1, value)
+        top = len(rows) + 1
+        info.write_string(top, 0, tr("시트"), book.header)
+        info.write_string(top, 1, tr("행 수"), book.header)
+        for index, (name, count) in enumerate(counts.items(), start=top + 1):
+            info.write_string(index, 0, tr(name))
+            info.write_number(index, 1, count)
     return counts
 
 
@@ -541,28 +588,27 @@ def _sheet_ranges(book: Book) -> int:
     return sheet.finish()
 
 
-def write_argo_workbook(store: Store, path: Path, month: str) -> int:
+def write_argo_workbook(store: Store, path: Path, month: str, scratch: Path | None = None) -> int:
     start, end = month_bounds(month)
-    book = Book(path)
-    sheet = Sheet(
-        book, "Argo층별",
-        [("시각 UTC", 17), ("플로트", 10), ("회차", 6), ("위도", 9), ("경도", 9), ("모드", 6), ("압력 dbar", 9), ("수심 m", 8),
-         ("수온 °C", 8), ("염분 PSU", 9), ("기준 염분 g/kg", 13), *ION_GRAM_HEADERS, ("범위 검사", 9)],
-    )
-    profiles = [p for p in store.argo_with_levels(since=start) if p["obs_time"] < end]
-    for profile in sorted(profiles, key=lambda p: (p["obs_time"], p["platform"])):
-        when = parse_time(profile["obs_time"])
-        for level in profile["levels"]:
-            salt = level.get("salt")
-            sheet.add(
-                [
-                    when, profile["platform"], profile["cycle"], profile["lat"], profile["lon"], profile["data_mode"],
-                    level.get("pressure_dbar"), level.get("depth_m"), level.get("temp"), salt,
-                    *_ion_cells(salt, level.get("depth_m")),
-                ]
-            )
-    count = sheet.finish()
-    book.close()
+    with Book(path, scratch) as book:
+        sheet = Sheet(
+            book, "Argo층별",
+            [("시각 UTC", 17), ("플로트", 10), ("회차", 6), ("위도", 9), ("경도", 9), ("모드", 6), ("압력 dbar", 9),
+             ("수심 m", 8), ("수온 °C", 8), ("염분 PSU", 9), ("기준 염분 g/kg", 13), *ION_GRAM_HEADERS, ("범위 검사", 9)],
+        )
+        profiles = [p for p in store.argo_with_levels(since=start) if p["obs_time"] < end]
+        for profile in sorted(profiles, key=lambda p: (p["obs_time"], p["platform"])):
+            when = parse_time(profile["obs_time"])
+            for level in profile["levels"]:
+                salt = level.get("salt")
+                sheet.add(
+                    [
+                        when, profile["platform"], profile["cycle"], profile["lat"], profile["lon"], profile["data_mode"],
+                        level.get("pressure_dbar"), level.get("depth_m"), level.get("temp"), salt,
+                        *_ion_cells(salt, level.get("depth_m")),
+                    ]
+                )
+        count = sheet.finish()
     return count
 
 
@@ -577,16 +623,80 @@ def months_to_write(store: Store, directory: Path, now: datetime | None = None) 
     return output or [moment.strftime("%Y-%m")]
 
 
-def sync(store: Store, directory: Path, months: list[str] | None = None) -> dict:
+def sweep_scratch(root: Path | None = None, now: float | None = None) -> int:
+    """하루 넘게 남은 조각 폴더를 지우고 그 수를 돌려줍니다. 저장 프로세스가 강제로 끝나면 폴더가 남습니다.
+
+    임시 폴더 바로 아래에서 이 프로그램이 만든 이름의 폴더만 봅니다. 다른 프로그램의 파일은 건드리지 않습니다.
+    """
+    moment = time.time() if now is None else now
+    removed = 0
+    try:
+        entries = list(os.scandir(root or tempfile.gettempdir()))
+    except OSError:
+        return 0
+    for entry in entries:
+        try:
+            if not entry.name.startswith(SCRATCH_PREFIX) or not entry.is_dir(follow_symlinks=False):
+                continue
+            if moment - entry.stat(follow_symlinks=False).st_mtime < SCRATCH_MAX_AGE:
+                continue
+        except OSError:
+            continue
+        shutil.rmtree(entry.path, ignore_errors=True)
+        removed += not os.path.exists(entry.path)
+    return removed
+
+
+def space_needed(directory: Path, months: list[str]) -> tuple[int, int]:
+    """(조각을 둘 곳, 엑셀 폴더)에 있어야 할 바이트 수. 지난번에 저장한 파일 가운데 가장 큰 것으로 어림합니다.
+
+    조각은 압축하기 전의 XML이라 완성된 파일보다 훨씬 큽니다. 엑셀 폴더에는 새 파일과 옛 파일이 잠깐 함께 있습니다.
+    """
+    largest = 0
+    for month in months:
+        for pattern in (MAIN_FILE, ARGO_FILE):
+            try:
+                largest = max(largest, (directory / pattern.format(month=month)).stat().st_size)
+            except OSError:
+                pass
+    return max(PIECES_FLOOR, largest * PIECES_PER_BYTE), max(OUTPUT_FLOOR, largest * 2)
+
+
+def require_space(directory: Path, months: list[str], scratch: Path | None = None) -> None:
+    """여유 공간이 모자라면 쓰기 전에 그만둡니다. 디스크가 가득 차면 수집한 자료를 DB에 넣는 일까지 실패합니다."""
+    pieces, output = space_needed(directory, months)
+    volumes: dict[int, list] = {}
+    for place, need in ((Path(scratch or tempfile.gettempdir()), pieces), (directory, output)):
+        try:
+            volume = volumes.setdefault(os.stat(place).st_dev, [place, shutil.disk_usage(place).free, 0])
+        except OSError:
+            continue
+        volume[2] += need
+    for place, free, need in volumes.values():
+        if free < need:
+            raise OSError(
+                tr(
+                    "저장할 공간이 부족합니다: {path} 여유 {free} MB, 필요 {need} MB",
+                    path=place, free=free // MIB, need=-(-need // MIB),
+                )
+            )
+
+
+def sync(store: Store, directory: Path, months: list[str] | None = None, scratch: Path | None = None) -> dict:
+    """달마다 통합 문서를 다시 씁니다. scratch는 조각 폴더를 둘 곳이고, 없으면 시스템 임시 폴더입니다."""
+    sweep_scratch()
+    months = months or months_to_write(store, directory)
+    directory.mkdir(parents=True, exist_ok=True)
+    require_space(directory, months, scratch)
     written, rows = [], 0
-    for month in months or months_to_write(store, directory):
+    for month in months:
         name = MAIN_FILE.format(month=month)
-        rows += sum(write_main_workbook(store, directory / name, month).values())
+        rows += sum(write_main_workbook(store, directory / name, month, scratch).values())
         written.append(name)
         start, end = month_bounds(month)
         if any(p["obs_time"] < end for p in store.argo_with_levels(since=start)):
             name = ARGO_FILE.format(month=month)
-            rows += write_argo_workbook(store, directory / name, month)
+            rows += write_argo_workbook(store, directory / name, month, scratch)
             written.append(name)
     return {"files": written, "rows": rows}
 
@@ -600,24 +710,68 @@ def sync_command(store_path: Path, directory: Path, result_path: Path | None = N
     return command
 
 
+async def _stop(process: asyncio.subprocess.Process) -> None:
+    """저장 프로세스를 끝내고 끝날 때까지 기다립니다.
+
+    프로세스가 살아 있는 채로 그 임시 폴더를 지우면, 저장을 마친 프로세스가 결과를 쓸 곳이 없어 오류로 끝납니다.
+    """
+    try:
+        process.kill()
+    except ProcessLookupError:
+        return
+    try:
+        await asyncio.wait_for(process.wait(), STOP_WAIT)
+    except TimeoutError:
+        pass
+
+
+def _read_result(path: Path) -> dict:
+    try:
+        result = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return result if isinstance(result, dict) else {}
+
+
+def _remove_leftovers(directory: Path) -> None:
+    """저장 프로세스가 끝난 뒤 엑셀 폴더에 남은 쓰다 만 파일을 지웁니다."""
+    for pattern in (MAIN_FILE, ARGO_FILE):
+        for leftover in directory.glob(temp_path(Path(pattern.format(month="*"))).name):
+            try:
+                leftover.unlink()
+            except OSError:
+                pass
+
+
 async def collect(ctx: Context) -> CollectResult:
-    """바뀐 내용이 있을 때만 별도 프로세스에서 파일을 만듭니다. 화면과 수집을 막지 않기 위함입니다."""
+    """바뀐 내용이 있을 때만 별도 프로세스에서 파일을 만듭니다. 화면과 수집을 막지 않기 위함입니다.
+
+    결과 파일과 조각 폴더는 이 함수가 만든 임시 폴더에 둡니다. 시간 초과나 프로그램 종료로 이 작업이 취소되면
+    저장 프로세스를 먼저 끝낸 뒤에 폴더를 지웁니다.
+    """
     stamp = ctx.store.data_stamp()
     directory = ctx.settings.excel_dir
     if stamp and ctx.store.kv_get("excel:stamp") == stamp and any(directory.glob("antarctic_db_*.xlsx")):
         return CollectResult(unchanged=True, message=msg("새 자료 없음"))
     directory.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory() as temp:
+    with tempfile.TemporaryDirectory(prefix=SCRATCH_PREFIX, ignore_cleanup_errors=True) as temp:
         result_path = Path(temp) / "result.json"
         flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
         process = await asyncio.create_subprocess_exec(
             *sync_command(ctx.store.path, directory, result_path),
             stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE, creationflags=flags,
         )
-        _, stderr = await process.communicate()
-        if process.returncode != 0 or not result_path.exists():
-            lines = stderr.decode("utf-8", "replace").strip().splitlines()
-            raise FetchError(lines[-1] if lines else msg("엑셀 저장 프로세스 종료 코드 {code}", code=process.returncode))
-        result = json.loads(result_path.read_text(encoding="utf-8"))
+        try:
+            _, stderr = await process.communicate()
+        finally:
+            if process.returncode is None:
+                await _stop(process)
+                _remove_leftovers(directory)
+        result = _read_result(result_path)
+    if process.returncode != 0 or "rows" not in result:
+        _remove_leftovers(directory)
+        lines = stderr.decode("utf-8", "replace").strip().splitlines()
+        fallback = lines[-1] if lines else msg("엑셀 저장 프로세스 종료 코드 {code}", code=process.returncode)
+        raise FetchError(result.get("error") or fallback)
     ctx.store.kv_set("excel:stamp", stamp or "")
     return CollectResult(rows=result["rows"], data_time=iso(), message=join(*result["files"]))

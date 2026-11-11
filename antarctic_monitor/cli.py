@@ -11,6 +11,7 @@ import logging.handlers
 import os
 import signal
 import sys
+import traceback
 from pathlib import Path
 
 from . import __version__, composition, exporter, ranges
@@ -204,23 +205,42 @@ def _ion_check(folder: Path) -> str:
 
 
 def _excel_sync(args: argparse.Namespace) -> None:
-    """Write the monthly workbooks. The GUI runs this as a child process."""
+    """Write the monthly workbooks. The GUI runs this as a child process.
+
+    A failure is reported, not raised: the message goes into the result file for the GUI, the traceback goes
+    to stderr, and the process ends with status 1. The installed program has no console, and an exception that
+    escapes there opens an "Unhandled exception in script" dialog for every failed save.
+    """
     from . import excel
 
-    settings = load_settings()
-    store = Store(args.db or settings.db_path)
-    directory = Path(args.dir) if args.dir else settings.excel_dir
-    months = None
-    if args.all:
-        months = store.months_with_data()
-    elif args.month:
-        months = [args.month]
-    result = excel.sync(store, directory, months)
-    store.close()
-    if args.result:
-        Path(args.result).write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
-    elif sys.stdout:
-        print(f"{directory}: {', '.join(result['files'])} ({result['rows']} rows)")
+    result_path = Path(args.result) if args.result else None
+    try:
+        settings = load_settings()
+        store = Store(args.db or settings.db_path)
+        try:
+            directory = Path(args.dir) if args.dir else settings.excel_dir
+            months = None
+            if args.all:
+                months = store.months_with_data()
+            elif args.month:
+                months = [args.month]
+            result = excel.sync(store, directory, months, scratch=result_path.parent if result_path else None)
+        finally:
+            store.close()
+        if result_path:
+            result_path.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+        elif sys.stdout:
+            print(f"{directory}: {', '.join(result['files'])} ({result['rows']} rows)")
+    except Exception as exc:
+        message = traceback.format_exception_only(exc)[-1].strip()
+        if result_path:
+            try:
+                result_path.write_text(json.dumps({"error": message}, ensure_ascii=False), encoding="utf-8")
+            except OSError:
+                pass
+        if sys.stderr:
+            traceback.print_exc()
+        raise SystemExit(1) from None
 
 
 def gui_available() -> bool:
