@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-11
+
+A new source, NOAA OSMC, adds the real-time in situ reports of drifting buoys, ice buoys, ships,
+uncrewed surface vehicles and tagged animals south of 50°S to the database, the workbook, the
+point inspector and the ion composition. Concept DOI for all versions: 10.5281/zenodo.23937852.
+
 ### Added
 
 - **A new source: real-time in situ reports from NOAA OSMC.** The collector `osmc` reads the
