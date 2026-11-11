@@ -6,9 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-11
+
 The ion composition now carries a salinity range check and a volume basis, the whole-area salinity
 grids are converted to ions as well, and the surface values of Argo profiles come from the
-quality-controlled levels.
+quality-controlled levels. Concept DOI for all versions: 10.5281/zenodo.23937852.
 
 ### Added
 
