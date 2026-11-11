@@ -10,7 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 A new source, NOAA OSMC, adds the real-time in situ reports of drifting buoys, ice buoys, ships,
 uncrewed surface vehicles and tagged animals south of 50°S to the database, the workbook, the
-point inspector and the ion composition. Concept DOI for all versions: 10.5281/zenodo.23937852.
+point inspector and the ion composition. Version DOI: https://doi.org/10.5281/zenodo.24131554
+(concept DOI for all versions: 10.5281/zenodo.23937852).
 
 ### Added
 
