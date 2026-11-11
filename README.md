@@ -166,6 +166,7 @@ python -m antarctic_monitor
 |---|---|
 | **Layer** | SST · OISST, SST anomaly · OISST, Temperature · HYCOM, Salinity · HYCOM, SSS · SMOS, SSS · SMAP, Sea ice · OISST, Air temperature 2 m · GFS |
 | **Depth** | 0 / 100 / 200 / 500 / 1000 / 2000 m for the two HYCOM layers |
+| **Show** | On the salinity layers (Salinity · HYCOM, SSS · SMOS, SSS · SMAP): read the map as one of the eight major ions in g/kg or mmol/kg instead of salinity (PSU). The colours stay the same; the colour-bar ticks, the cursor value and the caption change. The values are salinity times a factor: derived, not measured |
 | **Argo**, **Stations and areas** | Marker toggles. Black dots = Argo profiles from the last 30 days, triangles = stations, squares = sea-area points |
 | Mouse | Move: coordinates and value in the status bar. **Wheel**: zoom (up to 12×), **drag**: pan, **double-click**: reset, **click**: inspect that point (red cross). Clicking a marker inspects that float or station |
 | **Location** box | Type `-65, -60` (lat, lon) or paste a nullschool / Windy URL. Only the coordinates are read; the site is not contacted |
@@ -223,7 +224,7 @@ Per-source status, interval, data time, age, last run, countdown to the next run
 | File > Settings… (Ctrl+,) | Windy API key and tier, Excel folder, update mode, database path (read-only) |
 | File > Save Excel database now | Rewrite the workbooks without waiting 15 minutes |
 | File > Open Excel folder / Open data folder | In Explorer / Finder / your file manager |
-| File > Export CSV | All measurements / all Argo levels / current map layer |
+| File > Export CSV | All measurements / all Argo levels / current map layer / current layer ions (derived ions of every cell of a salinity layer) |
 | View > Language | English / 한국어 |
 | Collect > Collect all now (F5), Collect source | Fetch immediately |
 | Help > User guide (F1), Data sources, License, Third-party notices, About | |
@@ -284,7 +285,10 @@ fraction. At salinity 35 that is 19.3527 g/kg of chloride and 10.7815 g/kg of so
 seawater differs slightly, and the changed ratios in sea-ice brine or where river water mixes in are not modelled. Each salinity is
 also compared with the Southern Ocean range for its depth (Boyer & Levitus 1994, NOAA Technical Report NESDIS 81) and labelled `ok`, `low` or `high`;
 nothing is dropped, and the ranges are broad, so only gross errors are caught. Where a row has a paired temperature, the workbook and the CSV export
-add the density at 1 atm and the ions in mmol/L (in-situ pressure not included). Formula, factors, ranges and limits:
+add the density at 1 atm and the ions in mmol/L (in-situ pressure not included). The whole-area grids are converted too: the **Show** box on the map
+reads a salinity layer as an ion concentration, the *Grid ions* sheet keeps the ion composition of the mean south of 60°S and of the five sector means
+for every grid time, and `suya export grid-ions` writes the value of every grid cell to CSV. Cell values are computed when read and not stored.
+Formula, factors, ranges and limits:
 [docs/data-sources.en.md, section 11](docs/data-sources.en.md#11-ion-composition-derived-from-salinity).
 
 ## 7. Storage: SQLite and the Excel database
@@ -308,6 +312,7 @@ ignored), `matplotlib/` (font cache, installer builds only) and, while an update
 | `argo_profiles` | Profile listing (position, mode, QC, surface T/S) and the level data as JSON | platform, cycle |
 | `seawater_ions` | For every salinity row: practical and reference salinity and the eight major ions in g/kg, derived with the Reference Composition, plus `salinity_check` (`ok`, `low`, `high`) from the salinity range check. Triggers add, change and remove rows together with `measurements`; salinity stored before the upgrade is filled in once | source, dataset, lat, lon, level, obs_time |
 | `seawater_ions_mmol`, `argo_level_ions` (views) | The same rows in mmol/kg; and the derived ions and the range check of every Argo level, computed when read so the levels are not stored twice | |
+| `grid_ions` (view) | For every salinity grid (the PSU layers of `grids`): reference salinity, the eight major ions in g/kg and mmol/kg and the range check, derived from the mean south of 60°S and from each sector mean. Computed when read; no cell values are stored | |
 | `runs`, `source_state` | Every collection run; per-source last status, data time, next run, consecutive errors | |
 | `kv` | Source update tokens, daily call budgets, Excel stamp | |
 
@@ -332,6 +337,7 @@ while SUYA is running.
 | Windy | Windy API values (with a key) |
 | Point queries | Results for arbitrary points clicked on the map |
 | Ion composition | Every salinity row of the month with reference salinity and the eight major ions in g/kg and mmol/kg (derived, not measured); with a paired temperature also the density at 1 atm and mmol/L; a range-check column marks salinity outside the range |
+| Grid ions | For every salinity grid time, the whole area south of 60°S and the five sectors: valid cells, mean salinity, reference salinity, the eight major ions in g/kg and mmol/kg and the range check (derived from the mean salinity) |
 | Ion factors | The Reference Composition used: fifteen components with charge, molar mass, mass share and the factors per unit of salinity |
 | Salinity ranges | The Southern Ocean salinity range by depth used for the range check (Boyer & Levitus 1994): 33 standard depths with the depth window each range applies to |
 | *(second file)* Argo levels | Every Argo level: pressure, depth, temperature, salinity, reference salinity, the eight derived ions in g/kg and the range check |
@@ -378,6 +384,7 @@ suya export argo --out argo.csv
 suya export grid --layer hycom_salt_500 --out salt500.csv
 suya export ions --out ions.csv [--source hycom] [--since 2026-11-01T00:00:00Z]   # derived ions: g/kg, mmol/kg, mmol/L, range check
 suya export argo-ions --out argo_ions.csv [--since 2026-11-01T00:00:00Z]          # derived ions of every Argo level
+suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv                   # derived ions of every cell of a salinity grid (latest grid)
 suya ions 34.5                    # convert one salinity to its ion composition. --json for machine-readable output
 suya ions 34.5 --temperature -1.2 --depth 100   # also density at 1 atm, mmol/L and the salinity range check
 suya sources                      # list the sources

@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from .. import __version__, exporter, pointquery, queries, updates
+from .. import __version__, composition, exporter, pointquery, queries, updates
 from ..catalog import KIND_LABEL, LAYERS, OUTPUT_JOBS, SOURCES
 from ..collectors import JOBS
 from ..config import Settings, load_settings, save_user_settings
@@ -32,10 +32,21 @@ from .help import HelpDialog
 from .format import age, clock_time, coord_text, countdown, interval_text, num, percent, short_time, status_text
 from .panels import AirPanel, DataTable, IonPanel, ProfilePanel, SeriesPanel, WaterPanel
 from .polarmap import ColorBar, PolarMapWidget
-from .scales import build_scale
+from .scales import build_scale, rescale
 from .theme import Theme, current_theme, series_color
 
 DETAIL_TABS = ("water", "profile", "air", "series", "ions")
+ION_VIEW_UNITS = (("g/kg", "grams_per_salinity"), ("mmol/kg", "mmol_per_salinity"))
+ION_VIEWS = tuple(
+    (component, unit, getattr(component, attribute))
+    for unit, attribute in ION_VIEW_UNITS
+    for component in composition.MAJOR
+)
+"""염분 지도를 이온 농도로 읽는 보기: (성분, 단위, 염분 1 당 값)."""
+NARROW_COMBO_WIDTH = 96
+"""창이 좁을 때 지도 위 선택 상자가 줄어들 수 있는 가장 작은 폭."""
+MAP_SIDE_WIDTH = 400
+"""지도 탭에서 오른쪽 패널 몫으로 남겨 두는 폭. 창이 이만큼을 남기지 못할 때에만 지도 위 선택 상자를 줄입니다."""
 DETAIL_QUERY = {"ions": "water"}
 GRID_SOURCES = {
     "oisst": {"oisst_sst", "oisst_anom", "oisst_ice"},
@@ -124,6 +135,7 @@ class MainWindow(QMainWindow):
         export_menu.addAction(tr("측정값…"), self.export_measurements)
         export_menu.addAction(tr("Argo 전 층…"), self.export_argo)
         export_menu.addAction(tr("현재 레이어…"), self.export_layer)
+        export_menu.addAction(tr("현재 레이어 이온…"), self.export_layer_ions)
         file_menu.addSeparator()
         file_menu.addAction(tr("종료"), self.close, QKeySequence.StandardKey.Quit)
 
@@ -278,6 +290,17 @@ class MainWindow(QMainWindow):
         self.depth_combo.currentIndexChanged.connect(self._on_depth_changed)
         controls.addWidget(self.depth_label)
         controls.addWidget(self.depth_combo)
+        self.quantity_label = QLabel(tr("표시"))
+        self.quantity_combo = QComboBox()
+        self.quantity_combo.setToolTip(tr("염분 지도를 염분에서 환산한 이온 농도로 읽습니다. 색은 그대로이고 눈금과 커서 값이 바뀝니다."))
+        self.quantity_combo.addItem(f"{tr('염분')} (PSU)", -1)
+        for index, (component, unit, _factor) in enumerate(ION_VIEWS):
+            if index % len(composition.MAJOR) == 0:
+                self.quantity_combo.insertSeparator(self.quantity_combo.count())
+            self.quantity_combo.addItem(f"{component.symbol} ({unit})", index)
+        self.quantity_combo.currentIndexChanged.connect(lambda _index: self.render_layer())
+        controls.addWidget(self.quantity_label)
+        controls.addWidget(self.quantity_combo)
         controls.addStretch(1)
         self.argo_check = QCheckBox("Argo", checked=True)
         self.argo_check.toggled.connect(lambda on: self.map.set_visibility(argo=on))
@@ -285,6 +308,7 @@ class MainWindow(QMainWindow):
         self.location_check.toggled.connect(lambda on: self.map.set_visibility(locations=on))
         controls.addWidget(self.argo_check)
         controls.addWidget(self.location_check)
+        self.map_controls = controls
         left_layout.addLayout(controls)
         self.map = PolarMapWidget()
         self.map.set_theme(self.theme)
@@ -609,6 +633,34 @@ class MainWindow(QMainWindow):
                 self.depth_combo.addItem(f"{depth} m", depth)
             self.depth_combo.setCurrentIndex(max(0, self.depth_combo.findData(self.depth)))
             self.depth_combo.blockSignals(False)
+        is_salinity = layer["scale"] == "salinity"
+        self.quantity_label.setVisible(is_salinity)
+        self.quantity_combo.setVisible(is_salinity)
+        self._fit_map_controls()
+
+    def _fit_map_controls(self) -> None:
+        """오른쪽 패널에 MAP_SIDE_WIDTH가 남지 않을 때에만, 모자란 폭만큼 지도 위 선택 상자를 줄입니다."""
+        combos = [combo for combo in (self.layer_combo, self.quantity_combo) if not combo.isHidden()]
+        for combo in combos:
+            combo.setMinimumWidth(0)
+        self.map_controls.invalidate()
+        missing = self.map_controls.minimumSize().width() + MAP_SIDE_WIDTH - self.width()
+        spare = [max(combo.minimumSizeHint().width() - NARROW_COMBO_WIDTH, 0) for combo in combos]
+        if missing <= 0 or not sum(spare):
+            return
+        for combo, room in zip(combos, spare):
+            combo.setMinimumWidth(combo.minimumSizeHint().width() - min(room, -(-room * missing // sum(spare))))
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._fit_map_controls()
+
+    def ion_view(self) -> tuple[composition.Component, str, float] | None:
+        """염분 레이어를 이온 농도로 볼 때의 (성분, 단위, 염분 1 당 값). 염분 그대로 보거나 염분 레이어가 아니면 None."""
+        index = self.quantity_combo.currentData()
+        if index is None or index < 0 or self._layer_def()["scale"] != "salinity":
+            return None
+        return ION_VIEWS[index]
 
     def _on_layer_changed(self) -> None:
         self.layer_id = self.layer_combo.currentData()
@@ -669,6 +721,9 @@ class MainWindow(QMainWindow):
             self.layer_frames = []
             self.time_row.setVisible(False)
         label = f"{tr(layer['label'])} {self.depth} m" if layer.get("depths") else tr(layer["label"])
+        view = self.ion_view()
+        if view:
+            label = f"{label} · {view[0].symbol}"
         self.layer_request += 1
         token = self.layer_request
         if not info:
@@ -688,6 +743,9 @@ class MainWindow(QMainWindow):
                 return
             unit = "" if grid.unit == "fraction" else grid.unit
             scale = build_scale(layer["scale"], info["stats"], unit)
+            if view:
+                component, ion_unit, factor = view
+                scale = rescale(scale, factor, ion_unit, f"{component.symbol} {ion_unit}")
             self.map.set_layer(grid, scale, label)
             self.colorbar.set_scale(scale, self.theme)
             parts = [
@@ -695,6 +753,13 @@ class MainWindow(QMainWindow):
                 f"{short_time(shown['valid_time'])} ({age(shown['valid_time'])})",
                 tr("유효 {pct}%", pct=round((shown["stats"].get("coverage") or 0) * 100)),
             ]
+            if view:
+                parts.append(
+                    tr(
+                        "{ion} {unit} = 염분 × {factor} (기준 조성으로 환산, 측정값 아님)",
+                        ion=view[0].symbol, unit=view[1], factor=f"{view[2]:.5g}",
+                    )
+                )
             rejected = grid.meta.get("rejected_out_of_range")
             if rejected:
                 parts.append(tr("범위 밖 {n}개 제외", n=rejected))
@@ -935,6 +1000,18 @@ class MainWindow(QMainWindow):
         path = self._save_path(f"{grid_id}.csv")
         if path:
             self._export(exporter.export_grid, path, grid_id, path)
+
+    def export_layer_ions(self) -> None:
+        """현재 염분 레이어의 칸마다 환산한 이온 조성. 염분 레이어가 아니면 저장 창을 열지 않습니다."""
+        grid_id = self.grid_id()
+        if self._layer_def()["scale"] != "salinity":
+            QMessageBox.information(
+                self, tr("CSV 내보내기"), tr("염분 레이어가 아니어서 이온으로 환산할 수 없습니다: {layer}", layer=grid_id)
+            )
+            return
+        path = self._save_path(f"{grid_id}-ions.csv")
+        if path:
+            self._export(exporter.export_grid_ions, path, grid_id, path)
 
     def _confirm_close(self) -> bool:
         """업데이트 중에 창을 닫으면 내려받던 파일과 수집이 함께 멈추므로 먼저 묻습니다."""

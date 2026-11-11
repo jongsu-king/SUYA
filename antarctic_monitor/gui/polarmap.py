@@ -344,7 +344,7 @@ class PolarMapWidget(QWidget):
             value = float(sample_grid(self.prepared, np.array([lat]), np.array([lon]))[0])
             if not math.isnan(value):
                 unit = f" {self.scale.unit}" if self.scale.unit else ""
-                value_text = f"{num(value, self.scale.digits)}{unit}"
+                value_text = f"{num(value * self.scale.factor, self.scale.digits)}{unit}"
         return f"{coord_text(lat, lon)}    {self.layer_label}: {value_text}"
 
     def marker_tip(self, kind: str, item: dict) -> str:
@@ -438,23 +438,25 @@ class ColorBar(QWidget):
         painter = QPainter(self)
         pixels = np.column_stack([self.scale.lut, np.full(256, 255, np.uint8)]).tobytes()
         image = QImage(pixels, 256, 1, 1024, QImage.Format.Format_RGBA8888)
+        font = painter.font()
+        font.setPixelSize(10)
+        painter.setFont(font)
         margin = 24.0
-        unit_width = 44.0 if self.scale.unit else 0.0
+        caption = self.scale.legend or self.scale.unit
+        unit_width = max(44.0, painter.fontMetrics().horizontalAdvance(caption) + 12.0) if caption else 0.0
         bar = QRectF(margin, 2, self.width() - 2 * margin - unit_width, 11)
         painter.drawImage(bar, image)
         painter.setPen(QPen(QColor(self.theme.ink), 0.8))
         painter.drawRect(bar)
-        font = painter.font()
-        font.setPixelSize(10)
-        painter.setFont(font)
-        digits = 2 if self.scale.kind in ("salinity", "ice") else 1
         for at, value in legend_ticks(self.scale):
             x = bar.left() + at * bar.width()
             painter.drawLine(QPointF(x, bar.bottom()), QPointF(x, bar.bottom() + 3))
-            painter.drawText(QRectF(x - 30, bar.bottom() + 3, 60, 14), Qt.AlignmentFlag.AlignCenter, num(value, digits))
-        if self.scale.unit:
+            painter.drawText(
+                QRectF(x - 30, bar.bottom() + 3, 60, 14), Qt.AlignmentFlag.AlignCenter, num(value, self.scale.digits)
+            )
+        if caption:
             painter.drawText(
                 QRectF(bar.right() + 6, bar.top() - 2, unit_width, 15),
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self.scale.unit,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, caption,
             )
         painter.end()

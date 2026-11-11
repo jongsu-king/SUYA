@@ -161,6 +161,7 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 | `seawater_ions` | Reference salinity and the eight major ions in g/kg, derived for every salinity row, and the range-check verdict `salinity_check` (section 11); triggers keep it in step with `measurements` | (source, dataset, lat, lon, level, obs_time) |
 | `seawater_ions_mmol` (view) | The same rows in mmol/kg | |
 | `argo_level_ions` (view) | Temperature, salinity, derived ions in g/kg and the range-check verdict per Argo level; uses no storage | |
+| `grid_ions` (view) | Reference salinity, ions in g/kg and mmol/kg and the range-check verdict derived from the mean south of 60°S and each sector mean of every salinity grid; uses no storage | |
 | `runs` / `source_state` | Collection history, next run, consecutive errors | |
 | `kv` | Source tokens, daily budgets, Excel stamp | |
 
@@ -218,3 +219,14 @@ mmol/kg times the density of the seawater gives mmol/L: mmol/L = mmol/kg × ρ /
 - In-situ pressure is not included; the real density of deep water is higher (about 0.4 % at 1000 m).
 - Not stored in the database: the *Ion composition* sheet, `suya export ions` and `suya ions --temperature` compute it when they read. The Argo levels workbook and `argo_level_ions` do not carry it.
 - Seen on a copy of a real database (2026-11-11): 4,000 of the 4,007 point rows had a paired temperature.
+
+### Ion conversion of the whole-area grids
+
+Besides the point values, the salinity grids behind the map (`hycom_salt_<depth>`, `smos_sss`, `smap_sss`) are converted with the same factors. The conversion is proportional to salinity, so converting a mean salinity gives the same result as converting every cell and averaging with the same weights.
+
+- Area means: for every grid time the view `grid_ions` gives the reference salinity, the eight major ions in g/kg and mmol/kg and the range-check verdict, derived from the mean salinity of the whole area south of 60°S (`area` = `all`) and of the five sectors (`weddell`, `indian`, `west_pacific`, `ross`, `amundsen_bell`). A sector without a mean has no row. The *Grid ions* sheet carries that month's rows.
+- Cell values: `suya export grid-ions --layer <layer> --out <file>` and the menu entry *File > Export CSV > Current layer ions…* write one row for every cell that has a value in the latest grid of the layer. Columns: `valid_time`, `lat`, `lon`, `depth_m`, `practical_salinity`, `reference_salinity`, `_g_kg` and `_mmol_kg` for the eight ions, and `salinity_check`. The values are not rounded, and cells north of 60°S are included (the area means cover only the area south of 60°S). A layer that is not a salinity layer, or one not collected yet, is refused.
+- Map: on a salinity layer the *Show* box selects an ion and a unit (g/kg or mmol/kg); the colour-bar ticks, the cursor value and the caption then give that ion's concentration. Colours and pattern are those of the salinity map.
+- Storage: neither cell nor area ion amounts are stored. They are computed from the grids and statistics in `grids` whenever they are read; one grid has tens of thousands of cells, so storing them would keep the same information several times over.
+- Limits: the mean salinities are stored in the statistics with three decimals, so a rounding error of up to 0.0005 PSU carries into the ion amounts. No paired temperature is used, so there is no mmol/L. The range check uses the depth of the layer (0 m for satellite salinity); the surface range is 0–40, so satellite salinity and the 0 m level are practically never labelled. This is the salinity map read on another scale, not a map of measured ions, and the limits above apply unchanged.
+- Seen on a copy of a real database (2026-11-11): none of the 1,493 rows of `grid_ions` (1,481 in the 2026-11 sheet) was labelled. The cell CSV had 49,949 rows for `hycom_salt_0`, 42,597 for `hycom_salt_2000`, 29,624 for `smos_sss` and 22,565 for `smap_sss`, and every row equalled the grid value times the factor.

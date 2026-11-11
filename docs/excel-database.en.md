@@ -35,7 +35,7 @@ Why regenerate rather than append: an xlsx file is zipped XML, so appending one 
 ## Sheets in `antarctic_db_YYYY-MM.xlsx`
 
 ### Info
-Period, creation time (UTC), time-basis note, warning, notes on the ion conversion, the range check and the volume basis, rows per sheet.
+Period, creation time (UTC), time-basis note, warning, notes on the ion conversion, the range check, the volume basis and the grid ion conversion, rows per sheet.
 
 ### Monthly summary — one month's statistics per point, source and item
 Only surface and 2 m values count. Forecasts for days ahead (`kind = forecast`), deep levels and points clicked on the map are left out.
@@ -121,6 +121,25 @@ These are **not direct ion measurements**; each salinity is multiplied by the ra
 | Cl⁻ … Br⁻ mmol/L | mmol/kg × density / 1000; blank without a temperature |
 | Range check | `low` or `high` where the salinity is outside the Southern Ocean range for its depth; blank inside the range. A label only: the value is kept |
 
+### Grid ions — ions derived from the area means of the salinity grids
+That month's rows of the SQLite view `grid_ions`: for every time of a salinity grid (the HYCOM salinity layer of each depth, SMOS, SMAP) one row for the whole area south of 60°S and one per sector.
+These are **derived values**: the mean salinity times the same factors. The conversion is proportional to salinity, so the result equals converting every cell and averaging. Cell values come from `suya export grid-ions`. The formula and its limits are in [Data sources, section 11](data-sources.en.md#11-ion-composition-derived-from-salinity).
+
+| Column | Meaning |
+|---|---|
+| Time UTC | Data time of the grid |
+| Layer | `hycom_salt_<depth>`, `smos_sss`, `smap_sss` |
+| Area | `Southern Ocean (south of 60°S)` or one of the five sectors (Weddell Sea, Indian Ocean, Western Pacific, Ross Sea, Amundsen-Bellingshausen Seas). A sector without a mean has no row |
+| Depth m | Depth of the layer; 0 for satellite salinity |
+| Valid cells | Cells with a value south of 60°S; in a sector row, the cells inside that sector |
+| Salinity PSU | Weighted mean salinity of the area (the value of the *Grid means* sheet, three decimals) |
+| Reference salinity g/kg | S_R = (35.16504 / 35) × S_P |
+| Cl⁻ … Br⁻ g/kg | The eight major ions per kg of seawater |
+| Cl⁻ … Br⁻ mmol/kg | The same eight as amounts of substance |
+| Range check | `low` or `high` where the mean salinity is outside the Southern Ocean range for the layer depth; blank inside the range |
+
+No paired temperature is used, so there are no density and mmol/L columns.
+
 ### Ion factors — the Reference Composition used
 Fifteen components with symbol, charge, molar mass, mass share %, g/kg and mmol/kg per unit of salinity, and g/kg and mmol/kg at salinity 35.
 The eight rows with a `DB column` are the ones stored in the database and in Excel. Multiplying these factors by any salinity reproduces every value.
@@ -172,7 +191,7 @@ library(DBI); con <- dbConnect(RSQLite::SQLite(), "~/Library/Application Support
 dbGetQuery(con, "SELECT * FROM measurements WHERE variable='sea_water_temperature' LIMIT 10")
 ```
 
-Derived ion amounts are read from one table and two views: `seawater_ions` (g/kg, one row per salinity row), `seawater_ions_mmol` (mmol/kg) and `argo_level_ions` (per Argo level, g/kg). The range-check verdict is the column `salinity_check` (`ok`, `low`, `high`) of `seawater_ions` and `argo_level_ions`. Density and mmol/L are not in the database; the workbook and `suya export ions` compute them.
-For CSV use `suya export ions --out ions.csv` and `suya export argo-ions --out argo_ions.csv`.
+Derived ion amounts are read from one table and three views: `seawater_ions` (g/kg, one row per salinity row), `seawater_ions_mmol` (mmol/kg), `argo_level_ions` (per Argo level, g/kg) and `grid_ions` (the mean south of 60°S and the sector means of every salinity grid, g/kg and mmol/kg). The range-check verdict is the column `salinity_check` (`ok`, `low`, `high`) of `seawater_ions`, `argo_level_ions` and `grid_ions`. Density and mmol/L are not in the database; the workbook and `suya export ions` compute them.
+For CSV use `suya export ions --out ions.csv` and `suya export argo-ions --out argo_ions.csv`; for the value of every cell of a salinity grid, `suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv`.
 
 `grids.payload` is gzip-compressed JSON (`{"lats":[…],"lons":[…],"values":[…]}`); `antarctic_monitor.db.Store.load_grid("oisst_sst")` decodes it.

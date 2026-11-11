@@ -511,6 +511,23 @@ EN: dict[str, str] = {
     "temperature and salinity. In-situ pressure is not included.",
     "범위는 남극해 수심별 염분 범위(Boyer & Levitus 1994)이고, 넓게 잡혀 있어 큰 오류만 가려냅니다.": "The range is the Southern Ocean "
     "salinity range by depth (Boyer & Levitus 1994). It is broad and catches gross errors only.",
+    "유효 격자 수": "Valid cells",
+    "격자이온": "Grid ions",
+    "격자 이온 환산": "Grid ion conversion",
+    "격자이온 시트는 염분 격자의 60°S 이남 평균과 해역 평균에 같은 계수를 곱한 값. 환산이 염분에 비례하므로 "
+    "칸마다 환산해 평균한 값과 같음. 평균 염분은 소수 셋째 자리까지 저장된 값이고, 짝이 되는 수온이 없어 mmol/L 은 없음": (
+        "The Grid ions sheet multiplies the mean of each salinity grid south of 60°S, and the mean of each sector, "
+        "by the same ratios. The conversion is proportional to salinity, so the result equals converting every cell "
+        "and then averaging. Mean salinity is stored to three decimals, and there is no mmol/L because no paired "
+        "temperature exists"
+    ),
+    "염분 레이어가 아니어서 이온으로 환산할 수 없습니다: {layer}": "Not a salinity layer, so it cannot be converted to ions: {layer}",
+    "표시": "Show",
+    "염분 지도를 염분에서 환산한 이온 농도로 읽습니다. 색은 그대로이고 눈금과 커서 값이 바뀝니다.": "Reads the salinity map as an "
+    "ion concentration derived from salinity. Colors stay the same; the legend ticks and the cursor value change.",
+    "현재 레이어 이온…": "Current layer ions…",
+    "{ion} {unit} = 염분 × {factor} (기준 조성으로 환산, 측정값 아님)": "{ion} {unit} = salinity × {factor} "
+    "(derived from the Reference Composition, not measured)",
 }
 
 

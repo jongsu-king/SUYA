@@ -6,8 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-The ion composition now carries a salinity range check and a volume basis, and the surface values
-of Argo profiles come from the quality-controlled levels.
+The ion composition now carries a salinity range check and a volume basis, the whole-area salinity
+grids are converted to ions as well, and the surface values of Argo profiles come from the
+quality-controlled levels.
 
 ### Added
 
@@ -26,6 +27,23 @@ of Argo profiles come from the quality-controlled levels.
   included, and the cells stay blank without a paired temperature.
 - `suya ions` takes `--temperature` (adds the density at 1 atm and mmol/L) and `--depth` (adds the
   range check); `--json` carries both.
+- **Ion conversion of the whole-area grids.** The salinity grids behind the map (HYCOM salinity at
+  each depth, SMOS, SMAP) are converted with the same factors as the point values.
+  - Map: a *Show* box on the salinity layers reads the map as one of the eight major ions in g/kg
+    or mmol/kg. The colours stay the same; the colour-bar ticks, the cursor value and the caption
+    change.
+  - Workbook: a new sheet, *Grid ions*, with one row per grid time for the whole area south of
+    60°S and for each of the five sectors: valid cells, mean salinity, reference salinity, the
+    eight ions in g/kg and mmol/kg and the range check for the layer depth. The *Info* sheet
+    carries a note on it.
+  - Database: the new view `grid_ions` gives the same rows. Nothing is stored for it; the amounts
+    are computed from `grids` when read.
+  - CSV: `suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv` and the menu entry
+    *File > Export CSV > Current layer ions…* write every cell of the latest grid of a salinity
+    layer with its ions. Other layers are refused.
+  - The conversion is proportional to salinity, so the ions of a mean salinity equal the mean of
+    the cell ions. The stored means have three decimals. There is no mmol/L here, because no
+    paired temperature is used.
 
 ### Fixed
 

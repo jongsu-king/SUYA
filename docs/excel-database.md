@@ -36,7 +36,7 @@ SQLite가 원본이고 엑셀은 그것을 보기 좋게 펼친 사본이라고 
 ## `antarctic_db_YYYY-MM.xlsx` 시트
 
 ### 정보
-기간, 생성 시각(UTC), 시각 기준 안내, 주의 문구, 이온 환산·범위 검사·부피 기준 안내, 시트별 행 수.
+기간, 생성 시각(UTC), 시각 기준 안내, 주의 문구, 이온 환산·범위 검사·부피 기준·격자 이온 환산 안내, 시트별 행 수.
 
 ### 월간요약 — 지점·자료·항목별 한 달 통계
 표층과 2 m 값만 셉니다. 앞날 예보(`kind = forecast`), 깊은 층, 지도에서 클릭한 임의 지점은 뺍니다.
@@ -122,6 +122,25 @@ SQLite `seawater_ions` 표의 그 달 행을 그대로 옮깁니다. 해역 표�
 | Cl⁻ … Br⁻ mmol/L | mmol/kg × 밀도 / 1000. 수온이 없으면 빈 칸 |
 | 범위 검사 | 염분이 그 수심의 남극해 범위를 벗어나면 `낮음`·`높음`. 범위 안이면 빈 칸. 표시일 뿐이고 값은 그대로 둠 |
 
+### 격자이온 — 염분 격자의 해역 평균에서 환산한 이온
+SQLite `grid_ions` 뷰의 그 달 행을 그대로 옮깁니다. 염분 격자(HYCOM 염분의 수심별 레이어, SMOS, SMAP)의 시각마다 60°S 이남 전체 한 행과 해역마다 한 행입니다.
+평균 염분에 같은 계수를 곱한 **환산값**입니다. 환산이 염분에 비례하므로 칸마다 환산해 평균한 값과 같습니다. 칸마다의 값은 `suya export grid-ions`로 받습니다. 식과 한계는 [데이터 출처 11절](data-sources.md#11-염분에서-환산하는-이온-조성)에 있습니다.
+
+| 열 | 설명 |
+|---|---|
+| 시각 UTC | 격자의 자료 시각 |
+| 레이어 | `hycom_salt_<수심>`, `smos_sss`, `smap_sss` |
+| 해역 | `남극해 전체 (60°S 이남)` 또는 해역 5곳(웨델해, 인도양, 서태평양, 로스해, 아문젠·벨링스하우젠해). 평균이 없는 해역은 행이 없습니다 |
+| 수심 m | 레이어의 수심. 위성 염분은 0 |
+| 유효 격자 수 | 60°S 이남에서 값이 있는 칸 수. 해역 행은 그 해역 안의 칸 수 |
+| 염분 PSU | 그 해역의 가중 평균 염분(`격자평균` 시트와 같은 값, 소수 셋째 자리) |
+| 기준 염분 g/kg | S_R = (35.16504 / 35) × S_P |
+| Cl⁻ … Br⁻ g/kg | 주요 이온 여덟 가지. 바닷물 1 kg 기준 |
+| Cl⁻ … Br⁻ mmol/kg | 같은 여덟 가지의 물질량 |
+| 범위 검사 | 평균 염분이 레이어 수심의 남극해 범위를 벗어나면 `낮음`·`높음`. 범위 안이면 빈 칸 |
+
+짝이 되는 수온을 쓰지 않으므로 밀도와 mmol/L 열은 없습니다.
+
 ### 이온환산계수 — 환산에 쓴 기준 조성
 성분 열다섯 가지의 기호, 전하, 몰질량, 질량 비율 %, 염분 1당 g/kg·mmol/kg, 염분 35에서의 g/kg·mmol/kg.
 `DB 열`이 채워진 여덟 행이 DB와 엑셀에 쌓이는 성분입니다. 이 시트의 계수에 염분을 곱하면 어느 값이든 다시 계산할 수 있습니다.
@@ -173,7 +192,7 @@ library(DBI); con <- dbConnect(RSQLite::SQLite(), "~/Documents/../Library/Applic
 dbGetQuery(con, "SELECT * FROM measurements WHERE variable='sea_water_temperature' LIMIT 10")
 ```
 
-이온 환산값은 표 하나와 뷰 둘로 읽습니다: `seawater_ions`(g/kg, 염분 행마다 한 행), `seawater_ions_mmol`(mmol/kg), `argo_level_ions`(Argo 층별, g/kg). 범위 검사 결과는 `seawater_ions`와 `argo_level_ions`의 `salinity_check` 열(`ok`·`low`·`high`)입니다. 밀도와 mmol/L은 DB에 없고 엑셀과 `suya export ions`가 계산합니다.
-CSV가 필요하면 `suya export ions --out ions.csv`, `suya export argo-ions --out argo_ions.csv`를 씁니다.
+이온 환산값은 표 하나와 뷰 셋으로 읽습니다: `seawater_ions`(g/kg, 염분 행마다 한 행), `seawater_ions_mmol`(mmol/kg), `argo_level_ions`(Argo 층별, g/kg), `grid_ions`(염분 격자의 60°S 이남 평균과 해역 평균, g/kg·mmol/kg). 범위 검사 결과는 `seawater_ions`, `argo_level_ions`, `grid_ions`의 `salinity_check` 열(`ok`·`low`·`high`)입니다. 밀도와 mmol/L은 DB에 없고 엑셀과 `suya export ions`가 계산합니다.
+CSV가 필요하면 `suya export ions --out ions.csv`, `suya export argo-ions --out argo_ions.csv`를 쓰고, 염분 격자 칸마다의 값은 `suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv`로 받습니다.
 
 `grids` 표의 `payload`는 gzip으로 압축한 JSON(`{"lats":[…],"lons":[…],"values":[…]}`)이며 `antarctic_monitor.db.Store.load_grid("oisst_sst")`로 풀 수 있습니다.

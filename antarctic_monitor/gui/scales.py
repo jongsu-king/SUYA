@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from pathlib import Path
 
@@ -21,11 +21,15 @@ def _tables() -> dict[str, np.ndarray]:
 
 @dataclass
 class Scale:
+    """색은 domain 으로 정합니다. factor 는 눈금과 커서 값을 다른 양으로 읽을 때만 곱하고, legend 는 범례 옆에 쓰는 글자입니다."""
+
     kind: str
     domain: tuple[float, ...]
     digits: int
     unit: str
     lut: np.ndarray
+    factor: float = 1.0
+    legend: str = ""
 
     def to_unit(self, values: np.ndarray) -> np.ndarray:
         if len(self.domain) == 3:
@@ -65,10 +69,22 @@ def build_scale(kind: str, stats: dict | None, unit: str) -> Scale:
     return Scale(kind, (0.0, 1.0), 2, unit, tables["ice"])
 
 
+def rescale(scale: Scale, factor: float, unit: str, legend: str = "") -> Scale:
+    """같은 색과 범위를 다른 양으로 읽는 척도. 염분에 비례하는 이온 농도를 염분 지도에서 읽을 때 씁니다.
+
+    자릿수는 범위 폭의 백분의 일까지 보이게 잡습니다.
+    """
+    span = abs(scale.domain[-1] - scale.domain[0]) * abs(factor)
+    digits = max(scale.digits, 2 - math.floor(math.log10(span))) if span > 0 else scale.digits
+    return replace(scale, factor=factor, unit=unit, legend=legend, digits=digits)
+
+
 def legend_ticks(scale: Scale) -> list[tuple[float, float]]:
-    """(0~1 위치, 값) 목록."""
+    """(0~1 위치, 보여 줄 값) 목록."""
     if len(scale.domain) == 3:
         low, middle, high = scale.domain
-        return [(0.0, low), (0.25, (low + middle) / 2), (0.5, middle), (0.75, (middle + high) / 2), (1.0, high)]
-    low, high = scale.domain
-    return [(at, low + (high - low) * at) for at in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        ticks = [(0.0, low), (0.25, (low + middle) / 2), (0.5, middle), (0.75, (middle + high) / 2), (1.0, high)]
+    else:
+        low, high = scale.domain
+        ticks = [(at, low + (high - low) * at) for at in (0.0, 0.25, 0.5, 0.75, 1.0)]
+    return [(at, value * scale.factor) for at, value in ticks]

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Iterable, Iterator
 
 from . import composition, ranges, seawater
-from .gridutil import Grid, grid_stats
+from .gridutil import SECTORS, Grid, grid_stats
 
 log = logging.getLogger(__name__)
 
@@ -114,10 +114,23 @@ ARGO_ION_COLUMNS = (
     "platform", "cycle", "obs_time", "lat", "lon", "data_mode", "pressure_dbar", "depth_m", "temperature_c",
     "practical_salinity", "reference_salinity", *ION_GRAM_COLUMNS, ION_CHECK,
 )
+GRID_SALINITY_UNIT = "PSU"
+GRID_DEPTH_PREFIX = "hycom_salt_"
+GRID_ALL = "all"
+GRID_AREAS = (GRID_ALL, *(sector[0] for sector in SECTORS))
+GRID_ION_COLUMNS = (
+    "layer", "valid_time", "area", "depth_m", "valid_cells", "practical_salinity", "reference_salinity",
+    *ION_GRAM_COLUMNS, *ION_MMOL_COLUMNS, ION_CHECK,
+)
+GRID_CELL_ION_COLUMNS = (
+    "valid_time", "lat", "lon", "depth_m", "practical_salinity", "reference_salinity",
+    *ION_GRAM_COLUMNS, *ION_MMOL_COLUMNS, ION_CHECK,
+)
 ION_METHOD_KEY = "ions:method"
 ION_CHECK_KEY = "ions:check"
 ION_OBJECTS = (
     "seawater_ions_insert", "seawater_ions_update", "seawater_ions_delete", "seawater_ions_mmol", "argo_level_ions",
+    "grid_ions",
 )
 
 ION_SCHEMA = f"""
@@ -157,6 +170,19 @@ def _ion_select(row: str) -> str:
 
 def _ion_match(row: str) -> str:
     return " AND ".join(f"{name} = {row}.{name}" for name in ION_KEY)
+
+
+def grid_depth(layer: str) -> float:
+    """염분 격자 레이어의 수심(m). HYCOM 층은 이름 끝의 숫자가 수심이고, 위성 표층 염분 레이어는 0 입니다."""
+    tail = layer[len(GRID_DEPTH_PREFIX):] if layer.startswith(GRID_DEPTH_PREFIX) else ""
+    return float(tail) if tail.isdigit() else 0.0
+
+
+def _grid_depth_sql(layer: str) -> str:
+    """grid_depth 와 같은 규칙을 SQL 식으로 적은 것. 레이어 이름만 보므로 수심 목록이 바뀌어도 그대로 맞습니다."""
+    size = len(GRID_DEPTH_PREFIX)
+    tail = f"CAST(substr({layer}, {size + 1}) AS REAL)"
+    return f"CASE WHEN substr({layer}, 1, {size}) = '{GRID_DEPTH_PREFIX}' THEN {tail} ELSE 0.0 END"
 
 
 ION_INSERT = f"INSERT INTO seawater_ions ({', '.join(ION_COLUMNS)}, {ION_CHECK})"
@@ -201,6 +227,25 @@ ION_CREATES = (
                    json_extract(l.value, '$.temp') AS temperature_c,
                    json_extract(l.value, '$.salt') AS salt
             FROM argo_profiles AS p, json_each(p.levels_json) AS l
+        )
+        WHERE salt > 0""",
+    f"""CREATE VIEW grid_ions AS
+        SELECT layer, valid_time, area, depth_m, valid_cells, salt AS practical_salinity,
+               salt * {composition.REFERENCE_SALINITY_FACTOR!r} AS reference_salinity,
+               {_ion_factors("salt")}, {_ion_factors("salt", mmol=True)},
+               {ranges.sql_check("salt", "depth_m")} AS {ION_CHECK}
+        FROM (
+            SELECT g.layer AS layer, g.valid_time AS valid_time, '{GRID_ALL}' AS area,
+                   {_grid_depth_sql("g.layer")} AS depth_m,
+                   json_extract(g.stats_json, '$.valid_cells') AS valid_cells,
+                   json_extract(g.stats_json, '$.mean') AS salt
+            FROM grids AS g
+            WHERE g.unit = '{GRID_SALINITY_UNIT}'
+            UNION ALL
+            SELECT g.layer, g.valid_time, s.key, {_grid_depth_sql("g.layer")},
+                   json_extract(s.value, '$.valid_cells'), json_extract(s.value, '$.mean')
+            FROM grids AS g, json_each(g.stats_json, '$.sectors') AS s
+            WHERE g.unit = '{GRID_SALINITY_UNIT}'
         )
         WHERE salt > 0""",
 )
@@ -289,8 +334,8 @@ class Store:
     def _ensure_ions(self) -> None:
         """염분 행마다 이온 환산값이 seawater_ions 에 쌓이게 트리거와 뷰를 두고, 이미 있던 염분 행을 채웁니다.
 
-        환산 방식(composition.METHOD)이나 범위 검사 기준(ranges.SOURCE)이 바뀌었거나 트리거가 없을 때만 한 번
-        다시 계산합니다. 이전 버전이 만든 표에는 범위 검사 열을 덧붙입니다.
+        환산 방식(composition.METHOD)이나 범위 검사 기준(ranges.SOURCE)이 바뀌었거나 트리거·뷰 가운데 빠진 것이
+        있을 때만 한 번 다시 계산합니다. 이전 버전이 만든 표에는 범위 검사 열을 덧붙입니다.
         다른 프로세스가 DB 를 쓰는 중이라 잠금을 얻지 못하면 다음에 열 때 다시 시도합니다.
         """
         with self._lock:
@@ -520,6 +565,30 @@ class Store:
     def count_argo_level_ions(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM argo_level_ions").fetchone()[0]
+
+    def iter_grid_ions(
+        self, *, since: str | None = None, until: str | None = None, layer: str | None = None
+    ) -> Iterator[dict]:
+        """염분 격자의 60°S 이남 평균과 해역 평균에서 환산한 이온 조성. grid_ions 뷰를 읽습니다.
+
+        환산이 염분에 비례하므로 평균 염분에 계수를 곱한 값은 칸마다 환산한 뒤 평균한 값과 같습니다.
+        시각, 레이어, 해역(전체가 먼저, 그다음 SECTORS 순) 순으로 돌려줍니다.
+        """
+        clauses, params = [], []
+        for column, value, op in (("valid_time", since, ">="), ("valid_time", until, "<="), ("layer", layer, "=")):
+            if value is not None:
+                clauses.append(f"{column} {op} ?")
+                params.append(value)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._lock:
+            rows = self._conn.execute(f"SELECT * FROM grid_ions {where}", params).fetchall()
+        order = {area: index for index, area in enumerate(GRID_AREAS)}
+        for row in sorted(rows, key=lambda r: (r["valid_time"], r["layer"], order.get(r["area"], len(order)))):
+            yield dict(row)
+
+    def count_grid_ions(self) -> int:
+        with self._lock:
+            return self._conn.execute("SELECT COUNT(*) FROM grid_ions").fetchone()[0]
 
     def location_stats(
         self, since: str, until: str, sources: tuple[str, ...], variables: tuple[str, ...]

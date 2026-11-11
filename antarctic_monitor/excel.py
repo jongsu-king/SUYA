@@ -26,6 +26,7 @@ from . import composition, ranges
 from .collectors.base import CollectResult, Context
 from .collectors.openmeteo import MODELS
 from .db import (
+    GRID_ALL,
     ION_CHECK,
     ION_DENSITY,
     ION_GRAM_COLUMNS,
@@ -77,6 +78,11 @@ RANGE_NOTE = (
 VOLUME_NOTE = (
     "mmol/L 과 밀도는 같은 자료·위치·층·시각의 수온이 있는 행만 계산. 밀도는 그 수온과 염분의 1기압 값이고 현장 압력은 넣지 않음"
 )
+GRID_ION_NOTE = (
+    "격자이온 시트는 염분 격자의 60°S 이남 평균과 해역 평균에 같은 계수를 곱한 값. 환산이 염분에 비례하므로 "
+    "칸마다 환산해 평균한 값과 같음. 평균 염분은 소수 셋째 자리까지 저장된 값이고, 짝이 되는 수온이 없어 mmol/L 은 없음"
+)
+GRID_AREA_LABELS = {GRID_ALL: "남극해 전체 (60°S 이남)", **{key: name for key, name, *_ in SECTORS}}
 
 
 def parse_time(text: str) -> datetime:
@@ -185,6 +191,7 @@ def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
         "Windy": _sheet_windy(book, store, start, until),
         "지점조회": _sheet_points(book, store, start, until),
         "이온조성": _sheet_ions(book, store, start, until),
+        "격자이온": _sheet_grid_ions(book, store, start, until),
         "이온환산계수": _sheet_ion_factors(book),
         "염분범위": _sheet_ranges(book),
     }
@@ -198,6 +205,7 @@ def write_main_workbook(store: Store, path: Path, month: str) -> dict[str, int]:
         ("이온 환산", tr(ION_NOTE)),
         ("범위 검사", tr(RANGE_NOTE)),
         ("부피 기준", tr(VOLUME_NOTE)),
+        ("격자 이온 환산", tr(GRID_ION_NOTE)),
     )
     for index, (label, value) in enumerate(rows):
         info.write_string(index, 0, tr(label), book.header)
@@ -447,6 +455,29 @@ def _sheet_ions(book: Book, store: Store, start: str, until: str) -> int:
                 *[round(row[column], 4) for column in ION_MMOL_COLUMNS],
                 row["temperature_c"], _rounded(row[ION_DENSITY], 3),
                 *[_rounded(row[column], 4) for column in ION_LITRE_COLUMNS],
+                _check_cell(row[ION_CHECK]),
+            ]
+        )
+    return sheet.finish()
+
+
+def _sheet_grid_ions(book: Book, store: Store, start: str, until: str) -> int:
+    """염분 격자의 60°S 이남 평균과 해역 평균에서 환산한 이온 조성. DB의 grid_ions 뷰를 그대로 옮깁니다.
+
+    평균 염분에 계수를 곱한 값이고, 범위 검사는 그 층의 수심으로 봅니다.
+    """
+    sheet = Sheet(
+        book, "격자이온",
+        [("시각 UTC", 17), ("레이어", 16), ("해역", 22), ("수심 m", 8), ("유효 격자 수", 11), ("염분 PSU", 9),
+         ("기준 염분 g/kg", 13), *ION_GRAM_HEADERS, *ION_MMOL_HEADERS, ("범위 검사", 9)],
+    )
+    for row in store.iter_grid_ions(since=start, until=until):
+        sheet.add(
+            [
+                parse_time(row["valid_time"]), row["layer"], tr(GRID_AREA_LABELS.get(row["area"], row["area"])),
+                row["depth_m"], row["valid_cells"], row["practical_salinity"], round(row["reference_salinity"], 4),
+                *[round(row[column], 5) for column in ION_GRAM_COLUMNS],
+                *[round(row[column], 4) for column in ION_MMOL_COLUMNS],
                 _check_cell(row[ION_CHECK]),
             ]
         )

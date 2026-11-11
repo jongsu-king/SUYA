@@ -111,11 +111,12 @@ def _export(args: argparse.Namespace) -> None:
         count = exporter.export_argo_ions(store, out, args.since)
     else:
         if not args.layer:
-            raise SystemExit("--layer is required for grid, e.g. --layer hycom_salt_0")
+            raise SystemExit(f"--layer is required for {args.what}, e.g. --layer hycom_salt_0")
+        function = exporter.export_grid_ions if args.what == "grid-ions" else exporter.export_grid
         try:
-            count = exporter.export_grid(store, args.layer, out)
+            count = function(store, args.layer, out)
         except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
+            raise SystemExit(render(str(exc))) from exc
     store.close()
     print(f"{out}: {count} rows")
 
@@ -337,12 +338,14 @@ def main(argv: list[str] | None = None) -> None:
     collect.add_argument("--sources", help="collect only these sources (comma separated)")
 
     export = sub.add_parser("export", help="export stored data to CSV")
-    export.add_argument("what", choices=["measurements", "argo", "grid", "ions", "argo-ions"])
+    export.add_argument("what", choices=["measurements", "argo", "grid", "ions", "argo-ions", "grid-ions"])
     export.add_argument("--out", required=True)
     export.add_argument("--source")
     export.add_argument("--variable")
     export.add_argument("--since")
-    export.add_argument("--layer", help="layer for grid, e.g. hycom_salt_0, oisst_sst")
+    export.add_argument(
+        "--layer", help="layer for grid and grid-ions, e.g. hycom_salt_0, oisst_sst (grid-ions takes salinity layers)"
+    )
 
     ions = sub.add_parser("ions", help="convert a practical salinity to seawater ion amounts (derived, not measured)")
     ions.add_argument("salinity", type=float, help="practical salinity, e.g. 34.5")
