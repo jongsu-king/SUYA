@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-12
+
+This release makes the update check dependable: a check that failed is repeated within minutes,
+an interrupted download continues where it stopped, and nothing is installed without a SHA-256.
+It also adds `suya update-check` and shows the last check in the Settings dialog. Concept DOI for
+all versions: 10.5281/zenodo.23937852.
+
 ### Added
 
 - **`suya update-check`.** Prints this program's version, the latest release, whether it is newer

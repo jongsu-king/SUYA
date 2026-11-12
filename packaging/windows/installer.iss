@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "0.1.9"
+  #define AppVersion "0.1.10"
 #endif
 #define AppName "SUYA"
 #define AppPublisher "Jongsu Lim, Suyeon Park (Incheon National University)"
