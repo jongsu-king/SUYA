@@ -567,7 +567,7 @@ If SUYA helps in a publication, cite the **data providers** (they did the hard p
 | DOI | Use it for |
 |---|---|
 | [10.5281/zenodo.23937852](https://doi.org/10.5281/zenodo.23937852) | **concept DOI** — all versions; always resolves to the latest archived release. Use it unless the exact version matters |
-| *version DOI of 0.1.10* | issued by Zenodo when it archives the 0.1.10 release and added here afterwards |
+| [10.5281/zenodo.24157651](https://doi.org/10.5281/zenodo.24157651) | version 0.1.10 |
 | [10.5281/zenodo.24149153](https://doi.org/10.5281/zenodo.24149153) | version 0.1.9 |
 | [10.5281/zenodo.24131554](https://doi.org/10.5281/zenodo.24131554) | version 0.1.8 |
 | [10.5281/zenodo.24123936](https://doi.org/10.5281/zenodo.24123936) | version 0.1.7 |

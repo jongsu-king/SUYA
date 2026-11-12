@@ -34,6 +34,9 @@ identifiers:
     value: 10.5281/zenodo.23937852
     description: "Concept DOI for all versions of SUYA; always resolves to the latest release"
   - type: doi
+    value: 10.5281/zenodo.24157651
+    description: "Version DOI for SUYA 0.1.10"
+  - type: doi
     value: 10.5281/zenodo.24149153
     description: "Version DOI for SUYA 0.1.9"
   - type: doi
