@@ -24,8 +24,8 @@ authors:
     given-names: Suyeon
     email: dbsnt110@inu.ac.kr
     affiliation: "Clean Energy and Materials Lab (CELLMATE), Department of Materials Science and Engineering, Incheon National University"
-version: 0.1.8
-date-released: 2026-11-11
+version: 0.1.9
+date-released: 2026-11-12
 # The concept DOI always resolves to the latest archived release, so this file never goes
 # stale between releases. The DOI of each archived version is listed under identifiers.
 doi: 10.5281/zenodo.23937852
