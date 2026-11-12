@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
+from pathlib import Path
 from urllib.parse import urlparse
 
 import httpx
@@ -114,24 +116,45 @@ class Fetcher:
             raise FetchError(f"HTTP {response.status_code}: {_short_body(response)}")
         return response.json()
 
-    async def download(self, url: str, path, *, timeout: float = 900.0, progress=None, interactive: bool = True):
-        """큰 파일을 조각으로 받아 path에 씁니다. progress(받은 바이트, 전체 바이트)를 조각마다 부릅니다."""
+    async def download(
+        self, url: str, path, *, timeout: float = 900.0, progress=None, interactive: bool = True, resume: bool = False
+    ):
+        """큰 파일을 조각으로 받아 path에 씁니다. progress(받은 바이트, 전체 바이트)를 조각마다 부릅니다.
+
+        resume=True이고 path에 받다 만 부분이 있으면 Range 요청으로 그 뒤부터 이어 받습니다. 서버가 범위를 받아 주지
+        않으면 처음부터 다시 받습니다. 전송이 끊기면 받은 부분은 path에 남습니다.
+        """
+        path = Path(path)
+        offset = path.stat().st_size if resume and path.exists() else 0
         try:
-            async with self._semaphore(url, interactive):
-                async with self._client.stream("GET", url, timeout=timeout) as response:
-                    if response.status_code >= 400:
-                        raise FetchError(f"HTTP {response.status_code}")
-                    total = int(response.headers.get("content-length") or 0)
-                    received = 0
-                    with open(path, "wb") as handle:
-                        async for chunk in response.aiter_bytes(1 << 16):
-                            handle.write(chunk)
-                            received += len(chunk)
-                            if progress:
-                                progress(received, total)
+            while True:
+                headers = {"Range": f"bytes={offset}-"} if offset else None
+                async with self._semaphore(url, interactive):
+                    async with self._client.stream("GET", url, timeout=timeout, headers=headers) as response:
+                        status = response.status_code
+                        if offset and (status == 416 or (status == 206 and _range_start(response) != offset)):
+                            offset = 0
+                            continue
+                        if status >= 400:
+                            raise FetchError(f"HTTP {status}")
+                        received = offset if status == 206 else 0
+                        length = int(response.headers.get("content-length") or 0)
+                        total = received + length if length else 0
+                        with open(path, "ab" if received else "wb") as handle:
+                            async for chunk in response.aiter_bytes(1 << 16):
+                                handle.write(chunk)
+                                received += len(chunk)
+                                if progress:
+                                    progress(received, total)
+                        return path
         except (httpx.TimeoutException, httpx.TransportError) as exc:
             raise FetchError(f"{urlparse(url).netloc}: {type(exc).__name__}") from exc
-        return path
+
+
+def _range_start(response: httpx.Response) -> int | None:
+    """206 응답의 Content-Range가 알려 주는 첫 바이트 위치."""
+    found = re.match(r"bytes (\d+)-", response.headers.get("content-range") or "")
+    return int(found.group(1)) if found else None
 
 
 def _short_body(response: httpx.Response, limit: int = 200) -> str:

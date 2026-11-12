@@ -104,10 +104,11 @@ building a personal time series of Southern Ocean salinity, or simply having a l
 | **macOS** | Open the `.dmg`, drag **SUYA** to *Applications*, eject the disk image. Uninstall by moving the app to the Trash. |
 | **Linux** | `tar xzf SUYA-<version>-linux-x86_64.tar.gz && cd SUYA-<version>-linux-x86_64 && ./install.sh`. Installs to `~/.local/opt/suya`, links `~/.local/bin/suya`, adds a menu entry. Uninstall: delete those three things. |
 
-**Updating**: SUYA checks GitHub for a new release 15 seconds after it starts and once a day. Since 0.1.5 the default is fully
+**Updating**: SUYA checks GitHub for a new release 15 seconds after it starts and every 6 hours (once a day up to 0.1.9); a check
+that fails is repeated after 10 minutes, 30 minutes and 1 hour, then every 2 hours until one succeeds. Since 0.1.5 the default is fully
 automatic: the installer for your system is downloaded, verified against the release's `SHA256SUMS.txt`, installed, and SUYA
 restarts, with a 20-second prompt that lets you postpone. *Settings ▸ Updates* switches to *ask first* or *off* (a choice saved
-there is kept across updates). Installing a
+there is kept across updates) and shows when the last check ran and what it found. Installing a
 new version by hand over the old one also works. Your database, settings and workbooks live in your user folders (section 7) and are untouched.
 
 ### 2-2. First-run warnings
@@ -221,7 +222,7 @@ Per-source status, interval, data time, age, last run, countdown to the next run
 
 | Menu | Action |
 |---|---|
-| File > Settings… (Ctrl+,) | Windy API key and tier, Excel folder, update mode, database path (read-only) |
+| File > Settings… (Ctrl+,) | Windy API key and tier, Excel folder, update mode and the result of the last update check, database path (read-only) |
 | File > Save Excel database now | Rewrite the workbooks without waiting 15 minutes |
 | File > Open Excel folder / Open data folder | In Explorer / Finder / your file manager |
 | File > Export CSV | All measurements / all Argo levels / current map layer / current layer ions (derived ions of every cell of a salinity layer) |
@@ -367,7 +368,7 @@ Use `File > Settings`, or set these as **environment variables**, in a **`.env`*
 | `MONITOR_EXCEL_DIR` | `Documents/SUYA` | Excel folder |
 | `MONITOR_INTERVAL_<SOURCE_ID>` | see section 5 | Seconds, minimum 30, e.g. `MONITOR_INTERVAL_HYCOM_GRID=7200` |
 | `MONITOR_OPENMETEO_DAILY_BUDGET` | `9000` | Daily Open-Meteo call cap (the free limit is 10,000) |
-| `MONITOR_UPDATE_MODE` | `auto` | `auto` (default since 0.1.5: check daily; a newer release is downloaded, verified against `SHA256SUMS.txt`, installed and the program restarts - a 20-second prompt lets you postpone), `notify` (check daily, ask before installing), `off` (never check). A choice saved in Settings is kept |
+| `MONITOR_UPDATE_MODE` | `auto` | `auto` (default since 0.1.5: check every 6 hours; a newer release is downloaded, verified against `SHA256SUMS.txt`, installed and the program restarts - a 20-second prompt lets you postpone), `notify` (check every 6 hours, ask before installing), `off` (never check). A choice saved in Settings is kept |
 
 `settings.env` is written with owner-only permissions because it may contain the Windy key.
 
@@ -392,6 +393,7 @@ suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv                 
 suya ions 34.5                    # convert one salinity to its ion composition. --json for machine-readable output
 suya ions 34.5 --temperature -1.2 --depth 100   # also density at 1 atm, mmol/L and the salinity range check
 suya sources                      # list the sources
+suya update-check                 # look up the latest release and say whether it is newer; nothing is installed. Exit code 1 when the check failed
 suya self-test                    # installation check: opens a window off-screen and writes a workbook
 suya --version
 ```
@@ -464,7 +466,8 @@ month and are kept. Excel workbooks are 2–20 MB per month.
 
 **Privacy.** SUYA contacts only the data hosts listed in section 5, sends only coordinates and dataset names, and sends nothing about you.
 There is no telemetry and no account. The only other connection is the update check: unless you set it to *off* in Settings,
-SUYA asks `api.github.com` once a day for the latest release number (a plain HTTPS request carrying no personal data) and downloads an
+SUYA asks `api.github.com` every 6 hours for the latest release number, or reads it from the release page on `github.com` when
+that fails (plain HTTPS requests carrying no personal data), and downloads an
 installer from `github.com` only when you accept, or when you chose automatic updates; every download is verified against the
 release's SHA-256 list. The Windy key, if you enter one, stays in your local `settings.env`. The log file
 (`monitor.log`, 2 MB × 3 rotating) records collection results and errors, nothing else.
@@ -521,7 +524,7 @@ tests on every push on Linux and Windows with Python 3.11–3.13 and on macOS wi
 
 ```
 antarctic_monitor/        Python package (CLI name: suya)
-├── cli.py                commands: gui, daemon, collect, export, excel-sync, ions, sources, self-test
+├── cli.py                commands: gui, daemon, collect, export, excel-sync, ions, sources, update-check, self-test
 ├── engine.py             scheduler: intervals, back-off, rate limits, persisted schedule, event bus
 ├── collectors/           one module per data service (erddap, hycom, argo, gosud, osmc, openmeteo, metar, windy, woa)
 ├── db.py                 SQLite store

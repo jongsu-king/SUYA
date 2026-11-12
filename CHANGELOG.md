@@ -6,6 +6,46 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **`suya update-check`.** Prints this program's version, the latest release, whether it is newer
+  and the link of the release. Nothing is downloaded or installed, and the exit code is 1 when the
+  check failed.
+- **The last update check in the Settings dialog.** A line shows when the last check ran, what it
+  found (up to date, a new version, or the reason it failed) and when the next automatic check
+  is due.
+- **The update check is written to the log.** `monitor.log` records the latest release each check
+  found, or the reason of a failure with the time of the next attempt.
+
+### Changed
+
+- **A failed update check is repeated soon.** Until now a check that failed was not repeated for a
+  day and left no trace, so a copy that met GitHub's request limit at each daily check stayed on
+  its old version. A failed check is now repeated after 10 minutes, then after 30 minutes, 1 hour
+  and 2 hours, and every 2 hours after that until one succeeds; from the third failure in a row on,
+  the status bar says so. Successful checks are 6 hours apart, no longer a day, and the schedule
+  is compared with the clock every minute, so a computer that slept through a check catches up
+  when it wakes.
+- **The release page answers whenever the API does not.** The version was read from the release
+  page only when GitHub's request limit was reached. It is now read from there after a server
+  error, a failed connection or an answer that cannot be read as well.
+- **An interrupted download continues where it stopped.** A download is tried up to three times and
+  each try asks for the rest of the file (HTTP `Range`). The part already received is kept while
+  the program runs, so the next check continues from it. A connection that stays silent for 60
+  seconds counts as broken (15 minutes before). A file put together from parts whose SHA-256 is
+  wrong is downloaded once more from the start, and an installer that was already downloaded and
+  verified is not downloaded again when its installation is tried again.
+- **Nothing is installed without a SHA-256.** A file that `SHA256SUMS.txt` did not list was
+  installed unchecked. The update now stops with "The release's SHA-256 list has no entry for this
+  file" before the installer is downloaded.
+- **macOS: a copy that cannot replace itself says so before downloading.** A copy running from a
+  temporary location (opened from the Downloads folder without being moved) or from a folder that
+  is not writable (opened from the disk image) downloaded the whole disk image at every check and
+  failed afterwards. It now names the reason and asks whether to open the download page.
+- **The question about the download page is asked once.** A copy that cannot update itself, for
+  example one installed with pip, asked at every automatic check. It now asks once for each
+  version while the program runs; *Help ▸ Check for updates…* still asks every time.
+
 ## [0.1.9] - 2026-11-12
 
 This release fixes the "Unhandled exception in script" window that could appear on Windows

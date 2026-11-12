@@ -101,9 +101,11 @@
 | **macOS** | `.dmg`를 열고 **SUYA**를 *응용 프로그램*으로 끌어 놓은 뒤 디스크 이미지를 추출합니다. 제거는 앱을 휴지통으로. |
 | **Linux** | `tar xzf SUYA-<버전>-linux-x86_64.tar.gz && cd SUYA-<버전>-linux-x86_64 && ./install.sh`. `~/.local/opt/suya`에 설치, `~/.local/bin/suya` 링크, 메뉴 항목 등록. 제거는 그 셋을 지우면 됩니다. |
 
-**업데이트**: SUYA는 시작 15초 뒤와 하루 한 번 GitHub에서 새 릴리스를 확인합니다. 0.1.5부터 기본값은 완전 자동입니다:
+**업데이트**: SUYA는 시작 15초 뒤와 6시간마다(0.1.9까지는 하루 한 번) GitHub에서 새 릴리스를 확인합니다. 확인이 실패하면
+10분, 30분, 1시간 뒤에, 그다음부터는 성공할 때까지 2시간마다 다시 확인합니다. 0.1.5부터 기본값은 완전 자동입니다:
 이 컴퓨터용 설치 파일을 내려받아 릴리스의 `SHA256SUMS.txt`와 대조하고, 설치한 뒤 다시 시작합니다(20초 안에 미룰 수 있음).
-*설정 ▸ 업데이트*에서 *먼저 물어보기*나 *확인하지 않음*으로 바꿀 수 있고, 거기서 저장한 선택은 업데이트 뒤에도 유지됩니다. 새 버전을 손으로 그 위에
+*설정 ▸ 업데이트*에서 *먼저 물어보기*나 *확인하지 않음*으로 바꿀 수 있고, 거기서 저장한 선택은 업데이트 뒤에도 유지됩니다.
+같은 창에 마지막 확인 시각과 결과가 나옵니다. 새 버전을 손으로 그 위에
 설치해도 됩니다. 데이터베이스·설정·엑셀은 사용자 폴더(7장)에 있어 건드리지 않습니다.
 
 ### 2-2. 처음 실행 때 나오는 경고
@@ -215,7 +217,7 @@ python -m antarctic_monitor
 
 | 메뉴 | 동작 |
 |---|---|
-| 파일 > 설정… (Ctrl+,) | Windy API 키·종류, 엑셀 저장 폴더, 업데이트 방식, 데이터베이스 경로(읽기 전용) |
+| 파일 > 설정… (Ctrl+,) | Windy API 키·종류, 엑셀 저장 폴더, 업데이트 방식과 마지막 업데이트 확인 결과, 데이터베이스 경로(읽기 전용) |
 | 파일 > 엑셀 DB 지금 저장 | 15분을 기다리지 않고 바로 엑셀을 다시 씀 |
 | 파일 > 엑셀 폴더 열기 / 데이터 폴더 열기 | 탐색기·Finder·파일 관리자로 열기 |
 | 파일 > CSV 내보내기 | 측정값 전체 / Argo 전 층 / 현재 지도 레이어 / 현재 레이어 이온(염분 레이어의 칸마다 환산한 이온) |
@@ -351,7 +353,7 @@ SUYA가 돌아가는 중에도 파이썬, R, [DB Browser for SQLite](https://sql
 | `MONITOR_EXCEL_DIR` | `문서/SUYA` | 엑셀 저장 폴더 |
 | `MONITOR_INTERVAL_<소스ID 대문자>` | 5장의 주기 | 초 단위, 최소 30. 예: `MONITOR_INTERVAL_HYCOM_GRID=7200` |
 | `MONITOR_OPENMETEO_DAILY_BUDGET` | `9000` | Open-Meteo 하루 호출 상한(무료 한도 10,000) |
-| `MONITOR_UPDATE_MODE` | `auto` | `auto`(0.1.5부터 기본값: 하루 한 번 확인하고, 새 버전이 있으면 내려받아 `SHA256SUMS.txt`와 대조한 뒤 설치하고 다시 시작. 20초 안에 미룰 수 있음), `notify`(하루 한 번 확인, 설치 전에 물어봄), `off`(확인 안 함). 설정 창에서 저장한 선택은 그대로 유지 |
+| `MONITOR_UPDATE_MODE` | `auto` | `auto`(0.1.5부터 기본값: 6시간마다 확인하고, 새 버전이 있으면 내려받아 `SHA256SUMS.txt`와 대조한 뒤 설치하고 다시 시작. 20초 안에 미룰 수 있음), `notify`(6시간마다 확인, 설치 전에 물어봄), `off`(확인 안 함). 설정 창에서 저장한 선택은 그대로 유지 |
 
 `settings.env`에는 Windy 키가 들어갈 수 있어 소유자만 읽을 수 있는 권한으로 저장합니다.
 
@@ -375,6 +377,7 @@ suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv                 
 suya ions 34.5                    # 염분 하나를 이온 조성으로 환산. --json: 기계가 읽는 출력
 suya ions 34.5 --temperature -1.2 --depth 100   # 1기압 밀도, mmol/L, 염분 범위 검사까지
 suya sources                      # 소스 목록
+suya update-check                 # 최신 릴리스를 찾아 새 버전인지 알려 줌. 설치하지 않음. 확인에 실패하면 종료 코드 1
 suya self-test                    # 설치 점검: 창을 화면 밖에 띄워 보고 엑셀을 써 봄
 suya --version
 ```
@@ -439,8 +442,8 @@ Open-Meteo는 스스로 정한 하루 9,000 호출 상한 안에 머뭅니다(�
 데이터베이스는 몇 주 뒤 100~200 MB 선에서 안정되고, Argo 층별 값은 한 달에 몇 MB씩 늘며 계속 보관됩니다. 엑셀은 한 달에 2~20 MB입니다.
 
 **개인정보.** SUYA는 5장에 적은 데이터 호스트에만 접속하고 좌표와 데이터셋 이름만 보내며, 사용자에 관한 정보는 아무것도 보내지 않습니다.
-원격 측정과 계정이 없습니다. 그 밖의 연결은 업데이트 확인뿐입니다. 설정에서 *확인하지 않음*으로 두지 않는 한 SUYA는 하루 한 번
-`api.github.com`에 최신 릴리스 번호를 묻고(개인정보가 들어가지 않는 일반 HTTPS 요청), 사용자가 수락했거나 자동 업데이트를 골랐을 때만
+원격 측정과 계정이 없습니다. 그 밖의 연결은 업데이트 확인뿐입니다. 설정에서 *확인하지 않음*으로 두지 않는 한 SUYA는 6시간마다
+`api.github.com`에 최신 릴리스 번호를 묻고, 답을 받지 못하면 `github.com`의 릴리스 페이지에서 읽으며(개인정보가 들어가지 않는 일반 HTTPS 요청), 사용자가 수락했거나 자동 업데이트를 골랐을 때만
 `github.com`에서 설치 파일을 내려받으며, 내려받은 파일은 릴리스의 SHA-256 목록과 대조합니다. Windy 키를 넣으면 로컬 `settings.env`에만 저장됩니다. 로그(`monitor.log`, 2 MB × 3개 순환)에는 수집 결과와 오류만 남습니다.
 
 ## 12. 한계
@@ -494,7 +497,7 @@ powershell -File packaging\build.ps1      # Windows setup.exe (Inno Setup 6 필�
 
 ```
 antarctic_monitor/        파이썬 패키지 (명령 이름: suya)
-├── cli.py                gui, daemon, collect, export, excel-sync, ions, sources, self-test
+├── cli.py                gui, daemon, collect, export, excel-sync, ions, sources, update-check, self-test
 ├── engine.py             스케줄러: 주기, 백오프, 호출 한도, 일정 저장, 이벤트 버스
 ├── collectors/           데이터 서비스별 모듈 (erddap, hycom, argo, gosud, osmc, openmeteo, metar, windy, woa)
 ├── db.py                 SQLite 저장소

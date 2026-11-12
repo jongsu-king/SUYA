@@ -91,7 +91,7 @@ Windy는 <b>공식 Point Forecast API</b>만, 사용자가 키를 넣었을 때 
 
 <h2>4. 메뉴</h2>
 <table>
- <tr><td><b>파일 &gt; 설정</b></td><td>Windy API 키와 종류, 엑셀 저장 폴더, 업데이트 방식(확인 안 함 / 알리고 물어봄 / 자동 설치). 새 버전은 하루 한 번 GitHub 릴리스에서 확인하고, 설치판은 설치 파일을 받아 SHA-256을 검증한 뒤 설치하고 다시 시작합니다.</td></tr>
+ <tr><td><b>파일 &gt; 설정</b></td><td>Windy API 키와 종류, 엑셀 저장 폴더, 업데이트 방식(확인 안 함 / 알리고 물어봄 / 자동 설치). 새 버전은 6시간마다 GitHub 릴리스에서 확인하고(실패하면 10분 뒤부터 간격을 늘려 다시 확인), 설치판은 설치 파일을 받아 SHA-256을 검증한 뒤 설치하고 다시 시작합니다. 마지막 확인 시각과 결과가 이 창에 나옵니다.</td></tr>
  <tr><td><b>파일 &gt; 엑셀 DB 지금 저장</b></td><td>15분 주기를 기다리지 않고 바로 엑셀 파일을 다시 씁니다.</td></tr>
  <tr><td><b>파일 &gt; 엑셀 폴더 열기 / 데이터 폴더 열기</b></td><td>탐색기(Finder)로 엽니다.</td></tr>
  <tr><td><b>파일 &gt; CSV 내보내기</b></td><td>측정값 전체, Argo 전 층, 현재 지도 레이어, 현재 레이어 이온(염분 레이어의 칸마다 환산한 이온)을 CSV로.</td></tr>
@@ -165,6 +165,7 @@ suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv  염분 격자 �
 suya ions 34.5       염분 하나를 이온 양으로 환산 (--json)
 suya ions 34.5 --temperature -1.2 --depth 100   mmol/L과 염분 범위 검사 추가
 suya sources         소스 목록
+suya update-check    최신 릴리스 확인 (설치하지 않음)
 suya --lang en       영어로 실행</pre>
 
 <h2>9. 문제 해결</h2>
@@ -256,7 +257,7 @@ plus mean temperature and salinity by depth (Argo vs HYCOM).</p>
 
 <h2>4. Menus</h2>
 <table>
- <tr><td><b>File &gt; Settings</b></td><td>Windy API key and tier, Excel folder, update mode (do not check / notify and ask / install automatically). New versions are looked up once a day on the GitHub releases; the installed program downloads the installer, verifies its SHA-256, installs it and restarts.</td></tr>
+ <tr><td><b>File &gt; Settings</b></td><td>Windy API key and tier, Excel folder, update mode (do not check / notify and ask / install automatically). New versions are looked up every 6 hours on the GitHub releases (a failed check is repeated after 10 minutes, then at longer intervals); the installed program downloads the installer, verifies its SHA-256, installs it and restarts. The dialog shows when the last check ran and what it found.</td></tr>
  <tr><td><b>File &gt; Save Excel database now</b></td><td>Rewrite the workbooks immediately instead of waiting for the 15-minute cycle.</td></tr>
  <tr><td><b>File &gt; Open Excel folder / Open data folder</b></td><td>Opens them in Explorer / Finder.</td></tr>
  <tr><td><b>File &gt; Export CSV</b></td><td>All measurements, all Argo levels, the current map layer, or the derived ions of every cell of the current salinity layer.</td></tr>
@@ -330,6 +331,7 @@ suya export grid-ions --layer hycom_salt_0 --out salt0_ions.csv  ion composition
 suya ions 34.5       convert one salinity to ion amounts (--json)
 suya ions 34.5 --temperature -1.2 --depth 100   adds mmol/L and the salinity range check
 suya sources         list the sources
+suya update-check    look up the latest release (installs nothing)
 suya --lang ko       run in Korean</pre>
 
 <h2>9. Troubleshooting</h2>

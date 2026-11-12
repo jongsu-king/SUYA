@@ -21,7 +21,7 @@ from .collectors.base import Context
 from .config import app_data_dir, load_settings
 from .db import SALINITY, Measurement, Store
 from .engine import Engine, EventBus
-from .http import Fetcher
+from .http import FetchError, Fetcher
 from .i18n import default_language, render, set_language, tr
 
 
@@ -243,6 +243,28 @@ def _excel_sync(args: argparse.Namespace) -> None:
         raise SystemExit(1) from None
 
 
+async def _update_check() -> int:
+    """Look up the latest release and say whether it is newer than this program. Nothing is downloaded or installed."""
+    from . import updates
+
+    fetcher = Fetcher()
+    try:
+        release = await updates.latest_release(fetcher)
+    except FetchError as error:
+        print(tr("업데이트 확인 실패: {error}", error=render(str(error))), file=sys.stderr)
+        return 1
+    finally:
+        await fetcher.aclose()
+    print(tr("이 프로그램: {version}", version=__version__))
+    print(tr("최신 릴리스: {version}", version=release["version"]))
+    if release["newer"]:
+        print(tr("새 버전 {version}이 있습니다", version=release["version"]))
+        print(release["url"])
+    else:
+        print(tr("최신 버전입니다 ({version})", version=__version__))
+    return 0
+
+
 def gui_available() -> bool:
     """True when the window's libraries are installed (the ``gui`` extra); a server copy may lack them."""
     try:
@@ -381,6 +403,7 @@ def main(argv: list[str] | None = None) -> None:
     sync.add_argument("--result", help=argparse.SUPPRESS)
 
     sub.add_parser("sources", help="list data sources")
+    sub.add_parser("update-check", help="look up the latest release (nothing is downloaded or installed)")
 
     self_test = sub.add_parser("self-test", help="check that the installed program can start")
     self_test.add_argument("--out")
@@ -420,6 +443,8 @@ def main(argv: list[str] | None = None) -> None:
         for source in SOURCES:
             print(f"{source['id']:20s} {tr(source['name'])} | {tr(source['measures'])} | {tr(source['cadence'])}")
         return
+    if command == "update-check":
+        sys.exit(asyncio.run(_update_check()))
 
     try:
         from .gui.app import run_gui

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import re
 import sys
-from datetime import timedelta
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from PySide6.QtCore import QSettings, Qt, QTimer, QUrl, Signal
@@ -34,6 +36,8 @@ from .panels import AirPanel, DataTable, IonPanel, ProfilePanel, SeriesPanel, Wa
 from .polarmap import ColorBar, PolarMapWidget
 from .scales import build_scale, rescale
 from .theme import Theme, current_theme, series_color
+
+log = logging.getLogger(__name__)
 
 DETAIL_TABS = ("water", "profile", "air", "series", "ions")
 ION_VIEW_UNITS = (("g/kg", "grams_per_salinity"), ("mmol/kg", "mmol_per_salinity"))
@@ -78,6 +82,11 @@ def parse_location_text(text: str) -> tuple[float, float, str | None]:
     return point.lat, point.lon, f"{site} ({'view' if point.kind == 'view' else 'link'})"
 
 
+def _local_time(epoch: float) -> str:
+    """초 단위 시각을 이 컴퓨터의 시간대로 '2026-11-12 18:27'처럼 적습니다."""
+    return short_time(iso(datetime.fromtimestamp(epoch, timezone.utc)))
+
+
 class MainWindow(QMainWindow):
     update_progress = Signal(int, int)
 
@@ -117,10 +126,12 @@ class MainWindow(QMainWindow):
         self.update_progress.connect(self._show_update_progress)
         self._deferred_update: str | None = None
         self._updating = False
-        self.update_timer = QTimer(self, interval=24 * 3600 * 1000)
-        self.update_timer.timeout.connect(lambda: self.check_updates(manual=False))
+        self._update_schedule = updates.Schedule(time.time())
+        self._last_check: dict | None = None
+        self.update_timer = QTimer(self, interval=60_000)
+        self.update_timer.timeout.connect(self._update_tick)
         if self.settings_.update_mode != "off":
-            QTimer.singleShot(15_000, lambda: self.check_updates(manual=False))
+            QTimer.singleShot(15_000, self._update_tick)
             self.update_timer.start()
 
     def _build_menu(self) -> None:
@@ -164,39 +175,89 @@ class MainWindow(QMainWindow):
         help_menu.addAction(tr("업데이트 확인…"), self.check_updates)
         help_menu.addAction(tr("프로그램 정보…"), lambda: AboutDialog(self).exec())
 
+    def _update_tick(self) -> None:
+        """1분마다 불립니다. 자동 확인 시각이 되었으면 확인합니다."""
+        if self._updating or self.settings_.update_mode == "off":
+            return
+        if self._update_schedule.due(time.time()):
+            self.check_updates(manual=False)
+
     def check_updates(self, manual: bool = True) -> None:
+        """새 버전을 확인합니다. 실패하면 간격을 늘려 가며 다시 확인하고, 결과는 기록 파일과 설정 창에 남깁니다."""
         if self._updating:
             return
         if manual:
             self.statusBar().showMessage(tr("업데이트 확인 중…"))
+        self._update_schedule.started(time.time())
 
         def done(result, error):
+            now = time.time()
             if error or not result:
+                detail = str(error)
+                next_at = self._update_schedule.failed(now)
+                failures = self._update_schedule.failures
+                self._last_check = {"at": iso(), "error": detail, "version": None, "newer": False}
+                log.warning("업데이트 확인 실패 %d번째: %s, 다음 확인 %s", failures, render(detail), _local_time(next_at))
                 if manual:
-                    self.statusBar().showMessage(tr("업데이트 확인 실패: {error}", error=render(str(error))), 8000)
+                    self.statusBar().showMessage(tr("업데이트 확인 실패: {error}", error=render(detail)), 8000)
+                elif failures >= 3:
+                    self.statusBar().showMessage(
+                        tr("자동 업데이트 확인이 {count}번 연속 실패했습니다: {error}", count=failures, error=render(detail)), 10000
+                    )
                 return
+            self._last_check = {"at": iso(), "error": None, "version": result["version"], "newer": bool(result["newer"])}
             if not result["newer"]:
+                next_at = self._update_schedule.succeeded(now)
+                log.info(
+                    "업데이트 확인: 최신 릴리스 %s, 이 프로그램 %s, 다음 확인 %s", result["version"], __version__, _local_time(next_at)
+                )
                 if manual:
                     self.statusBar().showMessage(tr("최신 버전입니다 ({version})", version=__version__), 6000)
                 return
+            log.info("업데이트 확인: 새 버전 %s, 이 프로그램 %s", result["version"], __version__)
             if not manual and self._deferred_update == result["version"]:
+                self._update_schedule.succeeded(now)
                 return
             self.statusBar().clearMessage()
             self._offer_update(result, automatic=not manual and self.settings_.update_mode == "auto")
 
         self.backend.call(lambda: updates.latest_release(self.backend.ctx.fetcher), done)
 
+    def update_status_text(self) -> str:
+        """설정 창에 보여 줄 마지막 업데이트 확인 결과와 다음 자동 확인 시각."""
+        last = self._last_check
+        if last is None:
+            lines = [tr("아직 확인하지 않았습니다")]
+        else:
+            if last["error"] is not None:
+                outcome = tr("실패: {error}", error=render(last["error"]))
+            elif last["newer"]:
+                outcome = tr("새 버전 {version}이 있습니다", version=last["version"])
+            else:
+                outcome = tr("최신 버전입니다 ({version})", version=__version__)
+            lines = [f"{short_time(last['at'])} · {outcome}"]
+        if self.settings_.update_mode != "off":
+            lines.append(tr("다음 자동 확인 {time}", time=_local_time(self._update_schedule.next_at)))
+        return "\n".join(lines)
+
     def _offer_update(self, release: dict, automatic: bool) -> None:
+        """새 버전을 알립니다. 물음에 답이 끝나면 다음 자동 확인은 평소 간격으로 돌아갑니다."""
         version = release["version"]
-        if not (updates.can_self_update() and release.get("asset")):
-            answer = QMessageBox.question(
-                self, tr("업데이트 확인"),
-                tr("이 설치본은 스스로 업데이트할 수 없습니다. 새 버전 {version}의 내려받기 페이지를 열까요?", version=version),
-            )
+        capable = updates.can_self_update() and bool(release.get("asset"))
+        blocker = updates.self_update_blocker() if capable else None
+        if blocker or not capable:
+            if blocker:
+                question = tr(
+                    "스스로 업데이트할 수 없습니다: {reason}\n새 버전 {version}의 내려받기 페이지를 열까요?",
+                    reason=render(blocker), version=version,
+                )
+            else:
+                question = tr("이 설치본은 스스로 업데이트할 수 없습니다. 새 버전 {version}의 내려받기 페이지를 열까요?", version=version)
+            answer = QMessageBox.question(self, tr("업데이트 확인"), question)
             if answer == QMessageBox.StandardButton.Yes:
                 QDesktopServices.openUrl(QUrl(release["url"]))
-            else:
-                self._deferred_update = version
+            self._deferred_update = version
+            self._update_schedule.succeeded(time.time())
             return
         box = QMessageBox(self)
         box.setWindowTitle(tr("업데이트 확인"))
@@ -226,26 +287,32 @@ class MainWindow(QMainWindow):
             self._start_update(release)
         else:
             self._deferred_update = version
+            self._update_schedule.succeeded(time.time())
 
     def _start_update(self, release: dict) -> None:
+        """설치 파일을 받아 설치합니다. 실패하면 받은 부분을 남겨 두고, 간격을 늘려 가며 다시 시도합니다."""
         self._updating = True
         self.statusBar().showMessage(tr("업데이트 내려받는 중… {percent}%", percent=0))
 
         def progress(received: int, total: int) -> None:
             self.update_progress.emit(received, total)
 
+        def failed(error) -> None:
+            self._updating = False
+            next_at = self._update_schedule.failed(time.time())
+            log.warning("업데이트 실패: %s, 다음 확인 %s", render(str(error)), _local_time(next_at))
+            self.statusBar().showMessage(tr("업데이트 실패: {error}", error=render(str(error))), 10000)
+
         def downloaded(path, error):
             if error:
-                self._updating = False
-                self.statusBar().showMessage(tr("업데이트 실패: {error}", error=render(str(error))), 10000)
+                failed(error)
                 return
             self.statusBar().showMessage(tr("업데이트 설치 중…"))
             self.backend.call_sync(updates.install, path, callback=installed)
 
         def installed(_result, error):
             if error:
-                self._updating = False
-                self.statusBar().showMessage(tr("업데이트 실패: {error}", error=render(str(error))), 10000)
+                failed(error)
                 return
             self.relaunch = False
             self._updating = False
@@ -586,7 +653,7 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def open_settings(self) -> None:
-        dialog = SettingsDialog(self.backend.ctx.settings, self)
+        dialog = SettingsDialog(self.backend.ctx.settings, self, update_status=self.update_status_text())
         if dialog.exec() != SettingsDialog.DialogCode.Accepted:
             return
         values = dialog.values()
@@ -1030,6 +1097,7 @@ class MainWindow(QMainWindow):
         self.preferences.setValue("geometry", self.saveGeometry())
         self.clock.stop()
         self.refresh_timer.stop()
+        self.update_timer.stop()
         try:
             self.backend.event.disconnect(self.on_event)
         except (RuntimeError, TypeError):

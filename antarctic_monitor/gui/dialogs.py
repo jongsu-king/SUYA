@@ -40,7 +40,7 @@ class LanguageDialog(QDialog):
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, settings: Settings, parent=None):
+    def __init__(self, settings: Settings, parent=None, update_status: str = ""):
         super().__init__(parent)
         self.setWindowTitle(tr("설정"))
         self.setMinimumWidth(520)
@@ -66,6 +66,10 @@ class SettingsDialog(QDialog):
         form.addRow(tr("Windy 키 종류"), self.tier)
         form.addRow(tr("엑셀 저장 폴더"), folder_row)
         form.addRow(tr("업데이트"), self.updates)
+        if update_status:
+            self.update_status = QLabel(update_status)
+            self.update_status.setWordWrap(True)
+            form.addRow(tr("마지막 업데이트 확인"), self.update_status)
         form.addRow(tr("데이터베이스"), QLabel(str(settings.db_path)))
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
