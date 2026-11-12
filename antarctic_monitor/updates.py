@@ -78,12 +78,39 @@ def _rate_limited(response) -> bool:
     )
 
 
+async def release_from_page(fetcher: Fetcher, system: str = sys.platform, machine: str = platform.machine()) -> dict | None:
+    """API 한도에 걸렸을 때 쓰는 대안. 릴리스 페이지가 넘겨 주는 태그 주소에서 버전을 읽고, 파일 주소는 이름 규칙으로 만듭니다."""
+    try:
+        response = await fetcher.request("HEAD", RELEASES_PAGE, timeout=20.0, interactive=True)
+    except FetchError:
+        return None
+    found = re.search(r"/releases/tag/(v?(\d+\.\d+\.\d+[^/?#]*))$", response.url.path) if response.status_code < 400 else None
+    if not found:
+        return None
+    tag, version = found.group(1), found.group(2)
+    base = f"{__url__}/releases/download/{tag}/"
+    wanted = asset_name(version, system, machine)
+    return {
+        "version": version,
+        "url": f"{__url__}/releases/tag/{tag}",
+        "newer": is_newer(version),
+        "asset": {"name": wanted, "url": base + wanted, "size": 0} if wanted else None,
+        "checksums": base + CHECKSUMS,
+    }
+
+
 async def latest_release(fetcher: Fetcher, system: str = sys.platform, machine: str = platform.machine()) -> dict:
     try:
         response = await fetcher.request("GET", RELEASES_API, timeout=20.0, interactive=True)
     except RateLimited as exc:
+        release = await release_from_page(fetcher, system, machine)
+        if release:
+            return release
         raise FetchError(rate_limit_message()) from exc
     if _rate_limited(response):
+        release = await release_from_page(fetcher, system, machine)
+        if release:
+            return release
         raise FetchError(rate_limit_message(response.headers.get("x-ratelimit-reset")))
     if response.status_code >= 400:
         raise FetchError(f"HTTP {response.status_code}")

@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The update check works when GitHub's API limit is reached.** The check asks the GitHub API for
+  the latest release, which allows 60 requests an hour for each address; when the limit was
+  reached, the check stopped with "GitHub's request limit was reached". It now reads the version
+  from the address the public release page `releases/latest` points to and builds the file links
+  from the release naming. The download is still checked against `SHA256SUMS.txt`; when that file
+  cannot be read, nothing is installed.
+
 ### Fixed
 
 - **The "Unhandled exception in script" window on Windows.** When the program was closed, or a save

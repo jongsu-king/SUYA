@@ -142,3 +142,38 @@ def test_update_mode_setting(tmp_path, monkeypatch):
     monkeypatch.setenv("MONITOR_UPDATE_MODE", "notify")
     assert load_settings(env_file=tmp_path / "none", user_dir=tmp_path).update_mode == "notify"
     assert json.dumps(updates.MODES)
+
+
+async def test_latest_release_falls_back_to_the_release_page_when_the_api_is_rate_limited():
+    headers = {"x-ratelimit-remaining": "0", "x-ratelimit-reset": str(int(time.time()) + 20 * 60)}
+    seen = []
+
+    def handler(request):
+        seen.append((request.method, request.url.host, request.url.path))
+        if request.url.host == "api.github.com":
+            return httpx.Response(403, json={"message": "API rate limit exceeded"}, headers=headers)
+        if request.url.path.endswith("/releases/latest"):
+            return httpx.Response(302, headers={"location": "https://github.com/jongsu-king/SUYA/releases/tag/v9.1.2"})
+        return httpx.Response(200)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True)
+    fetcher = Fetcher(client, backoff=0.0)
+    release = await updates.latest_release(fetcher, system="darwin", machine="arm64")
+    assert release["version"] == "9.1.2" and release["newer"]
+    assert release["url"] == "https://github.com/jongsu-king/SUYA/releases/tag/v9.1.2"
+    base = "https://github.com/jongsu-king/SUYA/releases/download/v9.1.2/"
+    assert release["asset"] == {"name": "SUYA-9.1.2-macos-arm64.dmg", "url": base + "SUYA-9.1.2-macos-arm64.dmg", "size": 0}
+    assert release["checksums"] == base + "SHA256SUMS.txt"
+    assert ("HEAD", "github.com", "/jongsu-king/SUYA/releases/latest") in seen
+    await fetcher.aclose()
+
+    def no_tag(request):
+        if request.url.host == "api.github.com":
+            return httpx.Response(403, json={"message": "API rate limit exceeded"}, headers=headers)
+        return httpx.Response(200)
+
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(no_tag), follow_redirects=True), backoff=0.0)
+    with pytest.raises(FetchError) as caught:
+        await updates.latest_release(fetcher, system="darwin", machine="arm64")
+    assert "GitHub" in render(str(caught.value)) and "20" in render(str(caught.value))
+    await fetcher.aclose()
