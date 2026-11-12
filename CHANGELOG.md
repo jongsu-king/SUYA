@@ -10,8 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 This release fixes the "Unhandled exception in script" window that could appear on Windows
 while the monthly workbooks were being saved, removes the temporary files a failed save left
-behind, and keeps the update check working when GitHub's API limit is reached. Concept DOI for
-all versions: 10.5281/zenodo.23937852.
+behind, and keeps the update check working when GitHub's API limit is reached. Version DOI:
+https://doi.org/10.5281/zenodo.24149153 (concept DOI for all versions: 10.5281/zenodo.23937852).
 
 ### Changed
 
