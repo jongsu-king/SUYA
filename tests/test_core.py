@@ -23,7 +23,7 @@ from antarctic_monitor.db import WAL_LIMIT, Measurement, Store, iso, utcnow
 from antarctic_monitor.engine import STARTUP_STAGGER, UNREACHABLE_RETRY, Engine, EventBus, failure_message, job_timeout
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
-from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited, Unreachable, failure_of
+from antarctic_monitor.http import CONNECT_TIMEOUT, DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited, Unreachable, failure_of
 from antarctic_monitor.i18n import msg, render, set_language
 
 
@@ -335,6 +335,25 @@ async def test_fetcher_gives_up_after_retries():
     with pytest.raises(FetchError):
         await fetcher.get_text("https://x.test/")
     await fetcher.aclose()
+
+
+async def test_fetcher_keeps_the_connect_timeout_short_for_long_requests(tmp_path):
+    """요청마다 주는 긴 응답 제한이 연결 제한까지 늘리면, 닿지 않는 서버를 포기하는 데 몇 분이 걸립니다."""
+    seen = []
+
+    def handler(request):
+        seen.append(request.extensions["timeout"])
+        return httpx.Response(200, text="ok")
+
+    fetcher = Fetcher(httpx.AsyncClient(transport=httpx.MockTransport(handler)), backoff=0.0)
+    await fetcher.request("GET", "https://x.test/", timeout=180.0)
+    await fetcher.request("GET", "https://x.test/", timeout=5.0)
+    await fetcher.download("https://x.test/file", tmp_path / "file", timeout=900.0)
+    await fetcher.aclose()
+    assert [(limits["connect"], limits["read"]) for limits in seen] == [
+        (CONNECT_TIMEOUT, 180.0), (5.0, 5.0), (CONNECT_TIMEOUT, 900.0),
+    ]
+    assert CONNECT_TIMEOUT == 20.0
 
 
 async def test_interactive_requests_do_not_queue_behind_collection():

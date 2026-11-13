@@ -36,6 +36,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A server that cannot be reached is given up on within about a minute.** Every request passed
+  its own response limit (90 to 180 seconds, 900 for a download) in a way that also replaced the
+  20-second limit for opening the connection, so three attempts at a server that did not answer
+  the connection took up to 9 minutes before the failure was recorded. On 2026-11-13 one Open-Meteo
+  run took 4 minutes 37 seconds to fail this way. The connection limit is 20 seconds again and the
+  response limits are unchanged.
 - **A write that failed midway is undone.** When a write to the database failed partway, on a full
   disk for example, the part already done stayed pending and was saved together with the next
   successful write. Each write is now saved whole or undone whole.

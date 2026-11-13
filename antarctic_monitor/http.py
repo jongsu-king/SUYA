@@ -27,6 +27,7 @@ HOST_LIMITS = {
 }
 DEFAULT_HOST_LIMIT = 4
 INTERACTIVE_LIMIT = 2
+CONNECT_TIMEOUT = 20.0
 RETRYABLE_STATUS = {500, 502, 503, 504}
 
 
@@ -46,6 +47,14 @@ class NoData(FetchError):
     """서버가 '해당 조건에 데이터 없음'이라고 답했습니다. 실패가 아닙니다."""
 
 
+def limits(timeout: float) -> httpx.Timeout:
+    """응답은 timeout 초까지 기다리되 연결은 길어도 CONNECT_TIMEOUT 초만 기다립니다.
+
+    요청에 숫자 하나만 주면 연결 제한까지 그 값이 되어, 닿지 않는 서버를 포기하는 데 몇 분이 걸립니다.
+    """
+    return httpx.Timeout(timeout, connect=min(timeout, CONNECT_TIMEOUT))
+
+
 def failure_of(causes, text: str) -> FetchError:
     """여러 요청의 실패를 하나로 묶습니다. 하나도 서버에 닿지 못했을 때만 Unreachable 이 됩니다."""
     causes = list(causes)
@@ -58,7 +67,7 @@ class Fetcher:
         self._client = client or httpx.AsyncClient(
             headers={"User-Agent": USER_AGENT},
             follow_redirects=True,
-            timeout=httpx.Timeout(60.0, connect=20.0),
+            timeout=httpx.Timeout(60.0, connect=CONNECT_TIMEOUT),
         )
         self._retries = retries
         self._backoff = backoff
@@ -94,7 +103,7 @@ class Fetcher:
                 await asyncio.sleep(self._backoff * 2 ** (attempt - 1))
             try:
                 async with self._semaphore(url, interactive):
-                    response = await self._client.request(method, url, params=params, json=json, timeout=timeout)
+                    response = await self._client.request(method, url, params=params, json=json, timeout=limits(timeout))
             except (httpx.TimeoutException, httpx.TransportError) as exc:
                 reached = reached or not isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout))
                 last_error = f"{type(exc).__name__}: {exc}" if str(exc) else type(exc).__name__
@@ -137,7 +146,7 @@ class Fetcher:
             while True:
                 headers = {"Range": f"bytes={offset}-"} if offset else None
                 async with self._semaphore(url, interactive):
-                    async with self._client.stream("GET", url, timeout=timeout, headers=headers) as response:
+                    async with self._client.stream("GET", url, timeout=limits(timeout), headers=headers) as response:
                         status = response.status_code
                         if offset and (status == 416 or (status == 206 and _range_start(response) != offset)):
                             offset = 0
