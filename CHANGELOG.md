@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-13
+
+This release keeps collection going through network outages and storage failures: a source that
+cannot reach its server is tried again within 5 minutes, a database that cannot be written no
+longer stops a source until the next start, and the log records when the program starts and
+stops. Concept DOI for all versions: 10.5281/zenodo.23937852.
+
 ### Added
 
 - **Start and stop are written to the log.** `monitor.log` records when the collecting program
