@@ -7,6 +7,7 @@ import json
 import logging
 import sqlite3
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -16,6 +17,8 @@ from . import composition, ranges, seawater
 from .gridutil import SECTORS, Grid, grid_stats
 
 log = logging.getLogger(__name__)
+
+WAL_LIMIT = 16 * 1024 * 1024
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS measurements (
@@ -314,6 +317,7 @@ class Store:
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute(f"PRAGMA journal_size_limit={WAL_LIMIT}")
             self._conn.executescript(SCHEMA + ION_SCHEMA)
             self._conn.commit()
         self._ensure_ions()
@@ -321,6 +325,23 @@ class Store:
     def close(self) -> None:
         with self._lock:
             self._conn.close()
+
+    @contextmanager
+    def _write(self) -> Iterator[sqlite3.Connection]:
+        """쓰기 묶음 하나를 통째로 남기거나 통째로 되돌립니다.
+
+        중간에 실패한 변경을 그대로 두면 다음 저장의 commit 에 섞여 들어가므로, 실패하면 바로 되돌립니다.
+        """
+        with self._lock:
+            try:
+                yield self._conn
+                self._conn.commit()
+            except BaseException:
+                try:
+                    self._conn.rollback()
+                except sqlite3.Error:
+                    pass
+                raise
 
     def _ions_current(self) -> bool:
         keys = ",".join("?" * len(ION_MARKS))
@@ -373,9 +394,8 @@ class Store:
         params = self._measurement_params(rows, iso())
         if not params:
             return 0
-        with self._lock:
-            self._conn.executemany(UPSERT_MEASUREMENT, params)
-            self._conn.commit()
+        with self._write() as conn:
+            conn.executemany(UPSERT_MEASUREMENT, params)
         return len(params)
 
     def replace_datasets(self, source: str, groups: dict[str, list[Measurement]]) -> int:
@@ -385,24 +405,23 @@ class Store:
         """
         now = iso()
         count = 0
-        with self._lock:
+        with self._write() as conn:
             for dataset, rows in groups.items():
-                self._conn.execute("DELETE FROM measurements WHERE source = ? AND dataset = ?", (source, dataset))
+                conn.execute("DELETE FROM measurements WHERE source = ? AND dataset = ?", (source, dataset))
                 params = self._measurement_params(rows, now)
-                self._conn.executemany(UPSERT_MEASUREMENT, params)
+                conn.executemany(UPSERT_MEASUREMENT, params)
                 count += len(params)
-            self._conn.commit()
         return count
 
     def drop_invalid_metar(self, low: float, high: float) -> int:
         """수집 필터를 통과하지 못할 METAR 기온·이슬점이 이미 저장돼 있으면 지웁니다."""
-        with self._lock:
-            removed = self._conn.execute(
+        with self._write() as conn:
+            removed = conn.execute(
                 """DELETE FROM measurements WHERE source = 'metar'
                    AND variable IN ('air_temperature', 'dew_point') AND (value < ? OR value > ?)""",
                 (low, high),
             ).rowcount
-            crossed = self._conn.execute(
+            crossed = conn.execute(
                 """SELECT d.dataset, d.lat, d.lon, d.level, d.obs_time FROM measurements d
                    JOIN measurements t ON t.source = d.source AND t.dataset = d.dataset AND t.lat = d.lat
                     AND t.lon = d.lon AND t.level = d.level AND t.obs_time = d.obs_time
@@ -410,13 +429,12 @@ class Store:
                    WHERE d.source = 'metar' AND d.variable = 'dew_point' AND d.value > t.value"""
             ).fetchall()
             for row in crossed:
-                removed += self._conn.execute(
+                removed += conn.execute(
                     """DELETE FROM measurements WHERE source = 'metar'
                        AND variable IN ('air_temperature', 'dew_point')
                        AND dataset = ? AND lat = ? AND lon = ? AND level = ? AND obs_time = ?""",
                     tuple(row),
                 ).rowcount
-            self._conn.commit()
         return removed
 
     def delete_measurements(
@@ -433,21 +451,19 @@ class Store:
             f"AND variable IN ({marks})"
         )
         removed = 0
-        with self._lock:
+        with self._write() as conn:
             for start, end in spans:
-                removed += self._conn.execute(sql, (source, dataset, start, end, *names)).rowcount
-            self._conn.commit()
+                removed += conn.execute(sql, (source, dataset, start, end, *names)).rowcount
         return removed
 
     def relabel_metar_pressure(self) -> int:
         """예전에 ``surface_pressure``로 저장된 METAR 해면 기압을 ``sea_level_pressure``로 옮깁니다."""
-        with self._lock:
-            moved = self._conn.execute(
+        with self._write() as conn:
+            moved = conn.execute(
                 """UPDATE OR IGNORE measurements SET variable = 'sea_level_pressure'
                    WHERE source = 'metar' AND variable = 'surface_pressure'"""
             ).rowcount
-            self._conn.execute("DELETE FROM measurements WHERE source = 'metar' AND variable = 'surface_pressure'")
-            self._conn.commit()
+            conn.execute("DELETE FROM measurements WHERE source = 'metar' AND variable = 'surface_pressure'")
         return moved
 
     def latest_for_location(self, location_id: str) -> dict[str, dict]:
@@ -634,9 +650,9 @@ class Store:
     def prune(self, forecast_days: int = 30, grid_keep: int = 60) -> None:
         """오래된 예보와 격자 스냅샷을 지웁니다. 관측·위성·분석값은 계속 보관합니다."""
         cutoff = iso(utcnow() - timedelta(days=forecast_days))
-        with self._lock:
-            self._conn.execute("DELETE FROM measurements WHERE kind = 'forecast' AND obs_time < ?", (cutoff,))
-            self._conn.execute(
+        with self._write() as conn:
+            conn.execute("DELETE FROM measurements WHERE kind = 'forecast' AND obs_time < ?", (cutoff,))
+            conn.execute(
                 """DELETE FROM grids WHERE rowid IN (
                      SELECT rowid FROM (
                        SELECT rowid, ROW_NUMBER() OVER (PARTITION BY layer ORDER BY valid_time DESC) AS n FROM grids
@@ -644,19 +660,17 @@ class Store:
                    )""",
                 (grid_keep,),
             )
-            self._conn.execute("DELETE FROM runs WHERE id NOT IN (SELECT id FROM runs ORDER BY id DESC LIMIT 5000)")
-            self._conn.commit()
+            conn.execute("DELETE FROM runs WHERE id NOT IN (SELECT id FROM runs ORDER BY id DESC LIMIT 5000)")
 
     def save_grid(self, grid: Grid) -> dict:
         stats = grid_stats(grid)
         payload = gzip.compress(json.dumps(grid.as_dict(), separators=(",", ":")).encode(), compresslevel=6)
-        with self._lock:
-            self._conn.execute(
+        with self._write() as conn:
+            conn.execute(
                 "INSERT OR REPLACE INTO grids (layer, valid_time, fetched_at, unit, stats_json, payload) "
                 "VALUES (?, ?, ?, ?, ?, ?)",
                 (grid.layer, grid.valid_time, iso(), grid.unit, json.dumps(stats), payload),
             )
-            self._conn.commit()
         return stats
 
     def latest_grid_info(self) -> dict[str, dict]:
@@ -744,9 +758,9 @@ class Store:
         """
         now = iso()
         count = 0
-        with self._lock:
+        with self._write() as conn:
             for r in rows:
-                self._conn.execute(
+                conn.execute(
                     f"""INSERT INTO argo_profiles
                        (platform, cycle, obs_time, lat, lon, data_mode, position_qc, surface_temp, surface_salt, fetched_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -764,7 +778,6 @@ class Store:
                     ),
                 )
                 count += 1
-            self._conn.commit()
         return count
 
     def save_argo_levels(self, platform: str, cycle: int, levels: list[dict]) -> None:
@@ -775,8 +788,8 @@ class Store:
         surface = seawater.surface_values(levels)
         depths = [lv["depth_m"] for lv in levels if lv.get("depth_m") is not None]
         keep = not levels
-        with self._lock:
-            self._conn.execute(
+        with self._write() as conn:
+            conn.execute(
                 """UPDATE argo_profiles SET levels_json = ?, n_levels = ?, max_depth_m = ?,
                    surface_temp = CASE WHEN ? THEN surface_temp ELSE ? END,
                    surface_salt = CASE WHEN ? THEN surface_salt ELSE ? END,
@@ -786,15 +799,13 @@ class Store:
                     keep, surface["temp"], keep, surface["salt"], iso(), platform, cycle,
                 ),
             )
-            self._conn.commit()
 
     def set_argo_surface(self, rows: Iterable[tuple[float | None, float | None, str, int]]) -> None:
         """(표층 수온, 표층 염분, 플랫폼, 사이클) 묶음으로 프로파일의 표층 값만 고칩니다. 층별 값은 그대로 둡니다."""
-        with self._lock:
-            self._conn.executemany(
+        with self._write() as conn:
+            conn.executemany(
                 "UPDATE argo_profiles SET surface_temp = ?, surface_salt = ? WHERE platform = ? AND cycle = ?", list(rows)
             )
-            self._conn.commit()
 
     def argo_missing_levels(self, limit: int, recheck_days: int = 30) -> list[dict]:
         """층별 값을 받을 프로파일. 막 올라온 프로파일은 서버 색인이 늦어 비어 보일 수 있으므로, 빈 것은 하루 뒤 다시 묻습니다."""
@@ -869,13 +880,13 @@ class Store:
     ) -> None:
         now = iso()
         success = status in ("ok", "unchanged")
-        with self._lock:
-            self._conn.execute(
+        with self._write() as conn:
+            conn.execute(
                 "INSERT INTO runs (source, started_at, finished_at, status, rows, data_time, message) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (source, started_at, now, status, rows, data_time, message),
             )
-            self._conn.execute(
+            conn.execute(
                 """INSERT INTO source_state
                    (source, last_attempt, last_success, last_status, last_message, last_rows, data_time, next_run,
                     consecutive_errors)
@@ -895,16 +906,14 @@ class Store:
                     0 if status in ("ok", "unchanged", "disabled") else 1,
                 ),
             )
-            self._conn.commit()
 
     def set_next_run(self, source: str, next_run: str) -> None:
-        with self._lock:
-            self._conn.execute(
+        with self._write() as conn:
+            conn.execute(
                 "INSERT INTO source_state (source, next_run) VALUES (?, ?) "
                 "ON CONFLICT (source) DO UPDATE SET next_run = excluded.next_run",
                 (source, next_run),
             )
-            self._conn.commit()
 
     def source_states(self) -> dict[str, dict]:
         with self._lock:
@@ -922,6 +931,5 @@ class Store:
         return row["value"] if row else None
 
     def kv_set(self, key: str, value: str) -> None:
-        with self._lock:
-            self._conn.execute(SET_KV, (key, value))
-            self._conn.commit()
+        with self._write() as conn:
+            conn.execute(SET_KV, (key, value))

@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from ..db import Measurement, iso, utcnow
 from ..gridutil import grid_from_triples, sample_nearest
-from ..http import FetchError, Fetcher
+from ..http import FetchError, Fetcher, failure_of
 from ..i18n import join, msg
 from ..locations import OCEAN_LOCATIONS
 from .base import CollectResult, Context, finite, in_range
@@ -85,18 +85,18 @@ def lon_index(lon: float) -> int:
 async def _fetch(fetcher: Fetcher, variable: str, suffix: str, timeout: float, interactive: bool = False) -> str:
     """호스트를 차례로 시도합니다. 첫 호스트의 500이 곧 실패를 뜻하지 않기 때문입니다."""
     path = VARIABLES[variable]["path"]
-    errors = []
+    causes: list[FetchError] = []
     for host in HOSTS:
         url = f"https://{host}/thredds/dodsC/{path}{suffix}"
         try:
             response = await fetcher.request("GET", url, timeout=timeout, interactive=interactive)
         except FetchError as exc:
-            errors.append(str(exc))
+            causes.append(exc)
             continue
         if response.status_code == 200 and not response.text.lstrip().startswith("Error"):
             return response.text
-        errors.append(f"{host}: HTTP {response.status_code}")
-    raise FetchError("; ".join(errors))
+        causes.append(FetchError(f"{host}: HTTP {response.status_code}"))
+    raise failure_of(causes, "; ".join(str(cause) for cause in causes))
 
 
 async def time_axis(fetcher: Fetcher, variable: str, interactive: bool = False) -> tuple[list[float], datetime]:
@@ -128,6 +128,7 @@ async def collect_grid(ctx: Context) -> CollectResult:
     now = utcnow()
     started = time.monotonic()
     total, latest, skipped, messages, deferred = 0, None, 0, [], 0
+    causes: list[Exception] = []
     for index, (variable, config) in enumerate(VARIABLES.items()):
         if index and time.monotonic() - started > GRID_SOFT_LIMIT:
             deferred = len(VARIABLES) - index
@@ -171,13 +172,14 @@ async def collect_grid(ctx: Context) -> CollectResult:
         for depth, result in zip(MAP_DEPTHS, results):
             if isinstance(result, Exception):
                 messages.append(f"{LAYER_PREFIX[variable]}_{depth}: {result}")
+                causes.append(result)
             elif result < 0:
                 skipped += 1
             else:
                 total += result
     expected = (len(VARIABLES) - deferred) * len(MAP_DEPTHS)
     if len(messages) == expected:
-        raise FetchError("; ".join(messages[:2]))
+        raise failure_of(causes, "; ".join(messages[:2]))
     if skipped == expected and not deferred:
         return CollectResult(data_time=latest, unchanged=True, message=msg("같은 시각의 격자를 이미 보유"))
     note = msg("격자 {n}개 갱신", n=expected - skipped - len(messages))
@@ -241,17 +243,19 @@ def profile_measurements(profile: dict, location_id: str | None) -> list[Measure
 async def collect_profiles(ctx: Context) -> CollectResult:
     """해역 대표 지점의 깊이 프로파일을 쌓습니다. 시계열 분석의 바탕이 됩니다."""
     total, latest, failures = 0, None, []
+    causes: list[FetchError] = []
     for loc in OCEAN_LOCATIONS:
         try:
             profile = await fetch_profile(ctx.fetcher, loc.lat, loc.lon)
         except FetchError as exc:
             failures.append(f"{loc.id}: {exc}")
+            causes.append(exc)
             continue
         total += ctx.store.upsert_measurements(profile_measurements(profile, loc.id))
         if profile["time"]:
             latest = max(latest or profile["time"], profile["time"])
     if failures and not total:
-        raise FetchError(failures[0])
+        raise failure_of(causes, failures[0])
     message = msg("해역 {n}곳", n=len(OCEAN_LOCATIONS) - len(failures))
     if failures:
         message = join(message, msg("실패 {n}곳", n=len(failures)))

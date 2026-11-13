@@ -46,6 +46,13 @@ class NoData(FetchError):
     """서버가 '해당 조건에 데이터 없음'이라고 답했습니다. 실패가 아닙니다."""
 
 
+def failure_of(causes, text: str) -> FetchError:
+    """여러 요청의 실패를 하나로 묶습니다. 하나도 서버에 닿지 못했을 때만 Unreachable 이 됩니다."""
+    causes = list(causes)
+    kind = Unreachable if causes and all(isinstance(cause, Unreachable) for cause in causes) else FetchError
+    return kind(text)
+
+
 class Fetcher:
     def __init__(self, client: httpx.AsyncClient | None = None, retries: int = 3, backoff: float = 2.0):
         self._client = client or httpx.AsyncClient(

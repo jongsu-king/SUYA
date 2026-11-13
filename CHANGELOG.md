@@ -6,6 +6,45 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Start and stop are written to the log.** `monitor.log` records when the collecting program
+  starts, with its version and process number, and when it stops. When the run before did not
+  stop in the usual way, the next start says so and gives the time of the last collection attempt,
+  so a gap in the data can be traced to the moment the program went away. `suya daemon` writes
+  the same lines.
+- **Errors nothing handled are written to the log.** An error that reaches the top of the window
+  program, or that ends one of its threads, is recorded in `monitor.log` with its traceback and
+  then reported the usual way.
+
+### Changed
+
+- **A source that cannot reach its server is tried again within 5 minutes.** A failed collection
+  was repeated after 1, 2, 4, 8 … minutes up to the source's own interval, so after a long network
+  outage a source could wait hours for its next attempt. A failure in which no request reached a
+  server now waits 5 minutes at most, and as soon as one source collects again, the sources that
+  were waiting for the same reason are woken straight away. A failure in which the server answered
+  keeps the old schedule.
+- **A long outage no longer fills the log.** While a source stays unreachable only its first
+  failure is logged as a warning, and the log says when collection works again. A database that
+  refuses writes is reported the same way: once, and once more when it accepts them again.
+- **HYCOM, Open-Meteo Marine and Windy tell an unreachable server from a failed answer.** These
+  collectors reported every failure alike. They now report "unreachable" when none of their
+  requests reached a server, which is what the shorter retry above relies on.
+- **The write-ahead log beside the database stays small.** SQLite cuts the `-wal` file back to
+  16 MB after a checkpoint and no longer leaves it at its largest size.
+
+### Fixed
+
+- **A write that failed midway is undone.** When a write to the database failed partway, on a full
+  disk for example, the part already done stayed pending and was saved together with the next
+  successful write. Each write is now saved whole or undone whole.
+- **Collection goes on when the database cannot be written.** An error while saving the result of
+  a run or the time of the next run ended that source's loop until the program was restarted, and
+  an error in the daily clean-up ended the clean-up. Each loop now logs the failure and carries
+  on, and the retry interval keeps growing from the loop's own count while the stored count cannot
+  be updated.
+
 ## [0.1.10] - 2026-11-12
 
 This release makes the update check dependable: a check that failed is repeated within minutes,

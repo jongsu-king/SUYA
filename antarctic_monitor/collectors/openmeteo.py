@@ -12,7 +12,7 @@ from datetime import date
 
 from ..db import Measurement, utcnow
 from ..gridutil import grid_from_triples
-from ..http import FetchError, Fetcher, RateLimited, Unreachable
+from ..http import FetchError, Fetcher, RateLimited, Unreachable, failure_of
 from ..i18n import join, msg
 from ..locations import LOCATIONS, OCEAN_LOCATIONS, Location
 from .base import CollectResult, Context, finite, to_iso_utc
@@ -234,7 +234,7 @@ async def collect_marine(ctx: Context) -> CollectResult:
             )
         )
     if failures and not rows:
-        raise FetchError(failures[0])
+        raise failure_of((result for result in results if isinstance(result, Exception)), failures[0])
     saved = ctx.store.upsert_measurements(rows)
     latest = max((r.obs_time for r in rows), default=None)
     message = msg("해역 {n}곳", n=len(rows))

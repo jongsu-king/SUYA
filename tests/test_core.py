@@ -2,24 +2,28 @@
 
 import argparse
 import asyncio
+import json
 import math
+import os
+import sqlite3
 import sys
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
 
-from antarctic_monitor import cli, instance, pointquery, seawater, updates
+from antarctic_monitor import __version__, cli, instance, pointquery, seawater, session, updates
 from antarctic_monitor.collectors import JOBS, erddap, hycom, openmeteo, windy
 from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
 from antarctic_monitor.config import Settings, load_dotenv
-from antarctic_monitor.db import Measurement, Store, iso, utcnow
-from antarctic_monitor.engine import Engine, EventBus, failure_message, job_timeout
+from antarctic_monitor.db import WAL_LIMIT, Measurement, Store, iso, utcnow
+from antarctic_monitor.engine import STARTUP_STAGGER, UNREACHABLE_RETRY, Engine, EventBus, failure_message, job_timeout
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
-from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited
+from antarctic_monitor.http import DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited, Unreachable, failure_of
 from antarctic_monitor.i18n import msg, render, set_language
 
 
@@ -949,3 +953,309 @@ def test_metar_collect_relabels_pressure_already_stored_as_surface_pressure(stor
         ("metar", "sea_level_pressure", "2026-11-07T01:00:00Z"): 962.5,
         ("openmeteo", "surface_pressure", "2026-11-07T00:00:00Z"): 676.0,
     }
+
+
+def test_store_undoes_a_write_that_failed_midway(store):
+    store.upsert_measurements([_measurement()])
+    with pytest.raises(AttributeError):
+        store.replace_datasets("s", {"d": [object()]})
+    store.kv_set("k", "v")
+    assert [row["value"] for row in store.query_measurements()] == [1.0]
+    assert store.kv_get("k") == "v"
+
+
+def test_store_keeps_the_write_ahead_log_small(store):
+    assert store._conn.execute("PRAGMA journal_size_limit").fetchone()[0] == WAL_LIMIT == 16 * 1024 * 1024
+
+
+def test_failure_of_is_unreachable_only_when_no_request_arrived():
+    assert isinstance(failure_of([Unreachable("a"), Unreachable("b")], "둘 다 닿지 못함"), Unreachable)
+    assert type(failure_of([Unreachable("a"), FetchError("HTTP 503")], "하나는 응답")) is FetchError
+    assert type(failure_of([Unreachable("a"), ValueError("해석 실패")], "하나는 해석 실패")) is FetchError
+    assert type(failure_of([], "원인 없음")) is FetchError
+    assert str(failure_of(iter([Unreachable("a")]), "닿지 못함")) == "닿지 못함"
+
+
+async def test_collectors_say_so_when_no_request_reached_a_server(store):
+    ctx = _answering_ctx(store, _offline, windy_api_key="k", windy_key_tier="testing")
+    jobs = (hycom.collect_grid(ctx), hycom.collect_profiles(ctx), openmeteo.collect_marine(ctx), windy.collect(ctx))
+    for job in jobs:
+        with pytest.raises(Unreachable):
+            await job
+    await ctx.fetcher.aclose()
+
+
+async def test_hycom_failure_is_ordinary_when_one_host_answered(store):
+    def answer(request):
+        if request.url.host == hycom.HOSTS[0]:
+            _offline(request)
+        return httpx.Response(503)
+
+    ctx = _answering_ctx(store, answer)
+    with pytest.raises(FetchError) as caught:
+        await hycom.collect_grid(ctx)
+    assert not isinstance(caught.value, Unreachable)
+    assert all(host in str(caught.value) for host in hycom.HOSTS)
+    await ctx.fetcher.aclose()
+
+
+async def test_engine_retries_an_unreachable_source_within_five_minutes(store, monkeypatch):
+    failure = {"now": Unreachable("example.org: 연결하지 못했습니다")}
+
+    async def job(ctx):
+        raise failure["now"]
+
+    engine, _ = _engine(store, monkeypatch, job, interval=21600)
+    delays = [await engine.run_once("fake") for _ in range(6)]
+    assert delays == [60.0, 120.0, 240.0, UNREACHABLE_RETRY, UNREACHABLE_RETRY, UNREACHABLE_RETRY]
+    failure["now"] = FetchError("example.org: HTTP 503")
+    assert await engine.run_once("fake") == 3840.0
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_warns_once_while_a_source_stays_unreachable(store, monkeypatch, caplog):
+    async def job(ctx):
+        raise Unreachable("example.org: 연결하지 못했습니다")
+
+    engine, _ = _engine(store, monkeypatch, job)
+    with caplog.at_level("DEBUG", logger="antarctic_monitor.engine"):
+        for _ in range(3):
+            await engine.run_once("fake")
+    levels = [record.levelname for record in caplog.records if record.getMessage().startswith("수집 실패 fake")]
+    assert levels == ["WARNING", "DEBUG", "DEBUG"]
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_wakes_waiting_sources_when_one_reaches_its_server_again(store, monkeypatch, caplog):
+    monkeypatch.setattr("antarctic_monitor.engine.STARTUP_STAGGER", 0.0)
+    online = {"now": False}
+    runs = {"first": 0, "second": 0}
+
+    def job_for(name):
+        async def job(ctx):
+            runs[name] += 1
+            if not online["now"]:
+                raise Unreachable("example.org: 연결하지 못했습니다")
+            return CollectResult(rows=1)
+
+        return job
+
+    for name in runs:
+        monkeypatch.setitem(JOBS, name, job_for(name))
+    settings = Settings(intervals={"first": 3600, "second": 3600})
+    engine = Engine(Context(store, Fetcher(), settings), EventBus(), list(runs))
+
+    def both(status) -> bool:
+        states = store.source_states()
+        return all((states.get(name) or {}).get("last_status") == status for name in runs)
+
+    with caplog.at_level("INFO", logger="antarctic_monitor.engine"):
+        engine.start()
+        assert await _until(lambda: both("error"))
+        await asyncio.sleep(0.05)
+        online["now"] = True
+        engine.trigger(["first"])
+        assert await _until(lambda: both("ok"))
+        await engine.stop()
+    assert runs == {"first": 2, "second": 2}
+    assert "first 수집이 다시 됩니다. 서버에 닿지 못해 쉬던 소스 1개를 깨웁니다: second" in caplog.text
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_keeps_collecting_when_the_store_refuses_the_run_record(store, monkeypatch, caplog):
+    async def job(ctx):
+        raise RuntimeError("서버 고장")
+
+    engine, bus = _engine(store, monkeypatch, job, interval=3600)
+    record_run = store.record_run
+    refusing = {"now": True}
+
+    def flaky_record_run(*details):
+        if refusing["now"]:
+            raise sqlite3.OperationalError("unable to open database file")
+        record_run(*details)
+
+    monkeypatch.setattr(store, "record_run", flaky_record_run)
+    with caplog.at_level("DEBUG", logger="antarctic_monitor.engine"):
+        delays = [await engine.run_once("fake") for _ in range(3)]
+        refusing["now"] = False
+        delays.append(await engine.run_once("fake"))
+    assert delays == [60.0, 120.0, 240.0, 480.0]
+    saving = [record for record in caplog.records if record.getMessage().startswith("수집 기록 저장 fake 실패")]
+    assert [record.levelname for record in saving] == ["WARNING", "DEBUG", "DEBUG"]
+    assert "unable to open database file" in saving[0].getMessage()
+    assert caplog.text.count("저장이 다시 됩니다") == 1
+    assert [event["state"] for event in bus.history].count("done") == 4
+    assert store.source_states()["fake"]["last_status"] == "error"
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_loop_runs_when_the_schedule_cannot_be_saved(store, monkeypatch, caplog):
+    runs = {"count": 0}
+
+    async def job(ctx):
+        runs["count"] += 1
+        return CollectResult(rows=1)
+
+    def set_next_run(name, when):
+        raise sqlite3.OperationalError("database or disk is full")
+
+    engine, _ = _engine(store, monkeypatch, job, interval=3600)
+    monkeypatch.setattr(store, "set_next_run", set_next_run)
+    with caplog.at_level("WARNING", logger="antarctic_monitor.engine"):
+        engine.start()
+        assert await _until(lambda: runs["count"] == 1)
+
+        def triggered() -> bool:
+            engine.trigger(["fake"])
+            return runs["count"] >= 2
+
+        assert await _until(triggered)
+        await engine.stop()
+    assert "다음 실행 시각 저장 fake 실패: OperationalError: database or disk is full" in caplog.text
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_loop_goes_on_after_an_unexpected_error(store, monkeypatch, caplog):
+    monkeypatch.setattr("antarctic_monitor.engine.LOOP_RETRY_DELAY", 0.0)
+
+    async def job(ctx):
+        return CollectResult(rows=1)
+
+    engine, _ = _engine(store, monkeypatch, job, interval=3600)
+    run_once = engine.run_once
+    calls = {"count": 0}
+
+    async def flaky_run_once(name):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("예상하지 못한 오류")
+        return await run_once(name)
+
+    monkeypatch.setattr(engine, "run_once", flaky_run_once)
+    with caplog.at_level("ERROR", logger="antarctic_monitor.engine"):
+        engine.start()
+        assert await _until(lambda: (store.source_states().get("fake") or {}).get("last_status") == "ok")
+        await engine.stop()
+    assert "수집 루프 오류 fake" in caplog.text and "예상하지 못한 오류" in caplog.text
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_starts_when_the_saved_schedule_cannot_be_read(store, monkeypatch, caplog):
+    runs = {"count": 0}
+
+    async def job(ctx):
+        runs["count"] += 1
+        return CollectResult(rows=1)
+
+    engine, _ = _engine(store, monkeypatch, job, interval=3600)
+    source_states = store.source_states
+    failures = [sqlite3.OperationalError("unable to open database file")]
+
+    def flaky_source_states():
+        if failures:
+            raise failures.pop()
+        return source_states()
+
+    monkeypatch.setattr(store, "source_states", flaky_source_states)
+    with caplog.at_level("WARNING", logger="antarctic_monitor.engine"):
+        engine.start()
+        assert await _until(lambda: runs["count"] == 1)
+        await engine.stop()
+    assert "저장된 수집 계획을 읽지 못해 바로 시작합니다: OperationalError: unable to open database file" in caplog.text
+    await engine.ctx.fetcher.aclose()
+
+
+def test_engine_first_delay_ignores_a_schedule_it_cannot_read():
+    assert Engine._first_delay(3, {"next_run": "내일 아침"}) == 3 * STARTUP_STAGGER
+    assert Engine._first_delay(2, {"next_run": 20261112}) == 2 * STARTUP_STAGGER
+    assert Engine._first_delay(1, None) == STARTUP_STAGGER
+    assert Engine._first_delay(4, {"next_run": iso(utcnow() - timedelta(hours=1))}) == 4 * STARTUP_STAGGER
+    assert 3590 < Engine._first_delay(5, {"next_run": iso(utcnow() + timedelta(hours=1))}) <= 3600
+
+
+def test_session_marks_tell_a_clean_stop_from_a_lost_one(store, caplog):
+    store.record_run("fake", "2026-11-12T06:40:00Z", "ok", 1, None, None, None)
+    attempt = store.source_states()["fake"]["last_attempt"]
+    with caplog.at_level("INFO", logger="antarctic_monitor.session"):
+        assert session.begin(store, "gui") is None
+        lost = session.begin(store, "gui")
+        session.end(store, "gui")
+        assert session.begin(store, "gui") is None
+    assert lost["pid"] == os.getpid() and lost["version"] == __version__ and "stopped_at" not in lost
+    warnings = [record.getMessage() for record in caplog.records if record.levelname == "WARNING"]
+    assert len(warnings) == 1 and "종료 기록이 없습니다" in warnings[0] and attempt in warnings[0]
+    assert caplog.text.count("프로그램 시작 (gui)") == 3 and caplog.text.count("프로그램 종료 (gui)") == 1
+    assert "지난 실행은" in caplog.text
+    assert "stopped_at" not in json.loads(store.kv_get("session:gui"))
+
+
+def test_session_marks_are_kept_apart_by_role_and_survive_bad_input(store, monkeypatch, caplog):
+    assert session.begin(store, "gui") is None
+    assert session.begin(store, "daemon") is None
+    for unreadable in ("{", "[1, 2]"):
+        store.kv_set("session:gui", unreadable)
+        assert session.begin(store, "gui") is None
+
+    def kv_set(key, value):
+        raise sqlite3.OperationalError("database or disk is full")
+
+    monkeypatch.setattr(store, "kv_set", kv_set)
+    with caplog.at_level("WARNING", logger="antarctic_monitor.session"):
+        assert session.begin(store, "daemon")["pid"] == os.getpid()
+        session.end(store, "daemon")
+    assert "시작 기록을 남기지 못했습니다" in caplog.text and "종료 기록을 남기지 못했습니다" in caplog.text
+
+
+def test_backend_marks_a_collecting_run_and_no_other(tmp_path, monkeypatch):
+    pytest.importorskip("PySide6")
+    from antarctic_monitor.gui.backend import Backend
+
+    async def job(ctx):
+        return CollectResult(rows=1)
+
+    def mark():
+        reader = Store(settings.db_path)
+        try:
+            return json.loads(reader.kv_get("session:gui") or "null")
+        finally:
+            reader.close()
+
+    monkeypatch.setitem(JOBS, "fake", job)
+    settings = Settings(db_path=tmp_path / "t.db", excel_dir=tmp_path / "x", intervals={"fake": 3600}, update_mode="off")
+    viewer = Backend(settings, collect=False)
+    viewer.start()
+    viewer.stop()
+    assert mark() is None
+    collector = Backend(settings, sources=["fake"])
+    collector.start()
+    started = mark()
+    collector.stop()
+    stopped = mark()
+    assert started["pid"] == os.getpid() and started["version"] == __version__ and "stopped_at" not in started
+    assert stopped["started_at"] == started["started_at"] and stopped["stopped_at"] >= stopped["started_at"]
+
+
+def test_cli_writes_errors_nothing_handled_into_the_log(monkeypatch, caplog):
+    from types import SimpleNamespace
+
+    reported = []
+    monkeypatch.setattr(sys, "__excepthook__", lambda kind, value, trace: reported.append(kind))
+    try:
+        raise RuntimeError("창을 그리다 생긴 오류")
+    except RuntimeError as exc:
+        error = exc
+    thread = threading.Thread(name="hub-engine")
+    with caplog.at_level("CRITICAL", logger="antarctic_monitor.cli"):
+        cli._log_unhandled(RuntimeError, error, error.__traceback__)
+        cli._log_unhandled(KeyboardInterrupt, KeyboardInterrupt(), None)
+        cli._log_unhandled_in_thread(
+            SimpleNamespace(exc_type=RuntimeError, exc_value=error, exc_traceback=error.__traceback__, thread=thread)
+        )
+        cli._log_unhandled_in_thread(
+            SimpleNamespace(exc_type=SystemExit, exc_value=SystemExit(), exc_traceback=None, thread=thread)
+        )
+    messages = [record.getMessage() for record in caplog.records]
+    assert messages == ["처리되지 않은 오류", "스레드 hub-engine 에서 처리되지 않은 오류"]
+    assert caplog.text.count("RuntimeError: 창을 그리다 생긴 오류") == 2
+    assert reported == [RuntimeError, KeyboardInterrupt]

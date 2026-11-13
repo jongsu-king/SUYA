@@ -10,7 +10,7 @@ from typing import Any, Awaitable, Callable
 
 from PySide6.QtCore import QObject, Signal
 
-from .. import pointquery
+from .. import pointquery, session
 from ..collectors.base import Context
 from ..config import Settings
 from ..db import Store
@@ -43,6 +43,8 @@ class Backend(QObject):
         self.finished.connect(self._dispatch)
 
     def start(self) -> None:
+        if self.collecting:
+            session.begin(self.store, "gui")
         self._thread.start()
         self._ready.wait(timeout=10)
 
@@ -50,6 +52,8 @@ class Backend(QObject):
         if self._loop and self._stop:
             self._loop.call_soon_threadsafe(self._stop.set)
             self._thread.join(timeout=10)
+        if self.collecting:
+            session.end(self.store, "gui")
         self.store.close()
 
     def _run(self) -> None:

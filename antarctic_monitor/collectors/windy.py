@@ -12,7 +12,7 @@ import asyncio
 from datetime import date
 
 from ..db import Measurement
-from ..http import FetchError, Fetcher, RateLimited, Unreachable
+from ..http import FetchError, Fetcher, RateLimited, Unreachable, failure_of
 from ..i18n import join, msg
 from ..locations import LOCATIONS
 from .base import CollectResult, Context, epoch_to_iso, finite
@@ -135,7 +135,7 @@ async def collect(ctx: Context) -> CollectResult:
                 )
             )
     if failures and not rows:
-        raise FetchError(failures[0])
+        raise failure_of((result for result in results if isinstance(result, Exception)), failures[0])
     saved = await asyncio.to_thread(ctx.store.upsert_measurements, rows)
     message = msg("지점 {n}곳", n=len(LOCATIONS) - len(failures))
     if ctx.settings.windy_is_testing:

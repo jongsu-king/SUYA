@@ -11,10 +11,11 @@ import logging.handlers
 import os
 import signal
 import sys
+import threading
 import traceback
 from pathlib import Path
 
-from . import __version__, composition, exporter, ranges
+from . import __version__, composition, exporter, ranges, session
 from .catalog import SOURCES
 from .collectors import JOBS
 from .collectors.base import Context
@@ -89,12 +90,14 @@ async def _daemon(sources: list[str] | None) -> None:
                 _print_state(store, event["source"])
 
     reporter = asyncio.create_task(report())
+    session.begin(store, "daemon")
     engine.start()
     print(f"{tr('실시간 수집 시작')}: {store.path} (Ctrl+C)", flush=True)
     await stop.wait()
     reporter.cancel()
     await engine.stop()
     await fetcher.aclose()
+    session.end(store, "daemon")
     store.close()
 
 
@@ -338,6 +341,23 @@ def _exit(code: int) -> None:
 _crash_log = None
 
 
+def _log_unhandled(kind, value, trace) -> None:
+    """Write an error nothing handled into the log, then report it the usual way."""
+    if not issubclass(kind, KeyboardInterrupt):
+        logging.getLogger(__name__).critical("처리되지 않은 오류", exc_info=(kind, value, trace))
+    sys.__excepthook__(kind, value, trace)
+
+
+def _log_unhandled_in_thread(args) -> None:
+    """The same for an error that ends a thread."""
+    if args.exc_type is SystemExit:
+        return
+    logging.getLogger(__name__).critical(
+        "스레드 %s 에서 처리되지 않은 오류", args.thread.name if args.thread else "?",
+        exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+    )
+
+
 def _configure_logging(command: str) -> None:
     global _crash_log
     if command in ("gui", "daemon"):
@@ -352,6 +372,8 @@ def _configure_logging(command: str) -> None:
         handler: logging.Handler = logging.handlers.RotatingFileHandler(
             app_data_dir() / "monitor.log", maxBytes=2_000_000, backupCount=2, encoding="utf-8"
         )
+        sys.excepthook = _log_unhandled
+        threading.excepthook = _log_unhandled_in_thread
     else:
         handler = logging.StreamHandler()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=[handler])
