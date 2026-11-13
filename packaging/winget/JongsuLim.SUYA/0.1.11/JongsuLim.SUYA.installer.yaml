@@ -1,5 +1,5 @@
 PackageIdentifier: JongsuLim.SUYA
-PackageVersion: 0.1.10
+PackageVersion: 0.1.11
 InstallerLocale: en-US
 InstallerType: inno
 Scope: user
@@ -9,10 +9,10 @@ InstallModes:
   - silentWithProgress
 UpgradeBehavior: install
 ProductCode: '{6E1B0C2A-5C8F-4F5A-9C2E-7A3D1F0B2C44}_is1'
-ReleaseDate: 2026-11-12
+ReleaseDate: 2026-11-13
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/jongsu-king/SUYA/releases/download/v0.1.10/SUYA-0.1.10-windows-x64-setup.exe
-    InstallerSha256: 43714A5747FCFFDD38AC4DA92CF8F54735FBB17E5EFC109EE1FDEED6D5C48C62
+    InstallerUrl: https://github.com/jongsu-king/SUYA/releases/download/v0.1.11/SUYA-0.1.11-windows-x64-setup.exe
+    InstallerSha256: 25CCF0C185C91DC5692A4B7EF7246F512FBE38C1EA56DDD750FDFA65391AFF02
 ManifestType: installer
 ManifestVersion: 1.10.0
