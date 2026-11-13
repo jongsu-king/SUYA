@@ -11,7 +11,8 @@ All notable changes to this project are documented here. The format follows
 This release keeps collection going through network outages and storage failures: a source that
 cannot reach its server is tried again within 5 minutes, a database that cannot be written no
 longer stops a source until the next start, and the log records when the program starts and
-stops. Concept DOI for all versions: 10.5281/zenodo.23937852.
+stops. Version DOI: https://doi.org/10.5281/zenodo.24189873 (concept DOI for all versions:
+10.5281/zenodo.23937852).
 
 ### Added
 

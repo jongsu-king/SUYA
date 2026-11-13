@@ -73,6 +73,7 @@ def test_citation_metadata_lists_both_authors():
     assert "value: 10.5281/zenodo.24131554\n" in cff
     assert "value: 10.5281/zenodo.24149153\n" in cff
     assert "value: 10.5281/zenodo.24157651\n" in cff
+    assert "value: 10.5281/zenodo.24189873\n" in cff
     for name in ("README.md", "README.ko.md", "AUTHORS.md", "CHANGELOG.md"):
         assert concept_doi in (ROOT / name).read_text(encoding="utf-8"), name
     for html in (help_text.HELP_KO, help_text.HELP_EN):
