@@ -203,6 +203,22 @@ def test_budget_blocks_at_limit(store):
         consume_budget(ctx, 1)
 
 
+def test_budget_day_follows_utc_like_the_open_meteo_limit(store, monkeypatch):
+    ctx = _ctx(store, openmeteo_daily_budget=10)
+    monkeypatch.setattr(openmeteo, "utcnow", lambda: datetime(2030, 1, 2, 23, 30, tzinfo=timezone.utc))
+    consume_budget(ctx, 8)
+    assert store.kv_get("openmeteo_budget:2030-01-02") == "8"
+    assert openmeteo.budget_usage(ctx)["used"] == 8
+    with pytest.raises(BudgetExceeded):
+        consume_budget(ctx, 3)
+    openmeteo.refund_budget(ctx, 2)
+    assert store.kv_get("openmeteo_budget:2030-01-02") == "6"
+    monkeypatch.setattr(openmeteo, "utcnow", lambda: datetime(2030, 1, 3, 0, 10, tzinfo=timezone.utc))
+    assert openmeteo.budget_usage(ctx)["used"] == 0
+    consume_budget(ctx, 3)
+    assert store.kv_get("openmeteo_budget:2030-01-03") == "3"
+
+
 def test_budget_reserve_protects_priority_jobs(store):
     ctx = _ctx(store, openmeteo_daily_budget=100)
     with pytest.raises(BudgetExceeded):

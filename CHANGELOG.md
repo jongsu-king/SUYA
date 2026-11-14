@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Open-Meteo call budget is counted per UTC day.** The program counted its daily budget by
+  the computer's local date, while Open-Meteo's own limit and the troubleshooting table in the
+  README reset at midnight UTC. In Korea the budget therefore started again at 15:00 UTC, nine
+  hours away from the limit it is meant to guard. The count now starts again at midnight UTC. The
+  size of the budget is unchanged.
+
 ## [0.1.11] - 2026-11-13
 
 This release keeps collection going through network outages and storage failures: a source that

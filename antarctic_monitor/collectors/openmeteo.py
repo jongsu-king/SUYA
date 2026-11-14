@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import contextmanager
-from datetime import date
 
 from ..db import Measurement, utcnow
 from ..gridutil import grid_from_triples
@@ -49,9 +48,14 @@ class BudgetExceeded(RateLimited):
     """오늘 쓸 수 있는 호출 예산을 다 썼습니다."""
 
 
+def budget_key() -> str:
+    """오늘 쓴 호출 수를 적는 키. Open-Meteo의 하루 한도가 UTC 자정에 풀리므로 날짜도 UTC로 셉니다."""
+    return f"openmeteo_budget:{utcnow().date().isoformat()}"
+
+
 def consume_budget(ctx: Context, calls: int, reserve: float = 0.0) -> None:
     """예산을 차감합니다. reserve만큼은 더 중요한 수집을 위해 남겨 둡니다."""
-    key = f"openmeteo_budget:{date.today().isoformat()}"
+    key = budget_key()
     used = int(ctx.store.kv_get(key) or 0)
     limit = ctx.settings.openmeteo_daily_budget
     if used + calls > limit * (1.0 - reserve):
@@ -68,7 +72,7 @@ def consume_budget(ctx: Context, calls: int, reserve: float = 0.0) -> None:
 
 def refund_budget(ctx: Context, calls: int) -> None:
     """서버에 닿지 못한 호출은 한도에 들어가지 않으므로 돌려줍니다."""
-    key = f"openmeteo_budget:{date.today().isoformat()}"
+    key = budget_key()
     used = int(ctx.store.kv_get(key) or 0)
     ctx.store.kv_set(key, str(max(0, used - calls)))
 
@@ -85,7 +89,7 @@ def spending(ctx: Context, calls: int):
 
 
 def budget_usage(ctx: Context) -> dict:
-    key = f"openmeteo_budget:{date.today().isoformat()}"
+    key = budget_key()
     return {"used": int(ctx.store.kv_get(key) or 0), "limit": ctx.settings.openmeteo_daily_budget}
 
 
