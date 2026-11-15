@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The GFS air temperature on the hour is no longer replaced by the forecast.** The forecast
+  collection also returns the hours of the past day, and for the GFS model those rows share their
+  key with the current values collected every 15 minutes. Every 3 hours the forecast therefore
+  overwrote the current 2 m air temperature of each full hour and marked it as a forecast, so the
+  GFS air temperature sheet and the period statistics had the other seven values at :00 but no air
+  temperature. A forecast row now leaves a stored current value, observation or analysis in
+  place, and the current value still replaces the forecast once its hour arrives. Hours already
+  overwritten stay as they are.
 - **The Open-Meteo call budget is counted per UTC day.** The program counted its daily budget by
   the computer's local date, while Open-Meteo's own limit and the troubleshooting table in the
   README reset at midnight UTC. In Korea the budget therefore started again at 15:00 UTC, nine

@@ -139,6 +139,22 @@ def test_upsert_replaces_same_key(store):
     assert rows[0]["value"] == 2.0
 
 
+def test_forecast_does_not_replace_the_current_value_of_the_same_hour(store):
+    loc = openmeteo.LOCATIONS[0]
+    current = openmeteo.parse_current([{"current": {"time": "2026-11-14T22:00", "temperature_2m": -42.4}}], (loc,))
+    hourly = {"time": ["2026-11-14T22:00", "2026-11-14T23:00"], "temperature_2m_gfs_global": [-42.2, -41.0]}
+    forecast = openmeteo.parse_hourly_models([{"hourly": hourly}], (loc,))
+    store.upsert_measurements(current)
+    store.upsert_measurements(forecast)
+    rows = {row["obs_time"]: row for row in store.query_measurements(source="openmeteo", variable="air_temperature")}
+    assert (rows["2026-11-14T22:00:00Z"]["kind"], rows["2026-11-14T22:00:00Z"]["value"]) == ("model", -42.4)
+    assert (rows["2026-11-14T23:00:00Z"]["kind"], rows["2026-11-14T23:00:00Z"]["value"]) == ("forecast", -41.0)
+    later = openmeteo.parse_current([{"current": {"time": "2026-11-14T23:00", "temperature_2m": -41.7}}], (loc,))
+    store.upsert_measurements(later)
+    row = store.query_measurements(source="openmeteo", variable="air_temperature", since="2026-11-14T23:00:00Z")[0]
+    assert (row["kind"], row["value"]) == ("model", -41.7)
+
+
 def test_latest_for_location_ignores_future_forecasts(store):
     store.upsert_measurements([_measurement(1.0, "2020-01-01T00:00:00Z"), _measurement(9.0, "2999-01-01T00:00:00Z")])
     latest = store.latest_for_location("x")

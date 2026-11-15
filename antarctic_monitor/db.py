@@ -271,7 +271,8 @@ UPSERT_MEASUREMENT = (
     f"INSERT INTO measurements ({','.join(MEASUREMENT_COLUMNS)}) VALUES ({','.join('?' * len(MEASUREMENT_COLUMNS))}) "
     "ON CONFLICT (source, dataset, variable, lat, lon, level, obs_time) DO UPDATE SET "
     "value=excluded.value, unit=excluded.unit, kind=excluded.kind, quality=excluded.quality, "
-    "location_id=COALESCE(excluded.location_id, location_id), fetched_at=excluded.fetched_at"
+    "location_id=COALESCE(excluded.location_id, location_id), fetched_at=excluded.fetched_at "
+    "WHERE excluded.kind != 'forecast' OR measurements.kind = 'forecast'"
 )
 ARGO_MOVED = (
     "(argo_profiles.data_mode IS NOT excluded.data_mode OR argo_profiles.obs_time IS NOT excluded.obs_time"
@@ -391,6 +392,7 @@ class Store:
         ]
 
     def upsert_measurements(self, rows: Iterable[Measurement]) -> int:
+        """같은 키의 행은 새 값으로 바꿉니다. 예보 행은 이미 저장된 실측·분석·모델 현재값을 덮어쓰지 않습니다."""
         params = self._measurement_params(rows, iso())
         if not params:
             return 0
