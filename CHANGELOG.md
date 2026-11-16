@@ -10,8 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 This release fixes three faults found in the collected data: a METAR sea level pressure decoded
 100 hPa off is no longer stored, the GFS air temperature on the hour is no longer replaced by the
-forecast, and the Open-Meteo call budget is counted per UTC day. Concept DOI for all versions:
-10.5281/zenodo.23937852.
+forecast, and the Open-Meteo call budget is counted per UTC day. Version DOI:
+https://doi.org/10.5281/zenodo.24269180 (concept DOI for all versions: 10.5281/zenodo.23937852).
 
 ### Fixed
 
