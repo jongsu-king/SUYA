@@ -1,9 +1,9 @@
 cask "suya" do
   arch arm: "arm64", intel: "x86_64"
 
-  version "0.1.11"
-  sha256 arm:   "d484f1e2aaef37af842d8447fd243928e1d7422ddf2e960f02e7e9f6d7b9aaef",
-         intel: "301b2467553c4b571b0493bbebec1a4e70401ed47be72c2edddbe2e1a2ed1438"
+  version "0.1.12"
+  sha256 arm:   "23f66b460fcf9974768d99da94368e53dd0596424439a137b7427327c647effe",
+         intel: "765e8c7ea5c80b141d701273c86559ba76a8080da36cb4e188aa8903c74dc467"
 
   url "https://github.com/jongsu-king/SUYA/releases/download/v#{version}/SUYA-#{version}-macos-#{arch}.dmg"
   name "SUYA"
