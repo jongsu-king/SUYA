@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A METAR sea level pressure decoded 100 hPa off is no longer stored.** The remark `SLP520` of a
+  report carries only the last three digits, and the server guesses the leading one. Williams
+  Field reported `SLP520` with QNH 956.1 hPa on 2026-11-15 and the answer gave 1052 hPa, which was
+  stored as it came while the hours around it and McMurdo next to it read 955 to 957 hPa. When the
+  sea level pressure of a report is more than 20 hPa away from its QNH, the QNH is stored instead.
+  Values already stored stay as they are.
 - **The GFS air temperature on the hour is no longer replaced by the forecast.** The forecast
   collection also returns the hours of the past day, and for the GFS model those rows share their
   key with the current values collected every 15 minutes. Every 3 hours the forecast therefore

@@ -32,7 +32,7 @@ SUYA가 호출하는 모든 원격 서비스, 정확한 요청 형태, 받아 �
 
 - URL: `https://aviationweather.gov/api/data/metar?ids=NZSP,NZCM,NZFX,NZWD,NZPG,NZIR,SAWB,SCRM&format=json&hours=6`
   와 `…?bbox=-90,-180,-60,180&format=json&hours=6` 두 가지를 합칩니다. bbox만으로는 일부 기지가 빠지는 것을 확인했기 때문입니다.
-- 받는 값: `temp`(°C), `dewp`(°C), `slp` 또는 `altim`(hPa), 관측 시각 `obsTime`(epoch), 위치, 기지 이름.
+- 받는 값: `temp`(°C), `dewp`(°C), `slp` 또는 `altim`(hPa), 관측 시각 `obsTime`(epoch), 위치, 기지 이름. `slp`가 `altim`과 20 hPa 넘게 다르면 잘못 풀린 값으로 보고 `altim`을 씁니다.
 - 저장: `source=metar`, `dataset=<ICAO>`, `location_id=metar:<ICAO>`, `quality=<기지 이름>`.
 - 기지: NZSP 아문센-스콧(남극점), NZCM 맥머도 윌리엄스 필드, NZFX 피닉스 필드, NZWD 윌리엄스 필드, SAWB 마람비오(아르헨티나), SCRM 프레이(칠레). NZPG·NZIR는 운영이 끝났지만 목록에 두어 혹시 보고가 오면 받습니다.
 - 한계: 기지마다 보고 간격이 다르고(30분~1시간), 남극점은 이슬점이 자주 비어 있습니다. 세종·장보고 기지는 METAR를 공개 네트워크에 보내지 않습니다.

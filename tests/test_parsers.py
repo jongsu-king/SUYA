@@ -506,6 +506,13 @@ def test_metar_keeps_saturated_air_and_real_extremes():
     assert [r.value for r in rows if r.variable == "dew_point"] == [-2.0]
 
 
+def test_metar_uses_qnh_when_the_decoded_sea_level_pressure_is_far_from_it():
+    garbled = _metar_report(-3, -11, altim=956.1) | {"icaoId": "NZWD", "slp": 1052}
+    sound = _metar_report(-6, -16, altim=956.1) | {"icaoId": "NZWD", "obsTime": 1793930400, "slp": 955.5}
+    rows = metar.parse_reports([garbled, sound])
+    assert [r.value for r in rows if r.variable == "sea_level_pressure"] == [956.1, 955.5]
+
+
 def test_woa_csv_and_deep_fill():
     text = (
         'time,alt[unit="meters"],station,latitude[unit="degrees_north"],longitude[unit="degrees_east"],s_an[unit="1"]\n'

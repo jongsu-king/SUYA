@@ -34,7 +34,7 @@ Sources in parentheses are not scheduled; they are called only when a point is i
 
 - URLs: `https://aviationweather.gov/api/data/metar?ids=NZSP,NZCM,NZFX,NZWD,NZPG,NZIR,SAWB,SCRM&format=json&hours=6`
   merged with `…?bbox=-90,-180,-60,180&format=json&hours=6`, because the bounding box alone was seen to miss stations.
-- Fields: `temp` (°C), `dewp` (°C), `slp` or `altim` (hPa), `obsTime` (epoch), position, station name.
+- Fields: `temp` (°C), `dewp` (°C), `slp` or `altim` (hPa), `obsTime` (epoch), position, station name. When `slp` is more than 20 hPa away from `altim` it is taken as wrongly decoded and `altim` is used.
 - Stored as `source=metar`, `dataset=<ICAO>`, `location_id=metar:<ICAO>`, `quality=<station name>`.
 - Stations: NZSP Amundsen-Scott (South Pole), NZCM McMurdo/Williams Field, NZFX Phoenix Field, NZWD Williams Field, SAWB Marambio (Argentina), SCRM Frei (Chile). NZPG and NZIR are closed but kept in case reports resume.
 - Limits: reporting intervals differ per station (30–60 min); the South Pole often omits the dew point; King Sejong and Jang Bogo do not publish METAR on the public network.
