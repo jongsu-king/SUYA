@@ -318,7 +318,7 @@ ignored), `matplotlib/` (font cache, installer builds only) and, while an update
 | `seawater_ions_mmol`, `argo_level_ions` (views) | The same rows in mmol/kg; and the derived ions and the range check of every Argo level, computed when read so the levels are not stored twice | |
 | `grid_ions` (view) | For every salinity grid (the PSU layers of `grids`): reference salinity, the eight major ions in g/kg and mmol/kg and the range check, derived from the mean south of 60°S and from each sector mean. Computed when read; no cell values are stored | |
 | `runs`, `source_state` | Every collection run; per-source last status, data time, next run, consecutive errors | |
-| `kv` | Source update tokens, daily call budgets, Excel stamp | |
+| `kv` | Source update tokens, daily call budgets, Excel stamp, time of the last clean-up | |
 
 WAL mode, so the GUI reads while collectors write. Forecasts older than 30 days and grid snapshots beyond 60 per layer are pruned daily;
 observations, satellite and analysis values are kept forever. Open it with Python, R or [DB Browser for SQLite](https://sqlitebrowser.org/)

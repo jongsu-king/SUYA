@@ -5,6 +5,7 @@
 - 호출 한도에 걸리면 최소 1시간 쉽니다.
 - 서버에 닿지 못한 실패는 5분 안에 다시 시도하고, 한 소스가 다시 받아 오면 같은 이유로 쉬던 소스를 바로 깨웁니다.
 - 저장소가 기록을 받지 못해도 수집 루프는 멈추지 않습니다.
+- 오래된 기록 정리는 마지막 정리 시각을 저장해 두고 하루에 한 번 하므로, 프로그램을 매일 껐다 켜도 밀리지 않습니다.
 """
 
 from __future__ import annotations
@@ -31,6 +32,8 @@ UNREACHABLE_RETRY = 300.0
 LOOP_RETRY_DELAY = 60.0
 STARTUP_STAGGER = 2.0
 PRUNE_EVERY = 86400.0
+PRUNE_STARTUP = 60.0
+PRUNE_KEY = "prune:last"
 
 
 def job_timeout(name: str) -> float:
@@ -82,6 +85,18 @@ def parse_iso(text: str | None) -> datetime | None:
     if not text:
         return None
     return datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+
+def prune_delay(last: str | None, now: datetime) -> float:
+    """마지막 정리에서 하루가 되는 때까지 남은 시간. 기록이 없거나 읽을 수 없거나 하루가 지났으면 시작하고 곧 정리합니다."""
+    try:
+        previous = parse_iso(last)
+    except (TypeError, ValueError):
+        previous = None
+    elapsed = (now - previous).total_seconds() if previous else -1.0
+    if elapsed < 0:
+        return PRUNE_STARTUP
+    return max(PRUNE_STARTUP, PRUNE_EVERY - elapsed)
 
 
 class Engine:
@@ -272,11 +287,21 @@ class Engine:
         )
         return delay
 
+    def _prune(self) -> None:
+        self.ctx.store.prune()
+        self.ctx.store.kv_set(PRUNE_KEY, iso())
+
     async def _prune_loop(self) -> None:
+        """하루에 한 번 오래된 기록을 정리합니다. 마지막 정리 시각을 저장해 두어, 하루를 채우지 못하고 꺼지는 날이 이어져도 정리가 밀리지 않습니다."""
+        try:
+            delay = prune_delay(self.ctx.store.kv_get(PRUNE_KEY), utcnow())
+        except Exception:
+            delay = PRUNE_STARTUP
         while True:
-            await asyncio.sleep(PRUNE_EVERY)
+            await asyncio.sleep(delay)
+            delay = PRUNE_EVERY
             try:
-                await asyncio.to_thread(self.ctx.store.prune)
+                await asyncio.to_thread(self._prune)
             except Exception as exc:
                 self._store_failed("오래된 기록 정리", exc)
             else:

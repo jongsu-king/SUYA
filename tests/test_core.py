@@ -20,7 +20,10 @@ from antarctic_monitor.collectors.base import CollectResult, Context
 from antarctic_monitor.collectors.openmeteo import BudgetExceeded, consume_budget
 from antarctic_monitor.config import Settings, load_dotenv
 from antarctic_monitor.db import WAL_LIMIT, Measurement, Store, iso, utcnow
-from antarctic_monitor.engine import STARTUP_STAGGER, UNREACHABLE_RETRY, Engine, EventBus, failure_message, job_timeout
+from antarctic_monitor.engine import (
+    PRUNE_EVERY, PRUNE_KEY, PRUNE_STARTUP, STARTUP_STAGGER, UNREACHABLE_RETRY, Engine, EventBus, failure_message,
+    job_timeout, prune_delay,
+)
 from antarctic_monitor.geo import haversine_km, normalize_lon, parse_location_url
 from antarctic_monitor.gridutil import find_nearest_valid, grid_from_triples, grid_stats, sample_nearest
 from antarctic_monitor.http import CONNECT_TIMEOUT, DEFAULT_HOST_LIMIT, FetchError, Fetcher, RateLimited, Unreachable, failure_of
@@ -1110,6 +1113,52 @@ async def test_engine_wakes_waiting_sources_when_one_reaches_its_server_again(st
         await engine.stop()
     assert runs == {"first": 2, "second": 2}
     assert "first 수집이 다시 됩니다. 서버에 닿지 못해 쉬던 소스 1개를 깨웁니다: second" in caplog.text
+    await engine.ctx.fetcher.aclose()
+
+
+def test_prune_is_due_a_day_after_the_last_one_whatever_the_uptime():
+    now = datetime(2026, 11, 17, tzinfo=timezone.utc)
+    assert prune_delay(None, now) == PRUNE_STARTUP
+    assert prune_delay("읽을 수 없는 값", now) == PRUNE_STARTUP
+    assert prune_delay(iso(now - timedelta(hours=30)), now) == PRUNE_STARTUP
+    assert prune_delay(iso(now + timedelta(hours=5)), now) == PRUNE_STARTUP
+    assert prune_delay(iso(now - timedelta(hours=20)), now) == 4 * 3600
+    assert prune_delay(iso(now), now) == PRUNE_EVERY
+
+
+async def test_engine_prunes_soon_after_a_restart_when_the_last_prune_is_a_day_old(store, monkeypatch):
+    async def job(ctx):
+        return CollectResult(rows=1)
+
+    monkeypatch.setattr("antarctic_monitor.engine.PRUNE_STARTUP", 0.0)
+    pruned = []
+    prune = store.prune
+    monkeypatch.setattr(store, "prune", lambda: (pruned.append(1), prune())[1])
+    stale = iso(utcnow() - timedelta(hours=25))
+    store.kv_set(PRUNE_KEY, stale)
+    engine, _ = _engine(store, monkeypatch, job, interval=3600)
+    engine.start()
+    assert await _until(lambda: store.kv_get(PRUNE_KEY) != stale)
+    await engine.stop()
+    assert pruned == [1]
+    assert prune_delay(store.kv_get(PRUNE_KEY), utcnow()) > PRUNE_EVERY - 60
+    await engine.ctx.fetcher.aclose()
+
+
+async def test_engine_does_not_prune_again_within_a_day_of_the_last_prune(store, monkeypatch):
+    async def job(ctx):
+        return CollectResult(rows=1)
+
+    monkeypatch.setattr("antarctic_monitor.engine.PRUNE_STARTUP", 0.0)
+    pruned = []
+    monkeypatch.setattr(store, "prune", lambda: pruned.append(1))
+    store.kv_set(PRUNE_KEY, iso(utcnow() - timedelta(hours=1)))
+    engine, _ = _engine(store, monkeypatch, job, interval=3600)
+    engine.start()
+    assert await _until(lambda: (store.source_states().get("fake") or {}).get("last_status") == "ok")
+    await asyncio.sleep(0.05)
+    await engine.stop()
+    assert pruned == []
     await engine.ctx.fetcher.aclose()
 
 

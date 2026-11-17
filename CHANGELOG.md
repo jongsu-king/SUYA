@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Old records are pruned once a day even when the program does not stay open for a day.** The
+  daily clean-up started counting its 24 hours again at every start, so a program that was closed
+  each evening, or restarted by an update, never reached it. One installation held 74 snapshots
+  of each HYCOM layer and 6,038 collection runs where 60 and 5,000 are kept. The time of the last
+  clean-up is now stored in the database, and a start more than a day after it prunes within a
+  minute.
+
 ## [0.1.12] - 2026-11-16
 
 This release fixes three faults found in the collected data: a METAR sea level pressure decoded
