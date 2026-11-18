@@ -307,7 +307,7 @@ python -m antarctic_monitor
 | `runs`, `source_state` | 모든 수집 기록, 소스별 마지막 상태·자료 시각·다음 실행·연속 오류 수 | |
 | `kv` | 원천 갱신 토큰, 일일 호출 예산, 엑셀 생성 기준, 마지막 정리 시각 | |
 
-WAL 모드라 수집이 쓰는 동안에도 화면이 읽습니다. 30일 지난 예보와 레이어당 60개를 넘는 격자 스냅샷은 매일 정리하고, 관측·위성·분석값은 계속 보관합니다.
+WAL 모드라 수집이 쓰는 동안에도 화면이 읽습니다. 30일 지난 예보와 레이어당 60개를 넘는 격자 스냅샷, 30일 지난 날의 호출 예산 기록은 매일 정리하고, 관측·위성·분석값은 계속 보관합니다.
 SUYA가 돌아가는 중에도 파이썬, R, [DB Browser for SQLite](https://sqlitebrowser.org/)로 열 수 있습니다.
 
 ### 엑셀 (`antarctic_db_YYYY-MM.xlsx`, `argo_levels_YYYY-MM.xlsx`)

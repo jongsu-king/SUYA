@@ -19,6 +19,8 @@ from .gridutil import SECTORS, Grid, grid_stats
 log = logging.getLogger(__name__)
 
 WAL_LIMIT = 16 * 1024 * 1024
+BUDGET_PREFIXES = ("openmeteo_budget:", "windy_budget:")
+BUDGET_KEEP_DAYS = 30
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS measurements (
@@ -650,9 +652,12 @@ class Store:
         return [dict(row) for row in rows]
 
     def prune(self, forecast_days: int = 30, grid_keep: int = 60) -> None:
-        """오래된 예보와 격자 스냅샷을 지웁니다. 관측·위성·분석값은 계속 보관합니다."""
+        """오래된 예보와 격자 스냅샷, 30일 지난 날의 호출 예산 기록을 지웁니다. 관측·위성·분석값은 계속 보관합니다."""
         cutoff = iso(utcnow() - timedelta(days=forecast_days))
+        budget_day = (utcnow() - timedelta(days=BUDGET_KEEP_DAYS)).date().isoformat()
         with self._write() as conn:
+            for prefix in BUDGET_PREFIXES:
+                conn.execute("DELETE FROM kv WHERE key >= ? AND key < ?", (prefix, prefix + budget_day))
             conn.execute("DELETE FROM measurements WHERE kind = 'forecast' AND obs_time < ?", (cutoff,))
             conn.execute(
                 """DELETE FROM grids WHERE rowid IN (

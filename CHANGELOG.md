@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The daily clean-up removes call budget counters older than 30 days.** Every day left one
+  `openmeteo_budget:<date>` row (and one `windy_budget:<date>` row with a Windy key) in the `kv`
+  table for good. The counters of the last 30 days stay for looking back at the usage.
+
 ### Fixed
 
 - **Old records are pruned once a day even when the program does not stay open for a day.** The

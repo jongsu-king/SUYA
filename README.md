@@ -320,7 +320,7 @@ ignored), `matplotlib/` (font cache, installer builds only) and, while an update
 | `runs`, `source_state` | Every collection run; per-source last status, data time, next run, consecutive errors | |
 | `kv` | Source update tokens, daily call budgets, Excel stamp, time of the last clean-up | |
 
-WAL mode, so the GUI reads while collectors write. Forecasts older than 30 days and grid snapshots beyond 60 per layer are pruned daily;
+WAL mode, so the GUI reads while collectors write. Forecasts older than 30 days and grid snapshots beyond 60 per layer are pruned daily, along with call budget counters older than 30 days;
 observations, satellite and analysis values are kept forever. Open it with Python, R or [DB Browser for SQLite](https://sqlitebrowser.org/)
 while SUYA is running.
 

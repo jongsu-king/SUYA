@@ -211,6 +211,23 @@ def test_prune_removes_only_old_forecasts(store):
     assert [r["source"] for r in store.query_measurements()] == ["o"]
 
 
+def test_prune_removes_call_budget_counters_older_than_a_month(store):
+    today = utcnow().date()
+    recent, old = (today - timedelta(days=29)).isoformat(), (today - timedelta(days=31)).isoformat()
+    for name in ("openmeteo_budget", "windy_budget"):
+        for day in (today.isoformat(), recent, old):
+            store.kv_set(f"{name}:{day}", "7")
+    store.kv_set("token:oisst", "2000-01-01T12:00:00Z")
+    store.kv_set("openmeteo_budget_note", "1")
+    store.prune()
+    for name in ("openmeteo_budget", "windy_budget"):
+        assert store.kv_get(f"{name}:{today.isoformat()}") == "7"
+        assert store.kv_get(f"{name}:{recent}") == "7"
+        assert store.kv_get(f"{name}:{old}") is None
+    assert store.kv_get("token:oisst") == "2000-01-01T12:00:00Z"
+    assert store.kv_get("openmeteo_budget_note") == "1"
+
+
 def _ctx(store, **settings):
     return Context(store, Fetcher(), Settings(**settings))
 
