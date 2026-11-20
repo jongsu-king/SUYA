@@ -1133,6 +1133,39 @@ async def test_engine_wakes_waiting_sources_when_one_reaches_its_server_again(st
     await engine.ctx.fetcher.aclose()
 
 
+async def test_engine_logs_when_a_source_collects_again_after_failed_answers(store, monkeypatch, caplog):
+    outcomes = iter(
+        [
+            FetchError("example.org: HTTP 503"),
+            FetchError("example.org: HTTP 503"),
+            CollectResult(unchanged=True),
+            CollectResult(rows=1),
+            RateLimited("HTTP 429"),
+            CollectResult(rows=1),
+        ]
+    )
+
+    async def job(ctx):
+        outcome = next(outcomes)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    engine, _ = _engine(store, monkeypatch, job)
+    with caplog.at_level("INFO", logger="antarctic_monitor.engine"):
+        for _ in range(3):
+            await engine.run_once("fake")
+        assert [record.getMessage() for record in caplog.records] == [
+            "수집 실패 fake: FetchError: example.org: HTTP 503",
+            "수집 실패 fake: FetchError: example.org: HTTP 503",
+            "fake 수집이 다시 됩니다",
+        ]
+        for _ in range(3):
+            await engine.run_once("fake")
+    assert caplog.text.count("fake 수집이 다시 됩니다") == 1
+    await engine.ctx.fetcher.aclose()
+
+
 def test_prune_is_due_a_day_after_the_last_one_whatever_the_uptime():
     now = datetime(2026, 11, 17, tzinfo=timezone.utc)
     assert prune_delay(None, now) == PRUNE_STARTUP

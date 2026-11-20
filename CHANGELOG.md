@@ -11,6 +11,11 @@ All notable changes to this project are documented here. The format follows
 - **The daily clean-up removes call budget counters older than 30 days.** Every day left one
   `openmeteo_budget:<date>` row (and one `windy_budget:<date>` row with a Windy key) in the `kv`
   table for good. The counters of the last 30 days stay for looking back at the usage.
+- **The log says when a source collects again after any failure.** `monitor.log` recorded the
+  recovery only for a source that had not reached its server. After failures the server answered,
+  such as the HTTP 503 and the "unknown datasetID" 404 an ERDDAP server gives while it reloads, the
+  warnings stopped without a line saying that collection was working again. The first successful
+  run after such failures now writes the same line.
 
 ### Fixed
 

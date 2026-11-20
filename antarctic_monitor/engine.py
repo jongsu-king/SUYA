@@ -4,6 +4,7 @@
 - 실패하면 지수적으로 빨리 재시도하되 정해진 주기를 넘기지 않습니다.
 - 호출 한도에 걸리면 최소 1시간 쉽니다.
 - 서버에 닿지 못한 실패는 5분 안에 다시 시도하고, 한 소스가 다시 받아 오면 같은 이유로 쉬던 소스를 바로 깨웁니다.
+- 실패하던 소스가 다시 받아 오면 로그에 남깁니다.
 - 저장소가 기록을 받지 못해도 수집 루프는 멈추지 않습니다.
 - 오래된 기록 정리는 마지막 정리 시각을 저장해 두고 하루에 한 번 하므로, 프로그램을 매일 껐다 켜도 밀리지 않습니다.
 """
@@ -110,6 +111,7 @@ class Engine:
         self._locks: dict[str, asyncio.Lock] = {name: asyncio.Lock() for name in self.sources}
         self._failures: dict[str, int] = {}
         self._offline: set[str] = set()
+        self._failing: set[str] = set()
         self._store_down = False
         self.started = False
 
@@ -189,11 +191,21 @@ class Engine:
         return max(int(stored), self._failures.get(name, 0))
 
     def _track_network(self, name: str, status: str, unreachable: bool) -> None:
-        """서버에 닿지 못한 소스를 기억해 두었다가, 그중 하나가 다시 받아 오면 나머지를 바로 깨웁니다."""
+        """서버에 닿지 못한 소스를 기억해 두었다가, 그중 하나가 다시 받아 오면 나머지를 바로 깨웁니다.
+
+        서버가 오류로 답해 실패하던 소스가 다시 받아 올 때도 로그에 남깁니다.
+        """
+        failing = name in self._failing
+        if status == "error":
+            self._failing.add(name)
+        elif status in ("ok", "unchanged", "disabled"):
+            self._failing.discard(name)
         if unreachable:
             self._offline.add(name)
             return
         if name not in self._offline:
+            if failing and status in ("ok", "unchanged"):
+                log.info("%s 수집이 다시 됩니다", name)
             return
         self._offline.discard(name)
         if status not in ("ok", "unchanged"):
