@@ -19,6 +19,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A call budget or rate limit no longer lengthens the retry after a later error.** A run skipped
+  for the Open-Meteo or Windy daily budget, or for an HTTP 429, counted as a failure in a row, so the
+  first real error after it waited 2^n minutes instead of one. One installation showed two failures
+  in a row for `gfs_grid` although it had only skipped two runs for the budget. Such a run now keeps
+  the count as it was.
 - **Old records are pruned once a day even when the program does not stay open for a day.** The
   daily clean-up started counting its 24 hours again at every start, so a program that was closed
   each evening, or restarted by an update, never reached it. One installation held 74 snapshots

@@ -906,11 +906,13 @@ class Store:
                      last_rows = excluded.last_rows,
                      data_time = COALESCE(excluded.data_time, source_state.data_time),
                      next_run = excluded.next_run,
-                     consecutive_errors = CASE WHEN excluded.consecutive_errors = 0 THEN 0
+                     consecutive_errors = CASE WHEN excluded.last_status = 'rate_limited'
+                                                    THEN source_state.consecutive_errors
+                                               WHEN excluded.consecutive_errors = 0 THEN 0
                                                ELSE source_state.consecutive_errors + 1 END""",
                 (
                     source, now, now if success else None, status, message, rows, data_time, next_run,
-                    0 if status in ("ok", "unchanged", "disabled") else 1,
+                    0 if status in ("ok", "unchanged", "disabled", "rate_limited") else 1,
                 ),
             )
 

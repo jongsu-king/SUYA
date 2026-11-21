@@ -183,7 +183,7 @@ class Engine:
             log.info("저장이 다시 됩니다")
 
     def _error_count(self, name: str) -> int:
-        """이어진 실패 횟수. 저장된 값과 이번 실행에서 센 값 중 큰 쪽이라, 저장소가 기록을 받지 못하는 동안에도 재시도 간격이 늘어납니다."""
+        """이어진 실패 횟수. 호출 한도로 건너뛴 실행은 세지 않습니다. 저장된 값과 이번 실행에서 센 값 중 큰 쪽이라, 저장소가 기록을 받지 못하는 동안에도 재시도 간격이 늘어납니다."""
         try:
             stored = (self.ctx.store.source_states().get(name) or {}).get("consecutive_errors") or 0
         except Exception:
@@ -272,7 +272,10 @@ class Engine:
                     delay = min(delay, UNREACHABLE_RETRY)
             finally:
                 self.running.discard(name)
-        self._failures[name] = 0 if status in ("ok", "unchanged", "disabled") else self._failures.get(name, 0) + 1
+        if status in ("ok", "unchanged", "disabled"):
+            self._failures[name] = 0
+        elif status != "rate_limited":
+            self._failures[name] = self._failures.get(name, 0) + 1
         self._track_network(name, status, unreachable)
         next_run = iso(utcnow() + timedelta(seconds=delay))
         try:

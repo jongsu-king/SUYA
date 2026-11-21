@@ -854,6 +854,21 @@ async def test_engine_rate_limit_waits_at_least_an_hour(store, monkeypatch):
     await engine.ctx.fetcher.aclose()
 
 
+async def test_engine_rate_limit_does_not_lengthen_the_error_backoff(store, monkeypatch):
+    outcomes = iter([BudgetExceeded("예산"), BudgetExceeded("예산"), RuntimeError("서버 고장")])
+
+    async def job(ctx):
+        raise next(outcomes)
+
+    engine, _ = _engine(store, monkeypatch, job, interval=10800)
+    await engine.run_once("fake")
+    await engine.run_once("fake")
+    assert store.source_states()["fake"]["consecutive_errors"] == 0
+    assert await engine.run_once("fake") == 60.0
+    assert store.source_states()["fake"]["consecutive_errors"] == 1
+    await engine.ctx.fetcher.aclose()
+
+
 async def test_engine_backlog_runs_again_soon(store, monkeypatch):
     async def job(ctx):
         return CollectResult(rows=1, backlog=True)
